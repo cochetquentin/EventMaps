@@ -16,6 +16,7 @@ EventMaps/
 ├── models/            # Modèles Pydantic (TokyoCheapoEvent, HanabiEvent)
 ├── db/                # Persistance SQLite (EventStore)
 ├── api/               # API FastAPI
+├── frontend/          # UI carte interactive (Leaflet.js)
 ├── tests/             # Tests unitaires et API
 ├── data/              # Base de données et exports CSV (gitignored)
 └── main.py            # CLI de scraping
@@ -50,6 +51,19 @@ uv run python main.py tc --output csv > output.csv
 | `ar0700` | Shikoku |
 | `ar0800` | Kyūshū / Okinawa |
 
+## UI carte interactive
+
+```bash
+uv run uvicorn api.app:app --reload
+# → ouvrir http://localhost:8000
+```
+
+Affiche tous les événements géolocalisés sur une carte OpenStreetMap :
+- **Bleu** → Tokyo Cheapo · **Orange** → Hanabi
+- Clustering automatique des marqueurs proches
+- Popup au clic : titre, date, lieu, prix / feux d'artifice, lien
+- Filtres par source et par date (sidebar gauche)
+
 ## API
 
 ```bash
@@ -59,6 +73,7 @@ uv run uvicorn api.app:app --reload
 ### Endpoints
 
 ```
+GET /                                → UI carte (Leaflet.js)
 GET /events                          → liste tous les événements
 GET /events?source=tc                → filtre par source (tc | hanabi)
 GET /events?date=2026/07/25          → filtre par date

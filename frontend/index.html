@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EventMaps</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- MarkerCluster -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      display: flex;
+      height: 100vh;
+      font-family: system-ui, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+    }
+
+    #sidebar {
+      width: 280px;
+      min-width: 280px;
+      background: #16213e;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow-y: auto;
+      border-right: 1px solid #0f3460;
+      z-index: 1000;
+    }
+
+    #sidebar h1 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #e94560;
+      letter-spacing: 1px;
+    }
+
+    #sidebar h1 span {
+      color: #e0e0e0;
+    }
+
+    .section-title {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #888;
+      margin-bottom: 8px;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    label.checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    label.checkbox-label input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      accent-color: #e94560;
+      flex-shrink: 0;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot-tc { background: #4a9eff; }
+    .dot-hanabi { background: #ff6b35; }
+
+    .date-range {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .date-range-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      color: #888;
+    }
+
+    .date-range-row span {
+      width: 22px;
+      flex-shrink: 0;
+    }
+
+    input[type="date"] {
+      flex: 1;
+      padding: 7px 8px;
+      background: #0f3460;
+      border: 1px solid #1a4a7a;
+      border-radius: 6px;
+      color: #e0e0e0;
+      font-size: 0.8rem;
+      outline: none;
+      min-width: 0;
+    }
+    input[type="date"]:focus {
+      border-color: #e94560;
+    }
+
+    #categories-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .cat-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      text-transform: capitalize;
+    }
+
+    .cat-label input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      accent-color: #4a9eff;
+      flex-shrink: 0;
+    }
+
+    .cat-count {
+      margin-left: auto;
+      font-size: 0.7rem;
+      color: #555;
+    }
+
+    button#reset-filters {
+      padding: 8px;
+      background: transparent;
+      border: 1px solid #444;
+      border-radius: 6px;
+      color: #888;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.2s;
+    }
+    button#reset-filters:hover {
+      border-color: #e94560;
+      color: #e94560;
+    }
+
+    #stats {
+      font-size: 0.8rem;
+      color: #888;
+      line-height: 1.6;
+      margin-top: auto;
+      padding-top: 10px;
+      border-top: 1px solid #0f3460;
+    }
+    #stats strong {
+      color: #e0e0e0;
+    }
+
+    #map {
+      flex: 1;
+    }
+
+    /* Custom popup style */
+    .leaflet-popup-content-wrapper {
+      background: #16213e;
+      color: #e0e0e0;
+      border: 1px solid #0f3460;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .leaflet-popup-tip {
+      background: #16213e;
+    }
+    .popup-title {
+      font-weight: 700;
+      font-size: 0.95rem;
+      margin-bottom: 8px;
+      color: #fff;
+      line-height: 1.3;
+    }
+    .popup-row {
+      font-size: 0.8rem;
+      color: #aaa;
+      margin-bottom: 3px;
+    }
+    .popup-row span {
+      color: #e0e0e0;
+    }
+    .popup-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .badge-tc { background: #1a3a6e; color: #4a9eff; }
+    .badge-hanabi { background: #3d1f10; color: #ff6b35; }
+    .popup-link {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 4px 12px;
+      background: #0f3460;
+      border-radius: 4px;
+      color: #4a9eff;
+      text-decoration: none;
+      font-size: 0.75rem;
+    }
+    .popup-link:hover { background: #1a4a7a; }
+  </style>
+</head>
+<body>
+
+<div id="sidebar">
+  <h1>Event<span>Maps</span></h1>
+
+  <!-- Date range -->
+  <div>
+    <div class="section-title">Période</div>
+    <div class="date-range">
+      <div class="date-range-row">
+        <span>Du</span>
+        <input type="date" id="filter-date-from" />
+      </div>
+      <div class="date-range-row">
+        <span>Au</span>
+        <input type="date" id="filter-date-to" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Types (Hanabi + TC categories merged) -->
+  <div id="categories-section">
+    <div class="section-title">Types</div>
+    <div id="categories-group" class="filter-group">
+      <span style="font-size:0.75rem;color:#555">Chargement...</span>
+    </div>
+  </div>
+
+  <button id="reset-filters">Réinitialiser les filtres</button>
+
+  <div id="stats">Chargement...</div>
+</div>
+
+<div id="map"></div>
+
+<script>
+  const map = L.map('map').setView([35.68, 139.69], 10);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/">CARTO</a>',
+    maxZoom: 19,
+  }).addTo(map);
+
+  function makeIcon(color) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="24" height="36">
+      <path d="M12 0C5.373 0 0 5.373 0 12c0 9 12 24 12 24s12-15 12-24C24 5.373 18.627 0 12 0z"
+        fill="${color}" stroke="rgba(0,0,0,0.3)" stroke-width="1"/>
+      <circle cx="12" cy="12" r="5" fill="rgba(255,255,255,0.8)"/>
+    </svg>`;
+    return L.divIcon({
+      html: svg,
+      className: '',
+      iconSize: [24, 36],
+      iconAnchor: [12, 36],
+      popupAnchor: [0, -36],
+    });
+  }
+
+  const iconTC = makeIcon('#4a9eff');
+  const iconHanabi = makeIcon('#ff6b35');
+
+  let allEvents = [];
+  const clusterGroup = L.markerClusterGroup({ chunkedLoading: true });
+  map.addLayer(clusterGroup);
+
+  function formatDate(d) {
+    if (!d) return '—';
+    return d.replace(/\//g, '-');
+  }
+
+  function toSlash(d) {
+    return d ? d.replace(/-/g, '/') : null;
+  }
+
+  function buildPopup(ev) {
+    if (ev.source === 'tc') {
+      const loc = ev.location_name || '—';
+      const date = ev.end_date && ev.end_date !== ev.start_date
+        ? `${formatDate(ev.start_date)} → ${formatDate(ev.end_date)}`
+        : formatDate(ev.start_date);
+      const time = ev.start_time ? `${ev.start_time}${ev.end_time ? ' - ' + ev.end_time : ''}` : '';
+      const price = ev.price || '—';
+      const cats = (ev.categories || []).join(', ') || '—';
+      return `
+        <div class="popup-title">${ev.title}</div>
+        <div class="popup-badge badge-tc">Tokyo Cheapo</div>
+        <div class="popup-row">📅 <span>${date}</span>${time ? ` &nbsp;🕐 <span>${time}</span>` : ''}</div>
+        <div class="popup-row">📍 <span>${loc}</span></div>
+        <div class="popup-row">💰 <span>${price}</span></div>
+        <div class="popup-row">🏷 <span>${cats}</span></div>
+        <a class="popup-link" href="${ev.url}" target="_blank">Voir l'événement →</a>
+        <a class="popup-link" href="https://www.google.com/maps/dir/?api=1&destination=${ev.lat},${ev.lng}" target="_blank">🗺 Y aller</a>
+      `;
+    } else {
+      const date = formatDate(ev.start_date);
+      const time = ev.start_time ? `${ev.start_time}${ev.end_time ? ' - ' + ev.end_time : ''}` : '';
+      const venue = ev.venue || '—';
+      const count = ev.fireworks_count || '—';
+      const crowd = ev.expected_crowd || '—';
+      return `
+        <div class="popup-title">${ev.title}</div>
+        <div class="popup-badge badge-hanabi">🎆 Hanabi</div>
+        <div class="popup-row">📅 <span>${date}</span>${time ? ` &nbsp;🕐 <span>${time}</span>` : ''}</div>
+        <div class="popup-row">📍 <span>${venue}</span></div>
+        <div class="popup-row">🎇 <span>${count}</span></div>
+        <div class="popup-row">👥 <span>${crowd}</span></div>
+        <a class="popup-link" href="${ev.url}" target="_blank">Voir l'événement →</a>
+        <a class="popup-link" href="https://www.google.com/maps/dir/?api=1&destination=${ev.lat},${ev.lng}" target="_blank">🗺 Y aller</a>
+      `;
+    }
+  }
+
+  function getCheckedTypes() {
+    const checked = new Set();
+    document.querySelectorAll('#categories-group input[type="checkbox"]:checked')
+      .forEach(cb => checked.add(cb.value));
+    return checked;
+  }
+
+  function renderMarkers() {
+    const checkedTypes = getCheckedTypes();
+    const fromSlash = toSlash(document.getElementById('filter-date-from').value);
+    const toSlash_ = toSlash(document.getElementById('filter-date-to').value);
+
+    clusterGroup.clearLayers();
+
+    let visibleCount = 0, tcCount = 0, hanabiCount = 0;
+
+    allEvents.forEach(ev => {
+      if (!ev.lat || !ev.lng) return;
+
+      // Date range filter
+      const evStart = ev.start_date || ev.date;
+      const evEnd = ev.end_date || evStart;
+      if (fromSlash && evEnd < fromSlash) return;
+      if (toSlash_ && evStart > toSlash_) return;
+
+      // Type filter: hanabi uses 'hanabi' key, TC events use their categories
+      if (ev.source === 'hanabi') {
+        if (!checkedTypes.has('hanabi')) return;
+      } else {
+        const evCats = (ev.categories || []).filter(c => !TC_EXCLUDED_CATS.includes(c));
+        if (TC_EXCLUDED_CATS.every(c => (ev.categories || []).includes(c)) && evCats.length === 0) return;
+        if (!evCats.some(c => checkedTypes.has(c)) && evCats.length > 0) return;
+        if (evCats.length === 0 && checkedTypes.size === 0) return;
+      }
+
+      const icon = ev.source === 'tc' ? iconTC : iconHanabi;
+      const marker = L.marker([ev.lat, ev.lng], { icon });
+      marker.bindPopup(buildPopup(ev), { maxWidth: 280 });
+      clusterGroup.addLayer(marker);
+
+      visibleCount++;
+      if (ev.source === 'tc') tcCount++;
+      else hanabiCount++;
+    });
+
+    document.getElementById('stats').innerHTML = `
+      <strong>${visibleCount}</strong> événement${visibleCount !== 1 ? 's' : ''} affichés<br>
+      <span style="color:#4a9eff">●</span> TC : <strong>${tcCount}</strong><br>
+      <span style="color:#ff6b35">●</span> Hanabi : <strong>${hanabiCount}</strong>
+    `;
+  }
+
+  const TC_EXCLUDED_CATS = ['fireworks'];
+
+  function buildCategoryFilters() {
+    const container = document.getElementById('categories-group');
+    container.innerHTML = '';
+
+    // Hanabi entry first
+    const hanabiCount = allEvents.filter(ev => ev.source === 'hanabi').length;
+    const hanabiLabel = document.createElement('label');
+    hanabiLabel.className = 'cat-label checkbox-label';
+    hanabiLabel.innerHTML = `
+      <input type="checkbox" value="hanabi" checked />
+      <span class="dot dot-hanabi" style="width:10px;height:10px;border-radius:50%;flex-shrink:0"></span>
+      Hanabi
+      <span class="cat-count">${hanabiCount}</span>
+    `;
+    hanabiLabel.querySelector('input').addEventListener('change', renderMarkers);
+    container.appendChild(hanabiLabel);
+
+    // Separator
+    const sep = document.createElement('div');
+    sep.style.cssText = 'border-top:1px solid #1a3050;margin:4px 0';
+    container.appendChild(sep);
+
+    // TC categories
+    const catCounts = {};
+    allEvents.forEach(ev => {
+      if (ev.source !== 'tc') return;
+      (ev.categories || []).forEach(c => { catCounts[c] = (catCounts[c] || 0) + 1; });
+    });
+
+    Object.entries(catCounts).filter(([cat]) => !TC_EXCLUDED_CATS.includes(cat)).sort((a, b) => b[1] - a[1]).forEach(([cat, count]) => {
+      const label = document.createElement('label');
+      label.className = 'cat-label checkbox-label';
+      label.innerHTML = `
+        <input type="checkbox" value="${cat}" checked />
+        <span class="dot dot-tc" style="width:10px;height:10px;border-radius:50%;flex-shrink:0"></span>
+        ${cat}
+        <span class="cat-count">${count}</span>
+      `;
+      label.querySelector('input').addEventListener('change', renderMarkers);
+      container.appendChild(label);
+    });
+  }
+
+  function resetFilters() {
+    document.getElementById('filter-date-from').value = '';
+    document.getElementById('filter-date-to').value = '';
+    document.querySelectorAll('#categories-group input[type="checkbox"]')
+      .forEach(cb => cb.checked = true);
+    renderMarkers();
+  }
+
+  async function loadEvents() {
+    try {
+      const res = await fetch('/events?limit=1000');
+      allEvents = await res.json();
+      buildCategoryFilters();
+      renderMarkers();
+    } catch (e) {
+      document.getElementById('stats').textContent = 'Erreur de chargement.';
+      console.error(e);
+    }
+  }
+
+  document.getElementById('filter-date-from').addEventListener('change', renderMarkers);
+  document.getElementById('filter-date-to').addEventListener('change', renderMarkers);
+  document.getElementById('reset-filters').addEventListener('click', resetFilters);
+
+  loadEvents();
+</script>
+</body>
+</html>
