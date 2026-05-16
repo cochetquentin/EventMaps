@@ -167,6 +167,39 @@
 
     input[type="date"]:focus { border-color: var(--accent); }
 
+    /* Date presets */
+    .presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .preset-btn {
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1.5px solid var(--border);
+      background: white;
+      font-family: inherit;
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      line-height: 1;
+    }
+
+    .preset-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .preset-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
     /* Pills */
     .pills-wrap { margin-top: 14px; }
 
@@ -450,6 +483,13 @@
         <span>Au</span>
         <input type="date" id="filter-date-to" />
       </div>
+      <div class="presets">
+        <button class="preset-btn" data-preset="today">Aujourd'hui</button>
+        <button class="preset-btn" data-preset="weekend">Ce W-E</button>
+        <button class="preset-btn" data-preset="next-weekend">W-E suivant</button>
+        <button class="preset-btn" data-preset="week">Cette semaine</button>
+        <button class="preset-btn" data-preset="next-week">Semaine suivante</button>
+      </div>
     </div>
 
     <div class="pills-wrap">
@@ -637,32 +677,62 @@
       return;
     }
 
+    // Group by primary category
+    const groups = new Map();
     events.forEach(ev => {
-      const card = document.createElement('div');
-      card.className = 'event-card';
+      let cat;
+      if (ev.source === 'hanabi') {
+        cat = 'hanabi';
+      } else {
+        const cats = (ev.categories || []).filter(c => !TC_EXCLUDED_CATS.includes(c));
+        cat = cats[0] || 'other';
+      }
+      if (!groups.has(cat)) groups.set(cat, []);
+      groups.get(cat).push(ev);
+    });
 
-      const date = fmtDate(ev.start_date || ev.date);
-      const sub  = ev.source === 'tc'
-        ? [ev.location_name, ev.price].filter(Boolean).join(' · ')
-        : [ev.venue, ev.fireworks_count].filter(Boolean).join(' · ');
+    // Sort groups: hanabi first, then by count desc
+    const sorted = [...groups.entries()].sort((a, b) => {
+      if (a[0] === 'hanabi') return -1;
+      if (b[0] === 'hanabi') return 1;
+      return b[1].length - a[1].length;
+    });
 
-      card.innerHTML = `
-        <div class="card-header">
-          <div class="card-dot ${ev.source}"></div>
-          <div class="card-title">${ev.title}</div>
-        </div>
-        <div class="card-meta">${date}${sub ? '<br>' + sub : ''}</div>`;
+    sorted.forEach(([cat, catEvents]) => {
+      // Section header
+      const header = document.createElement('div');
+      header.style.cssText = 'font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.3px;color:var(--muted);padding:10px 2px 6px;';
+      const emoji = CAT_EMOJI[cat] || '';
+      header.textContent = `${emoji} ${cat} (${catEvents.length})`;
+      list.appendChild(header);
 
-      card.addEventListener('click', () => {
-        map.setView([ev.lat, ev.lng], 15, { animate: true });
-        const m = markerMap.get(ev.id);
-        if (m) setTimeout(() => m.openPopup(), 350);
-        document.querySelectorAll('.event-card').forEach(c => c.classList.remove('highlighted'));
-        card.classList.add('highlighted');
-        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      catEvents.forEach(ev => {
+        const card = document.createElement('div');
+        card.className = 'event-card';
+
+        const date = fmtDate(ev.start_date || ev.date);
+        const sub  = ev.source === 'tc'
+          ? [ev.location_name, ev.price].filter(Boolean).join(' · ')
+          : [ev.venue, ev.fireworks_count].filter(Boolean).join(' · ');
+
+        card.innerHTML = `
+          <div class="card-header">
+            <div class="card-dot ${ev.source}"></div>
+            <div class="card-title">${ev.title}</div>
+          </div>
+          <div class="card-meta">${date}${sub ? '<br>' + sub : ''}</div>`;
+
+        card.addEventListener('click', () => {
+          map.setView([ev.lat, ev.lng], 15, { animate: true });
+          const m = markerMap.get(ev.id);
+          if (m) setTimeout(() => m.openPopup(), 350);
+          document.querySelectorAll('.event-card').forEach(c => c.classList.remove('highlighted'));
+          card.classList.add('highlighted');
+          card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+
+        list.appendChild(card);
       });
-
-      list.appendChild(card);
     });
   }
 
@@ -703,16 +773,67 @@
 
   // ── Reset ─────────────────────────────────────────────────────────────
   document.getElementById('reset-filters').addEventListener('click', () => {
-    document.getElementById('filter-date-from').value = '';
+    document.getElementById('filter-date-from').value = isoDate(new Date());
     document.getElementById('filter-date-to').value   = '';
     document.getElementById('search-input').value     = '';
     document.querySelectorAll('.pill').forEach(p => p.classList.add('active'));
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
     renderMarkers();
   });
 
+  // ── Date presets ──────────────────────────────────────────────────────
+  function isoDate(d) {
+    return d.toISOString().slice(0, 10);
+  }
+
+  function computePresets() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dow = today.getDay(); // 0=Sun … 6=Sat
+
+    // Monday of current week (ISO: Mon=start)
+    const daysFromMon = dow === 0 ? 6 : dow - 1;
+    const thisMonday = new Date(today);
+    thisMonday.setDate(today.getDate() - daysFromMon);
+
+    const thisSaturday = new Date(thisMonday); thisSaturday.setDate(thisMonday.getDate() + 5);
+    const thisSunday   = new Date(thisMonday); thisSunday.setDate(thisMonday.getDate() + 6);
+    const nextMonday   = new Date(thisMonday); nextMonday.setDate(thisMonday.getDate() + 7);
+    const nextSaturday = new Date(nextMonday);  nextSaturday.setDate(nextMonday.getDate() + 5);
+    const nextSunday   = new Date(nextMonday);  nextSunday.setDate(nextMonday.getDate() + 6);
+
+    return {
+      today:        [isoDate(today), isoDate(today)],
+      weekend:      [isoDate(thisSaturday), isoDate(thisSunday)],
+      'next-weekend': [isoDate(nextSaturday), isoDate(nextSunday)],
+      week:         [isoDate(thisMonday), isoDate(thisSunday)],
+      'next-week':  [isoDate(nextMonday), isoDate(nextSunday)],
+    };
+  }
+
+  const PRESETS = computePresets();
+
+  function applyPreset(name) {
+    const [from, to] = PRESETS[name];
+    document.getElementById('filter-date-from').value = from;
+    document.getElementById('filter-date-to').value   = to;
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === name));
+    renderMarkers();
+  }
+
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+  });
+
+  // Clear active preset when date inputs are changed manually
+  ['filter-date-from', 'filter-date-to'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => {
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      renderMarkers();
+    });
+  });
+
   // ── Listeners ─────────────────────────────────────────────────────────
-  document.getElementById('filter-date-from').addEventListener('change', renderMarkers);
-  document.getElementById('filter-date-to').addEventListener('change', renderMarkers);
   document.getElementById('search-input').addEventListener('input', renderMarkers);
 
   // ── Init ──────────────────────────────────────────────────────────────
@@ -720,6 +841,8 @@
     try {
       const res = await fetch('/events?limit=1000');
       allEvents = await res.json();
+      // Default: hide past events
+      document.getElementById('filter-date-from').value = isoDate(new Date());
       buildPills();
       renderMarkers();
     } catch (e) {
