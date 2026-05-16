@@ -33,13 +33,31 @@ _FIELD_MAP = {
 
 BASE_URL = "https://hanabi.walkerplus.com"
 
-_DATE_RE = re.compile(r"\d{4}年\d{1,2}月\d{1,2}日[（(][月火水木金土日][）)]")
+_DATE_RE = re.compile(r"(\d{4})年(\d{1,2})月(\d{1,2})日[（(][月火水木金土日祝][）)]")
+_TIME_RANGE_RE = re.compile(r"\d{1,2}:\d{2}[～〜]\d{1,2}:\d{2}")
+_TIME_START_RE = re.compile(r"\d{1,2}:\d{2}[～〜]")
+
+
+def _extract_time(text: str) -> tuple[str | None, str | None]:
+    """Retourne (start_time, end_time) extraits du texte, ou None si absent."""
+    m = _TIME_RANGE_RE.search(text)
+    if m:
+        start, end = re.split(r"[～〜]", m.group(0))
+        return start, end
+    m = _TIME_START_RE.search(text)
+    if m:
+        start = m.group(0).rstrip("～〜")
+        return start, None
+    return None, None
 
 
 def _extract_date(text: str) -> str:
-    """Extrait la première date du format '2026年5月17日(日)' et ignore le texte suivant."""
+    """Extrait la première date et la retourne au format YYYY/MM/DD."""
     m = _DATE_RE.search(text)
-    return m.group(0) if m else text
+    if not m:
+        return text
+    year, month, day = m.group(1), m.group(2).zfill(2), m.group(3).zfill(2)
+    return f"{year}/{month}/{day}"
 
 
 def _split_paid_seating(text: str) -> tuple[str, str | None]:
@@ -107,6 +125,8 @@ class HanabiWalker:
                     for a in td.find_all("a"):
                         a.decompose()
                     result[english_key] = td.get_text(" ", strip=True)
+                elif english_key == "time":
+                    result["start_time"], result["end_time"] = _extract_time(td.text.strip())
                 elif english_key == "date":
                     result[english_key] = _extract_date(td.text.strip())
                 elif english_key == "paid_seating":
