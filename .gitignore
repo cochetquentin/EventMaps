@@ -11,3 +11,6 @@ wheels/
 
 # Data output
 data/
+
+# Local docs
+docs/
