@@ -6,12 +6,16 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "beautifulsoup4>=4.14.3",
+    "fastapi>=0.115",
     "pandas>=3.0.3",
+    "pydantic>=2.0",
     "requests>=2.34.1",
+    "uvicorn>=0.30",
 ]
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28",
     "pytest>=9.0.3",
 ]
 

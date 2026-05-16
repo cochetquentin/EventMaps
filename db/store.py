@@ -3,7 +3,9 @@ import hashlib
 import json
 import sqlite3
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
+
+from models.event import HanabiEvent, TokyoCheapoEvent
 
 
 def _make_id(parts: list[str]) -> str:
@@ -75,7 +77,7 @@ CREATE TABLE IF NOT EXISTS hanabi (
 
 
 class EventStore:
-    def __init__(self, db_path: str = "events.db"):
+    def __init__(self, db_path: str = "data/events.db"):
         self._conn = sqlite3.connect(db_path)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
@@ -92,9 +94,10 @@ class EventStore:
     def close(self):
         self._conn.close()
 
-    def upsert_tokyo_cheapo(self, events: list[dict]) -> None:
-        scraped_at = datetime.now(timezone.utc).isoformat()
-        rows = [self._tc_row(e, scraped_at) for e in events]
+    # --- Upsert ---
+
+    def upsert_tokyo_cheapo(self, events: list[TokyoCheapoEvent]) -> None:
+        rows = [self._tc_row(e) for e in events]
         self._conn.executemany(
             """
             INSERT INTO tokyo_cheapo VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
@@ -110,9 +113,8 @@ class EventStore:
         )
         self._conn.commit()
 
-    def upsert_hanabi(self, events: list[dict]) -> None:
-        scraped_at = datetime.now(timezone.utc).isoformat()
-        rows = [self._hanabi_row(e, scraped_at) for e in events]
+    def upsert_hanabi(self, events: list[HanabiEvent]) -> None:
+        rows = [self._hanabi_row(e) for e in events]
         self._conn.executemany(
             """
             INSERT INTO hanabi VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
@@ -133,11 +135,43 @@ class EventStore:
         )
         self._conn.commit()
 
+    # --- Query ---
+
+    def get_events(
+        self,
+        source: str | None = None,
+        date: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[TokyoCheapoEvent | HanabiEvent]:
+        results = []
+        if source in (None, "tc"):
+            results.extend(self._query_tc(date=date, limit=limit, offset=offset))
+        if source in (None, "hanabi"):
+            results.extend(self._query_hanabi(date=date, limit=limit, offset=offset))
+        return results
+
+    def get_event(self, event_id: str) -> TokyoCheapoEvent | HanabiEvent | None:
+        row = self._conn.execute(
+            "SELECT * FROM tokyo_cheapo WHERE id = ?", (event_id,)
+        ).fetchone()
+        if row:
+            return self._tc_from_row(row)
+
+        row = self._conn.execute(
+            "SELECT * FROM hanabi WHERE id = ?", (event_id,)
+        ).fetchone()
+        if row:
+            return self._hanabi_from_row(row)
+
+        return None
+
+    # --- CSV export ---
+
     def export_tokyo_cheapo_csv(self, path: str) -> None:
         rows = self._conn.execute(
             "SELECT * FROM tokyo_cheapo ORDER BY scraped_at DESC"
         ).fetchall()
-        headers = [h for h in _TC_HEADERS if h != "id" and h != "scraped_at"]
         headers = ["title", "start_date", "end_date", "start_time", "end_time",
                    "price", "categories", "tags", "official_link", "url",
                    "location_name", "lat", "lng"]
@@ -171,6 +205,134 @@ class EventStore:
 
         self._write_csv(path, headers, [fmt_row(r) for r in rows])
 
+    # --- Internal helpers ---
+
+    def _query_tc(self, date: str | None, limit: int, offset: int) -> list[TokyoCheapoEvent]:
+        if date:
+            rows = self._conn.execute(
+                "SELECT * FROM tokyo_cheapo WHERE start_date = ? OR end_date = ? LIMIT ? OFFSET ?",
+                (date, date, limit, offset),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT * FROM tokyo_cheapo ORDER BY start_date LIMIT ? OFFSET ?",
+                (limit, offset),
+            ).fetchall()
+        return [self._tc_from_row(r) for r in rows]
+
+    def _query_hanabi(self, date: str | None, limit: int, offset: int) -> list[HanabiEvent]:
+        if date:
+            rows = self._conn.execute(
+                "SELECT * FROM hanabi WHERE date = ? LIMIT ? OFFSET ?",
+                (date, limit, offset),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT * FROM hanabi ORDER BY date LIMIT ? OFFSET ?",
+                (limit, offset),
+            ).fetchall()
+        return [self._hanabi_from_row(r) for r in rows]
+
+    @staticmethod
+    def _tc_from_row(row: tuple) -> TokyoCheapoEvent:
+        col = {name: i for i, name in enumerate(_TC_HEADERS)}
+        return TokyoCheapoEvent(
+            id=row[col["id"]],
+            title=row[col["title"]] or "",
+            start_date=row[col["start_date"]] or "",
+            end_date=row[col["end_date"]] or None,
+            start_time=row[col["start_time"]] or None,
+            end_time=row[col["end_time"]] or None,
+            price=row[col["price"]] or None,
+            categories=json.loads(row[col["categories"]] or "[]"),
+            tags=json.loads(row[col["tags"]] or "[]"),
+            official_link=row[col["official_link"]] or None,
+            url=row[col["url"]],
+            location_name=row[col["location_name"]] or None,
+            lat=row[col["lat"]],
+            lng=row[col["lng"]],
+            scraped_at=datetime.fromisoformat(row[col["scraped_at"]]),
+        )
+
+    @staticmethod
+    def _hanabi_from_row(row: tuple) -> HanabiEvent:
+        col = {name: i for i, name in enumerate(_HANABI_HEADERS)}
+        return HanabiEvent(
+            id=row[col["id"]],
+            title=row[col["title"]] or "",
+            url=row[col["url"]],
+            start_date=row[col["date"]] or "",
+            start_time=row[col["start_time"]] or None,
+            end_time=row[col["end_time"]] or None,
+            lat=row[col["lat"]],
+            lng=row[col["lng"]],
+            scraped_at=datetime.fromisoformat(row[col["scraped_at"]]),
+            fireworks_count=row[col["fireworks_count"]] or None,
+            fireworks_duration=row[col["fireworks_duration"]] or None,
+            expected_crowd=row[col["expected_crowd"]] or None,
+            rain_policy=row[col["rain_policy"]] or None,
+            paid_seating=row[col["paid_seating"]] or None,
+            paid_seating_details=row[col["paid_seating_details"]] or None,
+            food_stalls=row[col["food_stalls"]] or None,
+            notes=row[col["notes"]] or None,
+            venue=row[col["venue"]] or None,
+            access=row[col["access"]] or None,
+            parking=row[col["parking"]] or None,
+            official_site=row[col["official_site"]] or None,
+            official_x=row[col["official_x"]] or None,
+            contact=row[col["contact"]] or None,
+            contact2=row[col["contact2"]] or None,
+        )
+
+    @staticmethod
+    def _tc_row(e: TokyoCheapoEvent) -> tuple:
+        return (
+            e.id,
+            e.title,
+            e.start_date,
+            e.end_date or "",
+            e.start_time or "",
+            e.end_time or "",
+            e.price or "",
+            json.dumps(e.categories),
+            json.dumps(e.tags),
+            e.official_link or "",
+            e.url,
+            e.location_name or "",
+            e.lat,
+            e.lng,
+            e.scraped_at.isoformat(),
+        )
+
+    @staticmethod
+    def _hanabi_row(e: HanabiEvent) -> tuple:
+        return (
+            e.id,
+            e.title,
+            e.fireworks_count or "",
+            e.fireworks_duration or "",
+            e.expected_crowd or "",
+            e.start_time or "",
+            e.end_time or "",
+            e.rain_policy or "",
+            e.paid_seating or "",
+            e.paid_seating_details or "",
+            e.food_stalls or "",
+            e.notes or "",
+            e.venue or "",
+            e.access or "",
+            e.parking or "",
+            e.official_site or "",
+            e.official_x or "",
+            e.url,
+            e.lat,
+            e.lng,
+            e.start_date,  # stored as `date` column
+            e.contact or "",
+            e.contact2 or "",
+            e.scraped_at.isoformat(),
+        )
+
     @staticmethod
     def _write_csv(path: str, headers: list[str], rows: list[list]) -> None:
         if path == "-":
@@ -183,53 +345,3 @@ class EventStore:
                 w = csv.writer(f)
                 w.writerow(headers)
                 w.writerows(rows)
-
-    @staticmethod
-    def _tc_row(e: dict, scraped_at: str) -> tuple:
-        location_name = e.get("location_name") or ""
-        return (
-            _make_id([e["url"], location_name]),
-            e.get("title", ""),
-            e.get("start_date", ""),
-            e.get("end_date", ""),
-            e.get("start_time", ""),
-            e.get("end_time", ""),
-            e.get("price") or "",
-            json.dumps(e.get("categories") or []),
-            json.dumps(e.get("tags") or []),
-            e.get("official_link") or "",
-            e["url"],
-            location_name,
-            e.get("lat"),
-            e.get("lng"),
-            scraped_at,
-        )
-
-    @staticmethod
-    def _hanabi_row(e: dict, scraped_at: str) -> tuple:
-        return (
-            _make_id([e["url"], e.get("date") or ""]),
-            e.get("title", ""),
-            e.get("fireworks_count", ""),
-            e.get("fireworks_duration", ""),
-            e.get("expected_crowd", ""),
-            e.get("start_time") or "",
-            e.get("end_time") or "",
-            e.get("rain_policy", ""),
-            e.get("paid_seating", ""),
-            e.get("paid_seating_details") or "",
-            e.get("food_stalls", ""),
-            e.get("notes", ""),
-            e.get("venue", ""),
-            e.get("access", ""),
-            e.get("parking", ""),
-            e.get("official_site") or "",
-            e.get("official_x") or "",
-            e["url"],
-            e.get("lat"),
-            e.get("lng"),
-            e.get("date", ""),
-            e.get("contact", ""),
-            e.get("contact2", ""),
-            scraped_at,
-        )

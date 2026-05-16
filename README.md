@@ -8,80 +8,36 @@ Scrapers d'événements géolocalisés pour alimenter une carte interactive.
 uv sync
 ```
 
-## Scrapers disponibles
+## Structure
 
-### Tokyo Cheapo
-
-Événements de la semaine à Tokyo depuis [tokyocheapo.com](https://tokyocheapo.com).
-
-```python
-from scrapers.tokyo_cheapo import TokyoCheapo
-
-scraper = TokyoCheapo()
-events = scraper.scrape_all(max_pages=10)
+```
+EventMaps/
+├── scrapers/          # Scrapers Tokyo Cheapo et Hanabi Walker
+├── models/            # Modèles Pydantic (TokyoCheapoEvent, HanabiEvent)
+├── db/                # Persistance SQLite (EventStore)
+├── api/               # API FastAPI
+├── tests/             # Tests unitaires et API
+├── data/              # Base de données et exports CSV (gitignored)
+└── main.py            # CLI de scraping
 ```
 
-**Champs retournés :**
+## Scraping
 
-| Champ | Description |
-|---|---|
-| `url` | URL de la page Tokyo Cheapo |
-| `title` | Nom de l'événement |
-| `start_date` | Date de début au format `YYYY/MM/DD` |
-| `end_date` | Date de fin au format `YYYY/MM/DD` (identique à `start_date` si événement sur un seul jour) |
-| `start_time` | Heure de début (`HH:MM`, 24h) |
-| `end_time` | Heure de fin (`HH:MM`, 24h) |
-| `price` | Prix (ex: `Free`, `¥1,000 – ¥2,500`, `¥500 (advance sales)`) |
-| `categories` | Catégories séparées par des virgules |
-| `tags` | Tags séparés par des virgules |
-| `official_link` | URL du site officiel de l'événement |
-| `locations` | Liste de lieux avec `name`, `lat`, `lng`, `address` |
+```bash
+# Scraper Tokyo Cheapo → SQLite
+uv run python main.py tc
 
-**Normalisation des dates :**
-- Dates précises (`Fri, May 15`, `May 16 - May 17`) → `YYYY/MM/DD`
-- Plages floues (`Mid May`, `Mid ~ Late May`, `Early Apr ~ Early Jun`) → converties via Early=1-10, Mid=11-20, Late=21-fin du mois
-- Dates non parsables → conservées telles quelles
+# Scraper Hanabi Walker → SQLite (région Kantō par défaut)
+uv run python main.py hanabi --region ar0300
 
----
+# Scraper les deux sources
+uv run python main.py all
 
-### Hanabi Walker
-
-Festivals de feux d'artifice japonais depuis [hanabi.walkerplus.com](https://hanabi.walkerplus.com).
-
-```python
-from scrapers.hanabi_walker import HanabiWalker
-
-scraper = HanabiWalker(region="ar0300")  # ar0300 = Kanto (défaut)
-events = scraper.scrape_all(max_pages=20)
+# Exporter en CSV au lieu de SQLite
+uv run python main.py tc --output csv > output.csv
 ```
 
-Les événements sur plusieurs jours sont automatiquement dupliqués — une ligne par jour.
-
-**Champs retournés :**
-
-| Champ | Description |
-|---|---|
-| `url` | URL de l'événement |
-| `title` | Nom du festival |
-| `date` | Date au format `YYYY/MM/DD` |
-| `start_time` | Heure de début (`HH:MM`) |
-| `end_time` | Heure de fin (`HH:MM`) |
-| `fireworks_count` | Nombre de feux |
-| `fireworks_duration` | Durée du spectacle |
-| `expected_crowd` | Affluence estimée |
-| `rain_policy` | Politique en cas de pluie |
-| `paid_seating` | `あり` / `なし` |
-| `paid_seating_details` | Détails et tarifs des places payantes |
-| `food_stalls` | Présence de stands de nourriture |
-| `venue` | Lieu |
-| `access` | Accès (transports) |
-| `parking` | Informations parking |
-| `contact` | Contact |
-| `official_site` | URL du site officiel |
-| `official_x` | URL du compte X (Twitter) |
-| `lat` / `lng` | Coordonnées GPS |
-
-**Codes région disponibles** (paramètre `region`) :
+**Codes région Hanabi Walker :**
 
 | Code | Région |
 |---|---|
@@ -94,24 +50,96 @@ Les événements sur plusieurs jours sont automatiquement dupliqués — une lig
 | `ar0700` | Shikoku |
 | `ar0800` | Kyūshū / Okinawa |
 
-## Export CSV
-
-### Tokyo Cheapo
+## API
 
 ```bash
-uv run python main.py > output.csv
+uv run uvicorn api.app:app --reload
 ```
 
-Colonnes : `title`, `start_date`, `end_date`, `start_time`, `end_time`, `price`, `categories`, `tags`, `official_link`, `url`, `location_name`, `lat`, `lng`
+### Endpoints
 
+```
+GET /events                          → liste tous les événements
+GET /events?source=tc                → filtre par source (tc | hanabi)
+GET /events?date=2026/07/25          → filtre par date
+GET /events?limit=50&offset=0        → pagination
+GET /events/{id}                     → détail d'un événement
+GET /docs                            → Swagger UI
+```
+
+### Exemple de réponse
+
+```json
+[
+  {
+    "id": "4e1e4f87206f7566",
+    "source": "tc",
+    "title": "Dry Noodle Grand Prix",
+    "url": "https://tokyocheapo.com/events/dry-noodle-grand-prix/",
+    "start_date": "2026/05/11",
+    "end_date": "2026/05/20",
+    "start_time": "10:00",
+    "end_time": "18:00",
+    "price": "Free",
+    "categories": ["food"],
+    "tags": ["food", "noodles"],
+    "location_name": "Komazawa Olympic Park",
+    "lat": 35.627198,
+    "lng": 139.661894,
+    "scraped_at": "2026-05-16T12:51:25+00:00"
+  }
+]
+```
+
+## Base de données
+
+Les événements sont stockés dans `data/events.db` (SQLite) avec un hash SHA-256 (16 hex) comme clé primaire. Relancer le scraper met à jour les lignes existantes sans créer de doublons.
+
+| Table | Source | Clé de déduplication |
+|---|---|---|
+| `tokyo_cheapo` | tokyocheapo.com | `url` + `location_name` |
+| `hanabi` | hanabi.walkerplus.com | `url` + `date` |
+
+## Modèles de données
+
+### TokyoCheapoEvent
+
+| Champ | Description |
+|---|---|
+| `title` | Nom de l'événement |
+| `start_date` / `end_date` | Dates au format `YYYY/MM/DD` |
+| `start_time` / `end_time` | Heures (`HH:MM`, 24h) |
+| `price` | Prix (`Free`, `¥1,000`, etc.) |
+| `categories` / `tags` | Listes de strings |
+| `official_link` | URL du site officiel |
+| `location_name` / `lat` / `lng` | Lieu et coordonnées GPS |
+
+Les dates floues (`Mid May`, `Early Apr ~ Late Jun`) sont converties : Early=1-10, Mid=11-20, Late=21-fin du mois.
 Les événements multi-lieux génèrent une ligne par lieu.
 
-### Hanabi Walker
+### HanabiEvent
 
-```python
-import pandas as pd
+| Champ | Description |
+|---|---|
+| `title` | Nom du festival |
+| `start_date` | Date au format `YYYY/MM/DD` |
+| `start_time` / `end_time` | Heures (`HH:MM`) |
+| `fireworks_count` | Nombre de feux |
+| `fireworks_duration` | Durée du spectacle |
+| `expected_crowd` | Affluence estimée |
+| `rain_policy` | Politique en cas de pluie |
+| `paid_seating` / `paid_seating_details` | Places payantes |
+| `food_stalls` | Stands de nourriture |
+| `venue` / `access` / `parking` | Informations pratiques |
+| `official_site` / `official_x` | Liens officiels |
+| `lat` / `lng` | Coordonnées GPS |
 
-scraper = HanabiWalker()
-events = scraper.scrape_all()
-pd.DataFrame(events).to_csv("output_hanabi.csv", index=False, encoding="utf-8-sig")
+Les événements multi-jours génèrent une ligne par jour.
+
+## Tests
+
+```bash
+uv run pytest          # tous les tests (115)
+uv run pytest tests/test_store.py   # store SQLite
+uv run pytest tests/test_api.py     # API FastAPI
 ```
