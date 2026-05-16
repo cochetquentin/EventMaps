@@ -73,7 +73,12 @@
     }
 
     /* Header */
-    .sidebar-header { margin-bottom: 16px; }
+    .sidebar-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
 
     .sidebar-header h1 {
       font-size: 26px;
@@ -94,6 +99,34 @@
       margin-top: 4px;
       font-weight: 400;
     }
+
+    #scrape-btn {
+      flex-shrink: 0;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      background: white;
+      font-size: 18px;
+      cursor: pointer;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      line-height: 1;
+    }
+
+    #scrape-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    #scrape-btn.running {
+      animation: spin 1s linear infinite;
+      color: var(--accent);
+      border-color: var(--accent);
+      pointer-events: none;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* Search */
     .search-wrap {
@@ -464,8 +497,11 @@
   <div class="sidebar-fixed">
 
     <div class="sidebar-header">
-      <h1>Event<em>Maps</em></h1>
-      <p>Discover events across Tokyo</p>
+      <div>
+        <h1>Event<em>Maps</em></h1>
+        <p>Discover events across Tokyo</p>
+      </div>
+      <button id="scrape-btn" title="Relancer le scraping">↻</button>
     </div>
 
     <div class="search-wrap">
@@ -773,7 +809,7 @@
 
   // ── Reset ─────────────────────────────────────────────────────────────
   document.getElementById('reset-filters').addEventListener('click', () => {
-    document.getElementById('filter-date-from').value = isoDate(new Date());
+    document.getElementById('filter-date-from').value = isoDate(todayJST());
     document.getElementById('filter-date-to').value   = '';
     document.getElementById('search-input').value     = '';
     document.querySelectorAll('.pill').forEach(p => p.classList.add('active'));
@@ -782,25 +818,34 @@
   });
 
   // ── Date presets ──────────────────────────────────────────────────────
+  // JST = UTC+9, toujours fixe — getTime() est en UTC pur
+  function todayJST() {
+    const now = new Date();
+    const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    jst.setUTCHours(0, 0, 0, 0);
+    return jst;
+  }
+
+  function addDays(d, n) {
+    return new Date(d.getTime() + n * 24 * 60 * 60 * 1000);
+  }
+
   function isoDate(d) {
     return d.toISOString().slice(0, 10);
   }
 
   function computePresets() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const dow = today.getDay(); // 0=Sun … 6=Sat
+    const today = todayJST();
+    const dow = today.getUTCDay(); // 0=Sun … 6=Sat
 
-    // Monday of current week (ISO: Mon=start)
     const daysFromMon = dow === 0 ? 6 : dow - 1;
-    const thisMonday = new Date(today);
-    thisMonday.setDate(today.getDate() - daysFromMon);
+    const thisMonday   = addDays(today, -daysFromMon);
 
-    const thisSaturday = new Date(thisMonday); thisSaturday.setDate(thisMonday.getDate() + 5);
-    const thisSunday   = new Date(thisMonday); thisSunday.setDate(thisMonday.getDate() + 6);
-    const nextMonday   = new Date(thisMonday); nextMonday.setDate(thisMonday.getDate() + 7);
-    const nextSaturday = new Date(nextMonday);  nextSaturday.setDate(nextMonday.getDate() + 5);
-    const nextSunday   = new Date(nextMonday);  nextSunday.setDate(nextMonday.getDate() + 6);
+    const thisSaturday = addDays(thisMonday, 5);
+    const thisSunday   = addDays(thisMonday, 6);
+    const nextMonday   = addDays(thisMonday, 7);
+    const nextSaturday = addDays(nextMonday, 5);
+    const nextSunday   = addDays(nextMonday, 6);
 
     return {
       today:        [isoDate(today), isoDate(today)],
@@ -842,7 +887,7 @@
       const res = await fetch('/events?limit=1000');
       allEvents = await res.json();
       // Default: hide past events
-      document.getElementById('filter-date-from').value = isoDate(new Date());
+      document.getElementById('filter-date-from').value = isoDate(todayJST());
       buildPills();
       renderMarkers();
     } catch (e) {
@@ -850,6 +895,26 @@
       console.error(e);
     }
   }
+
+  // ── Scrape button ─────────────────────────────────────────────────────
+  const scrapeBtn = document.getElementById('scrape-btn');
+  let pollInterval = null;
+
+  async function startScrape() {
+    scrapeBtn.classList.add('running');
+    await fetch('/scrape', { method: 'POST' });
+    pollInterval = setInterval(async () => {
+      const res  = await fetch('/scrape/status');
+      const data = await res.json();
+      if (!data.running) {
+        clearInterval(pollInterval);
+        scrapeBtn.classList.remove('running');
+        await loadEvents();
+      }
+    }, 2000);
+  }
+
+  scrapeBtn.addEventListener('click', startScrape);
 
   loadEvents();
 </script>
