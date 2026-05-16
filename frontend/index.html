@@ -5,30 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>EventMaps — Tokyo</title>
 
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 
-  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!-- MarkerCluster -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
   <style>
     :root {
-      --bg:      #f6f3ee;
-      --surface: rgba(255,255,255,0.92);
-      --text:    #1f2937;
-      --muted:   #6b7280;
-      --border:  rgba(15,23,42,0.08);
-      --tc:      #2563eb;
-      --hanabi:  #f97316;
-      --accent:  #e11d48;
+      --bg:     #f6f3ee;
+      --glass:  rgba(255,255,255,0.88);
+      --text:   #1f2937;
+      --muted:  #6b7280;
+      --border: rgba(15,23,42,0.08);
+      --tc:     #2563eb;
+      --hanabi: #f97316;
+      --accent: #e11d48;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -41,103 +37,61 @@
       color: var(--text);
     }
 
-    /* ── Map full screen ── */
-    #map {
-      position: absolute;
-      inset: 0;
-      z-index: 0;
+    /* ── Map ── */
+    #map { position: absolute; inset: 0; z-index: 0; }
+
+    /* ── Shared glass style ── */
+    .glass {
+      background: var(--glass);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.7);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.04);
+      border-radius: 20px;
     }
 
-    /* ── Sidebar flottante ── */
-    #sidebar {
+    /* ── Top bar ── */
+    #top-bar {
       position: absolute;
       top: 16px;
       left: 16px;
-      bottom: 16px;
-      width: 360px;
+      right: 16px;
       z-index: 1000;
-      background: var(--surface);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-radius: 24px;
-      border: 1px solid rgba(255,255,255,0.7);
-      box-shadow: 0 8px 40px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.05);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
     }
 
-    .sidebar-fixed {
-      padding: 22px 20px 0;
-      flex-shrink: 0;
-    }
-
-    /* Header */
-    .sidebar-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      margin-bottom: 16px;
-    }
-
-    .sidebar-header h1 {
-      font-size: 26px;
-      font-weight: 700;
-      letter-spacing: -0.04em;
-      color: var(--text);
-      line-height: 1;
-    }
-
-    .sidebar-header h1 em {
-      color: var(--accent);
-      font-style: normal;
-    }
-
-    .sidebar-header p {
-      font-size: 13px;
-      color: var(--muted);
-      margin-top: 4px;
-      font-weight: 400;
-    }
-
-    #scrape-btn {
-      flex-shrink: 0;
-      width: 34px;
-      height: 34px;
-      border-radius: 10px;
-      border: 1.5px solid var(--border);
-      background: white;
-      font-size: 18px;
-      cursor: pointer;
-      color: var(--muted);
+    .bar-row1 {
       display: flex;
       align-items: center;
-      justify-content: center;
-      transition: all 0.2s ease;
-      line-height: 1;
+      gap: 10px;
+      padding: 12px 16px;
+      background: var(--glass);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.7);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      border-radius: 18px;
     }
 
-    #scrape-btn:hover { border-color: var(--accent); color: var(--accent); }
-
-    #scrape-btn.running {
-      animation: spin 1s linear infinite;
-      color: var(--accent);
-      border-color: var(--accent);
-      pointer-events: none;
+    .brand {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      white-space: nowrap;
+      color: var(--text);
+      flex-shrink: 0;
     }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .brand em { color: var(--accent); font-style: normal; }
 
-    /* Search */
     .search-wrap {
       position: relative;
-      margin-bottom: 14px;
+      flex: 1;
     }
 
     .search-wrap input {
       width: 100%;
-      padding: 11px 14px 11px 38px;
-      border-radius: 14px;
+      padding: 9px 14px 9px 36px;
+      border-radius: 12px;
       border: 1.5px solid var(--border);
       background: rgba(255,255,255,0.7);
       font-family: inherit;
@@ -152,80 +106,89 @@
 
     .search-icon {
       position: absolute;
-      left: 12px;
+      left: 10px;
       top: 50%;
       transform: translateY(-50%);
-      font-size: 14px;
+      font-size: 13px;
       pointer-events: none;
     }
 
-    /* Section label */
-    .section-label {
-      font-size: 10.5px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 1.3px;
-      color: var(--muted);
-      margin-bottom: 8px;
-    }
-
-    /* Date range */
-    .date-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
-    }
-
-    .date-row span {
-      font-size: 12px;
-      color: var(--muted);
-      width: 20px;
+    #scrape-btn {
       flex-shrink: 0;
-    }
-
-    input[type="date"] {
-      flex: 1;
-      padding: 8px 10px;
+      width: 36px;
+      height: 36px;
       border-radius: 10px;
       border: 1.5px solid var(--border);
-      background: rgba(255,255,255,0.7);
-      font-family: inherit;
-      font-size: 13px;
-      color: var(--text);
-      outline: none;
-      min-width: 0;
-      transition: border-color 0.2s;
-    }
-
-    input[type="date"]:focus { border-color: var(--accent); }
-
-    /* Date presets */
-    .presets {
+      background: white;
+      font-size: 17px;
+      cursor: pointer;
+      color: var(--muted);
       display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 8px;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
     }
 
+    #scrape-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    #scrape-btn.running {
+      animation: spin 1s linear infinite;
+      color: var(--accent);
+      border-color: var(--accent);
+      pointer-events: none;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Row 2 — filters */
+    .bar-row2 {
+      margin-top: 8px;
+      padding: 10px 14px;
+      background: var(--glass);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.7);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .row2-scroll {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .row2-scroll::-webkit-scrollbar { display: none; }
+
+    .row2-sep {
+      width: 1px;
+      height: 20px;
+      background: var(--border);
+      flex-shrink: 0;
+      margin: 0 4px;
+    }
+
+    /* Preset buttons */
     .preset-btn {
-      padding: 5px 10px;
+      flex-shrink: 0;
+      padding: 6px 12px;
       border-radius: 999px;
       border: 1.5px solid var(--border);
       background: white;
       font-family: inherit;
-      font-size: 11.5px;
+      font-size: 12px;
       font-weight: 500;
       color: var(--muted);
       cursor: pointer;
       transition: all 0.15s ease;
+      white-space: nowrap;
       line-height: 1;
     }
 
-    .preset-btn:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
+    .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
 
     .preset-btn.active {
       background: var(--accent);
@@ -233,103 +196,144 @@
       color: white;
     }
 
-    /* Pills */
-    .pills-wrap { margin-top: 14px; }
+    #date-custom-btn { font-size: 13px; }
 
-    .pills {
+    /* Pills in row2 */
+    .pills-row {
       display: flex;
-      flex-wrap: wrap;
-      gap: 7px;
-      margin-top: 8px;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
     }
 
     .pill {
-      padding: 7px 13px;
+      flex-shrink: 0;
+      padding: 6px 12px;
       border-radius: 999px;
       border: 1.5px solid var(--border);
       background: white;
       font-family: inherit;
-      font-size: 13px;
+      font-size: 12px;
+      font-weight: 500;
       color: var(--muted);
       cursor: pointer;
-      transition: all 0.18s ease;
-      font-weight: 500;
+      transition: all 0.15s ease;
+      white-space: nowrap;
       line-height: 1;
     }
 
-    .pill:hover { transform: translateY(-1px); border-color: #d1d5db; color: var(--text); }
+    .pill:hover { border-color: #d1d5db; color: var(--text); }
 
-    .pill.active {
-      background: var(--text);
-      color: white;
-      border-color: var(--text);
-    }
-
-    .pill.active.h {
-      background: var(--hanabi);
-      border-color: var(--hanabi);
-    }
+    .pill.active { background: var(--text); color: white; border-color: var(--text); }
+    .pill.active.h { background: var(--hanabi); border-color: var(--hanabi); }
 
     /* Reset */
-    .reset-btn {
-      display: inline-block;
-      margin-top: 14px;
-      padding: 0;
-      background: none;
-      border: none;
+    #reset-filters {
+      flex-shrink: 0;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1.5px solid var(--border);
+      background: transparent;
       font-family: inherit;
       font-size: 12px;
       color: var(--muted);
       cursor: pointer;
-      text-decoration: underline;
-      text-underline-offset: 2px;
+      transition: all 0.15s;
+      white-space: nowrap;
     }
 
-    .reset-btn:hover { color: var(--accent); }
+    #reset-filters:hover { border-color: var(--accent); color: var(--accent); }
 
-    /* Divider */
-    .divider {
-      height: 1px;
-      background: var(--border);
-      margin: 14px 0 10px;
+    /* Custom date dropdown */
+    #date-dropdown {
+      margin-top: 8px;
+      padding: 14px 16px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      background: var(--glass);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.7);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+      border-radius: 14px;
     }
 
-    /* Stats */
+    #date-dropdown.hidden { display: none; }
+
+    .dd-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    input[type="date"] {
+      padding: 7px 10px;
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      background: rgba(255,255,255,0.8);
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="date"]:focus { border-color: var(--accent); }
+
+    /* ── Bottom bar ── */
+    #bottom-bar {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      right: 16px;
+      z-index: 1000;
+      background: var(--glass);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.7);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      border-radius: 20px;
+      padding: 12px 16px 14px;
+    }
+
     #stats {
       font-size: 12px;
       color: var(--muted);
-      padding: 0 20px 10px;
-      flex-shrink: 0;
+      margin-bottom: 10px;
     }
 
     #stats strong { color: var(--text); }
 
-    /* Event list */
     #event-list {
-      flex: 1;
-      overflow-y: auto;
-      padding: 0 12px 16px;
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
       scrollbar-width: thin;
       scrollbar-color: rgba(0,0,0,0.1) transparent;
+      padding-bottom: 2px;
     }
 
-    #event-list::-webkit-scrollbar { width: 4px; }
+    #event-list::-webkit-scrollbar { height: 4px; }
     #event-list::-webkit-scrollbar-track { background: transparent; }
     #event-list::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 4px; }
 
     .event-card {
+      flex-shrink: 0;
+      width: 210px;
       background: white;
-      border-radius: 16px;
+      border-radius: 14px;
       padding: 12px 14px;
-      margin-bottom: 8px;
       cursor: pointer;
-      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.15s;
       border: 1.5px solid transparent;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.15s;
     }
 
     .event-card:hover {
       transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.08);
     }
 
     .event-card.highlighted { border-color: var(--accent); }
@@ -337,13 +341,13 @@
     .card-header {
       display: flex;
       align-items: flex-start;
-      gap: 8px;
+      gap: 7px;
       margin-bottom: 4px;
     }
 
     .card-dot {
-      width: 8px;
-      height: 8px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       flex-shrink: 0;
       margin-top: 4px;
@@ -353,17 +357,24 @@
     .card-dot.hanabi { background: var(--hanabi); }
 
     .card-title {
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 600;
       color: var(--text);
       line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
 
     .card-meta {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--muted);
-      line-height: 1.6;
-      padding-left: 16px;
+      line-height: 1.5;
+      padding-left: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     /* ── Markers ── */
@@ -421,70 +432,27 @@
 
     .pop-body { padding: 16px 18px 18px; }
 
-    .pop-source {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1.3px;
-      margin-bottom: 6px;
-    }
+    .pop-source { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.3px; margin-bottom: 6px; }
     .pop-source.tc     { color: var(--tc); }
     .pop-source.hanabi { color: var(--hanabi); }
 
-    .pop-title {
-      font-size: 17px;
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      line-height: 1.25;
-      color: var(--text);
-      margin-bottom: 10px;
-    }
+    .pop-title { font-size: 17px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.25; color: var(--text); margin-bottom: 10px; }
 
-    .pop-meta {
-      font-size: 13px;
-      color: var(--muted);
-      line-height: 1.8;
-      margin-bottom: 10px;
-    }
+    .pop-meta { font-size: 13px; color: var(--muted); line-height: 1.8; margin-bottom: 10px; }
 
-    .pop-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 12px;
-    }
+    .pop-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 
-    .pop-badge {
-      font-size: 12px;
-      padding: 3px 9px;
-      border-radius: 8px;
-      background: #f3f4f6;
-      color: var(--text);
-      font-weight: 500;
-    }
+    .pop-badge { font-size: 12px; padding: 3px 9px; border-radius: 8px; background: #f3f4f6; color: var(--text); font-weight: 500; }
 
     .pop-actions { display: flex; gap: 8px; }
 
-    .pop-btn {
-      flex: 1;
-      padding: 9px 12px;
-      border-radius: 12px;
-      font-family: inherit;
-      font-size: 13px;
-      font-weight: 600;
-      text-align: center;
-      text-decoration: none;
-      cursor: pointer;
-      border: none;
-      transition: opacity 0.15s;
-      display: block;
-    }
+    .pop-btn { flex: 1; padding: 9px 12px; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; border: none; transition: opacity 0.15s; display: block; }
 
     .pop-btn:hover { opacity: 0.82; }
     .pop-btn.primary   { background: var(--text); color: white; }
     .pop-btn.secondary { background: #f3f4f6; color: var(--text); }
 
-    /* Leaflet controls offset */
+    /* Leaflet zoom controls */
     .leaflet-top.leaflet-right  { top: 16px; right: 16px; }
     .leaflet-bottom.leaflet-right { right: 16px; bottom: 16px; }
   </style>
@@ -493,50 +461,46 @@
 
 <div id="map"></div>
 
-<div id="sidebar">
-  <div class="sidebar-fixed">
-
-    <div class="sidebar-header">
-      <div>
-        <h1>Event<em>Maps</em></h1>
-        <p>Discover events across Tokyo</p>
-      </div>
-      <button id="scrape-btn" title="Relancer le scraping">↻</button>
-    </div>
-
+<!-- ── Top bar ── -->
+<div id="top-bar">
+  <div class="bar-row1">
+    <div class="brand">Event<em>Maps</em></div>
     <div class="search-wrap">
       <span class="search-icon">🔍</span>
       <input type="text" id="search-input" placeholder="Événement, lieu, station…" />
     </div>
-
-    <div>
-      <div class="section-label">Période</div>
-      <div class="date-row">
-        <span>Du</span>
-        <input type="date" id="filter-date-from" />
-      </div>
-      <div class="date-row">
-        <span>Au</span>
-        <input type="date" id="filter-date-to" />
-      </div>
-      <div class="presets">
-        <button class="preset-btn" data-preset="today">Aujourd'hui</button>
-        <button class="preset-btn" data-preset="weekend">Ce W-E</button>
-        <button class="preset-btn" data-preset="next-weekend">W-E suivant</button>
-        <button class="preset-btn" data-preset="week">Cette semaine</button>
-        <button class="preset-btn" data-preset="next-week">Semaine suivante</button>
-      </div>
-    </div>
-
-    <div class="pills-wrap">
-      <div class="section-label">Types</div>
-      <div id="pills" class="pills"></div>
-    </div>
-
-    <button class="reset-btn" id="reset-filters">Réinitialiser les filtres</button>
-    <div class="divider"></div>
+    <button id="scrape-btn" title="Relancer le scraping">↻</button>
   </div>
 
+  <div class="bar-row2">
+    <div class="row2-scroll">
+      <button class="preset-btn" data-preset="today">Aujourd'hui</button>
+      <button class="preset-btn" data-preset="weekend">Ce W-E</button>
+      <button class="preset-btn" data-preset="next-weekend">W-E suivant</button>
+      <button class="preset-btn" data-preset="week">Cette semaine</button>
+      <button class="preset-btn" data-preset="next-week">Sem. suivante</button>
+      <button id="date-custom-btn" class="preset-btn">📅 Dates ▾</button>
+      <div class="row2-sep"></div>
+      <div id="pills" class="pills-row"></div>
+      <div class="row2-sep"></div>
+      <button id="reset-filters">✕ Reset</button>
+    </div>
+  </div>
+
+  <div id="date-dropdown" class="hidden">
+    <div class="dd-row">
+      <span>Du</span>
+      <input type="date" id="filter-date-from" />
+    </div>
+    <div class="dd-row">
+      <span>Au</span>
+      <input type="date" id="filter-date-to" />
+    </div>
+  </div>
+</div>
+
+<!-- ── Bottom bar ── -->
+<div id="bottom-bar">
   <div id="stats">Chargement…</div>
   <div id="event-list"></div>
 </div>
@@ -551,21 +515,8 @@
   }).addTo(map);
 
   // ── Icons ─────────────────────────────────────────────────────────────
-  const iconTC = L.divIcon({
-    html: '<div class="m-tc"></div>',
-    className: '',
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
-    popupAnchor: [0, -12],
-  });
-
-  const iconHanabi = L.divIcon({
-    html: '<div class="m-hanabi"></div>',
-    className: '',
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
-    popupAnchor: [0, -14],
-  });
+  const iconTC = L.divIcon({ html: '<div class="m-tc"></div>', className: '', iconSize: [16,16], iconAnchor: [8,8], popupAnchor: [0,-12] });
+  const iconHanabi = L.divIcon({ html: '<div class="m-hanabi"></div>', className: '', iconSize: [20,20], iconAnchor: [10,10], popupAnchor: [0,-14] });
 
   // ── Cluster ───────────────────────────────────────────────────────────
   const clusterGroup = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 });
@@ -587,26 +538,19 @@
 
   function buildPopup(ev) {
     if (ev.source === 'tc') {
-      const date  = ev.end_date && ev.end_date !== ev.start_date
-        ? `📅 ${fmtDate(ev.start_date)} → ${fmtDate(ev.end_date)}`
-        : `📅 ${fmtDate(ev.start_date)}`;
+      const date  = ev.end_date && ev.end_date !== ev.start_date ? `📅 ${fmtDate(ev.start_date)} → ${fmtDate(ev.end_date)}` : `📅 ${fmtDate(ev.start_date)}`;
       const time  = ev.start_time ? `🕐 ${ev.start_time}${ev.end_time ? ' – ' + ev.end_time : ''}` : '';
       const loc   = ev.location_name ? `📍 ${ev.location_name}` : '';
       const meta  = [date, time, loc].filter(Boolean).join('<br>');
       const badge = ev.price ? `<div class="pop-badges"><span class="pop-badge">${ev.price}</span></div>` : '';
-      return `<div class="pop">
-        <div class="pop-bar tc"></div>
-        <div class="pop-body">
-          <div class="pop-source tc">Tokyo Cheapo</div>
-          <div class="pop-title">${ev.title}</div>
-          <div class="pop-meta">${meta}</div>
-          ${badge}
-          <div class="pop-actions">
-            <a class="pop-btn primary" href="${ev.url}" target="_blank">Voir →</a>
-            <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.lat},${ev.lng}" target="_blank">🗺 Y aller</a>
-          </div>
-        </div>
-      </div>`;
+      return `<div class="pop"><div class="pop-bar tc"></div><div class="pop-body">
+        <div class="pop-source tc">Tokyo Cheapo</div>
+        <div class="pop-title">${ev.title}</div>
+        <div class="pop-meta">${meta}</div>${badge}
+        <div class="pop-actions">
+          <a class="pop-btn primary" href="${ev.url}" target="_blank">Voir →</a>
+          <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.lat},${ev.lng}" target="_blank">🗺 Y aller</a>
+        </div></div></div>`;
     } else {
       const date   = `📅 ${fmtDate(ev.start_date)}`;
       const time   = ev.start_time ? `🕐 ${ev.start_time}${ev.end_time ? ' – ' + ev.end_time : ''}` : '';
@@ -616,23 +560,18 @@
       const bs = [
         ev.fireworks_count ? `🎇 ${ev.fireworks_count}` : null,
         ev.expected_crowd  ? `👥 ${ev.expected_crowd}`  : null,
-        ev.food_stalls === 'あり'    ? '🍢 Food stalls'  : null,
-        ev.paid_seating === 'あり'  ? '🎫 Paid seating' : null,
+        ev.food_stalls === 'あり'  ? '🍢 Food stalls'  : null,
+        ev.paid_seating === 'あり' ? '🎫 Paid seating' : null,
       ].filter(Boolean);
       const badges = bs.length ? `<div class="pop-badges">${bs.map(b => `<span class="pop-badge">${b}</span>`).join('')}</div>` : '';
-      return `<div class="pop">
-        <div class="pop-bar hanabi"></div>
-        <div class="pop-body">
-          <div class="pop-source hanabi">🎆 Hanabi</div>
-          <div class="pop-title">${ev.title}</div>
-          <div class="pop-meta">${meta}</div>
-          ${badges}
-          <div class="pop-actions">
-            <a class="pop-btn primary" href="${ev.url}" target="_blank">Voir →</a>
-            <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.lat},${ev.lng}" target="_blank">🗺 Y aller</a>
-          </div>
-        </div>
-      </div>`;
+      return `<div class="pop"><div class="pop-bar hanabi"></div><div class="pop-body">
+        <div class="pop-source hanabi">🎆 Hanabi</div>
+        <div class="pop-title">${ev.title}</div>
+        <div class="pop-meta">${meta}</div>${badges}
+        <div class="pop-actions">
+          <a class="pop-btn primary" href="${ev.url}" target="_blank">Voir →</a>
+          <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.lat},${ev.lng}" target="_blank">🗺 Y aller</a>
+        </div></div></div>`;
     }
   }
 
@@ -649,10 +588,10 @@
   const markerMap = new Map();
 
   function renderMarkers() {
-    const active    = getActivePills();
-    const fromS     = toSlash(document.getElementById('filter-date-from').value);
-    const toS       = toSlash(document.getElementById('filter-date-to').value);
-    const query     = document.getElementById('search-input').value.trim().toLowerCase();
+    const active = getActivePills();
+    const fromS  = toSlash(document.getElementById('filter-date-from').value);
+    const toS    = toSlash(document.getElementById('filter-date-to').value);
+    const query  = document.getElementById('search-input').value.trim().toLowerCase();
 
     clusterGroup.clearLayers();
     markerMap.clear();
@@ -662,13 +601,11 @@
     allEvents.forEach(ev => {
       if (!ev.lat || !ev.lng) return;
 
-      // Date range
       const evStart = ev.start_date || ev.date;
       const evEnd   = ev.end_date || evStart;
       if (fromS && evEnd   < fromS) return;
       if (toS   && evStart > toS)   return;
 
-      // Type filter
       if (ev.source === 'hanabi') {
         if (!active.has('hanabi')) return;
       } else {
@@ -678,10 +615,8 @@
         if (cats.length > 0 && !cats.some(c => active.has(c))) return;
       }
 
-      // Search
       if (query) {
-        const hay = [ev.title, ev.location_name, ev.venue, ev.access]
-          .filter(Boolean).join(' ').toLowerCase();
+        const hay = [ev.title, ev.location_name, ev.venue, ev.access].filter(Boolean).join(' ').toLowerCase();
         if (!hay.includes(query)) return;
       }
 
@@ -703,72 +638,49 @@
     buildEventList(visible);
   }
 
-  // ── Event cards ───────────────────────────────────────────────────────
+  // ── Event list (horizontal) ───────────────────────────────────────────
   function buildEventList(events) {
     const list = document.getElementById('event-list');
     list.innerHTML = '';
 
     if (!events.length) {
-      list.innerHTML = '<div style="text-align:center;padding:32px 20px;font-size:13px;color:var(--muted)">Aucun événement</div>';
+      list.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:4px 0">Aucun événement</div>';
       return;
     }
 
-    // Group by primary category
-    const groups = new Map();
-    events.forEach(ev => {
-      let cat;
-      if (ev.source === 'hanabi') {
-        cat = 'hanabi';
-      } else {
-        const cats = (ev.categories || []).filter(c => !TC_EXCLUDED_CATS.includes(c));
-        cat = cats[0] || 'other';
-      }
-      if (!groups.has(cat)) groups.set(cat, []);
-      groups.get(cat).push(ev);
+    // Sort by start date
+    const sorted = [...events].sort((a, b) => {
+      const da = a.start_date || a.date || '';
+      const db = b.start_date || b.date || '';
+      return da.localeCompare(db);
     });
 
-    // Sort groups: hanabi first, then by count desc
-    const sorted = [...groups.entries()].sort((a, b) => {
-      if (a[0] === 'hanabi') return -1;
-      if (b[0] === 'hanabi') return 1;
-      return b[1].length - a[1].length;
-    });
+    sorted.forEach(ev => {
+      const card = document.createElement('div');
+      card.className = 'event-card';
 
-    sorted.forEach(([cat, catEvents]) => {
-      // Section header
-      const header = document.createElement('div');
-      header.style.cssText = 'font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.3px;color:var(--muted);padding:10px 2px 6px;';
-      const emoji = CAT_EMOJI[cat] || '';
-      header.textContent = `${emoji} ${cat} (${catEvents.length})`;
-      list.appendChild(header);
+      const date = fmtDate(ev.start_date || ev.date);
+      const sub  = ev.source === 'tc'
+        ? [ev.location_name, ev.price].filter(Boolean).join(' · ')
+        : [ev.venue, ev.fireworks_count].filter(Boolean).join(' · ');
 
-      catEvents.forEach(ev => {
-        const card = document.createElement('div');
-        card.className = 'event-card';
+      card.innerHTML = `
+        <div class="card-header">
+          <div class="card-dot ${ev.source}"></div>
+          <div class="card-title">${ev.title}</div>
+        </div>
+        <div class="card-meta">${date}${sub ? ' · ' + sub : ''}</div>`;
 
-        const date = fmtDate(ev.start_date || ev.date);
-        const sub  = ev.source === 'tc'
-          ? [ev.location_name, ev.price].filter(Boolean).join(' · ')
-          : [ev.venue, ev.fireworks_count].filter(Boolean).join(' · ');
-
-        card.innerHTML = `
-          <div class="card-header">
-            <div class="card-dot ${ev.source}"></div>
-            <div class="card-title">${ev.title}</div>
-          </div>
-          <div class="card-meta">${date}${sub ? '<br>' + sub : ''}</div>`;
-
-        card.addEventListener('click', () => {
-          map.setView([ev.lat, ev.lng], 15, { animate: true });
-          const m = markerMap.get(ev.id);
-          if (m) setTimeout(() => m.openPopup(), 350);
-          document.querySelectorAll('.event-card').forEach(c => c.classList.remove('highlighted'));
-          card.classList.add('highlighted');
-          card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        });
-
-        list.appendChild(card);
+      card.addEventListener('click', () => {
+        map.setView([ev.lat, ev.lng], 15, { animate: true });
+        const m = markerMap.get(ev.id);
+        if (m) setTimeout(() => m.openPopup(), 350);
+        document.querySelectorAll('.event-card').forEach(c => c.classList.remove('highlighted'));
+        card.classList.add('highlighted');
+        card.scrollIntoView({ behavior: 'smooth', inline: 'nearest' });
       });
+
+      list.appendChild(card);
     });
   }
 
@@ -777,8 +689,7 @@
     const container = document.getElementById('pills');
     container.innerHTML = '';
 
-    const hCount = allEvents.filter(e => e.source === 'hanabi').length;
-    addPill(container, 'hanabi', `🎆 Hanabi`, true);
+    addPill(container, 'hanabi', '🎆 Hanabi', true);
 
     const catCounts = {};
     allEvents.forEach(ev => {
@@ -789,10 +700,7 @@
     Object.entries(catCounts)
       .filter(([c]) => !TC_EXCLUDED_CATS.includes(c))
       .sort((a, b) => b[1] - a[1])
-      .forEach(([cat]) => {
-        const emoji = CAT_EMOJI[cat] || '';
-        addPill(container, cat, `${emoji} ${cat}`);
-      });
+      .forEach(([cat]) => addPill(container, cat, `${CAT_EMOJI[cat] || ''} ${cat}`));
   }
 
   function addPill(container, type, label, isHanabi = false) {
@@ -800,25 +708,16 @@
     btn.className = 'pill active' + (isHanabi ? ' h' : '');
     btn.dataset.type = type;
     btn.textContent = label;
-    btn.addEventListener('click', () => {
-      btn.classList.toggle('active');
-      renderMarkers();
-    });
+    btn.addEventListener('click', () => { btn.classList.toggle('active'); renderMarkers(); });
     container.appendChild(btn);
   }
 
-  // ── Reset ─────────────────────────────────────────────────────────────
-  document.getElementById('reset-filters').addEventListener('click', () => {
-    document.getElementById('filter-date-from').value = isoDate(todayJST());
-    document.getElementById('filter-date-to').value   = '';
-    document.getElementById('search-input').value     = '';
-    document.querySelectorAll('.pill').forEach(p => p.classList.add('active'));
-    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-    renderMarkers();
+  // ── Date custom toggle ────────────────────────────────────────────────
+  document.getElementById('date-custom-btn').addEventListener('click', () => {
+    document.getElementById('date-dropdown').classList.toggle('hidden');
   });
 
-  // ── Date presets ──────────────────────────────────────────────────────
-  // JST = UTC+9, toujours fixe — getTime() est en UTC pur
+  // ── JST dates ────────────────────────────────────────────────────────
   function todayJST() {
     const now = new Date();
     const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
@@ -826,33 +725,20 @@
     return jst;
   }
 
-  function addDays(d, n) {
-    return new Date(d.getTime() + n * 24 * 60 * 60 * 1000);
-  }
-
-  function isoDate(d) {
-    return d.toISOString().slice(0, 10);
-  }
+  function addDays(d, n) { return new Date(d.getTime() + n * 24 * 60 * 60 * 1000); }
+  function isoDate(d) { return d.toISOString().slice(0, 10); }
 
   function computePresets() {
     const today = todayJST();
-    const dow = today.getUTCDay(); // 0=Sun … 6=Sat
-
+    const dow = today.getUTCDay();
     const daysFromMon = dow === 0 ? 6 : dow - 1;
-    const thisMonday   = addDays(today, -daysFromMon);
-
-    const thisSaturday = addDays(thisMonday, 5);
-    const thisSunday   = addDays(thisMonday, 6);
-    const nextMonday   = addDays(thisMonday, 7);
-    const nextSaturday = addDays(nextMonday, 5);
-    const nextSunday   = addDays(nextMonday, 6);
-
+    const mon  = addDays(today, -daysFromMon);
     return {
-      today:        [isoDate(today), isoDate(today)],
-      weekend:      [isoDate(thisSaturday), isoDate(thisSunday)],
-      'next-weekend': [isoDate(nextSaturday), isoDate(nextSunday)],
-      week:         [isoDate(thisMonday), isoDate(thisSunday)],
-      'next-week':  [isoDate(nextMonday), isoDate(nextSunday)],
+      today:          [isoDate(today),         isoDate(today)],
+      weekend:        [isoDate(addDays(mon,5)), isoDate(addDays(mon,6))],
+      'next-weekend': [isoDate(addDays(mon,12)),isoDate(addDays(mon,13))],
+      week:           [isoDate(mon),            isoDate(addDays(mon,6))],
+      'next-week':    [isoDate(addDays(mon,7)), isoDate(addDays(mon,13))],
     };
   }
 
@@ -866,16 +752,26 @@
     renderMarkers();
   }
 
-  document.querySelectorAll('.preset-btn').forEach(btn => {
+  document.querySelectorAll('.preset-btn[data-preset]').forEach(btn => {
     btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
   });
 
-  // Clear active preset when date inputs are changed manually
   ['filter-date-from', 'filter-date-to'].forEach(id => {
     document.getElementById(id).addEventListener('change', () => {
       document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
       renderMarkers();
     });
+  });
+
+  // ── Reset ─────────────────────────────────────────────────────────────
+  document.getElementById('reset-filters').addEventListener('click', () => {
+    document.getElementById('filter-date-from').value = isoDate(todayJST());
+    document.getElementById('filter-date-to').value   = '';
+    document.getElementById('search-input').value     = '';
+    document.querySelectorAll('.pill').forEach(p => p.classList.add('active'));
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('date-dropdown').classList.add('hidden');
+    renderMarkers();
   });
 
   // ── Listeners ─────────────────────────────────────────────────────────
@@ -886,7 +782,6 @@
     try {
       const res = await fetch('/events?limit=1000');
       allEvents = await res.json();
-      // Default: hide past events
       document.getElementById('filter-date-from').value = isoDate(todayJST());
       buildPills();
       renderMarkers();
