@@ -86,7 +86,7 @@ def cmd_all(args):
 def main():
     parser = argparse.ArgumentParser(description="EventMaps scraper")
     parser.add_argument("--output", choices=["csv", "db"], default="db")
-    parser.add_argument("--db", default="events.db", metavar="PATH")
+    parser.add_argument("--db", default="data/events.db", metavar="PATH")
 
     sub = parser.add_subparsers(dest="source", required=True)
 
