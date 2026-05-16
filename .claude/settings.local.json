@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run python -c ':*)",
+      "Bash(uv run:*)",
+      "Bash(rm extract_locations.py)",
+      "Bash(rm -rf html_samples/)",
+      "Bash(rm tokyo_events_scrapper.ipynb)",
+      "Bash(uv add:*)",
+      "Bash(rtk git:*)",
+      "Bash(grep -E \"\\\\.py$\")",
+      "Bash(iconv -f utf-8 -t utf-8)",
+      "Bash(grep -E \"\\\\.\\(csv|py|ipynb\\)$\")",
+      "Bash(python -c ':*)",
+      "Bash(git -C /d/Perso/Algo/Perso/EventMaps log --oneline)"
+    ]
+  }
+}

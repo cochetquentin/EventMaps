@@ -4,7 +4,7 @@ import sys
 
 from scrapers.tokyo_cheapo import TokyoCheapo
 from scrapers.hanabi_walker import HanabiWalker
-from store import EventStore
+from db.store import EventStore
 
 
 def _explode_locations(events: list[dict]) -> list[dict]:

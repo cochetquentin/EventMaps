@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from store import EventStore, _make_id
+from db.store import EventStore, _make_id
 
 
 # --- Fixtures ---
