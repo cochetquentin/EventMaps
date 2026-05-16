@@ -3,7 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>EventMaps</title>
+  <title>EventMaps — Tokyo</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -15,453 +20,713 @@
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
   <style>
+    :root {
+      --bg:      #f6f3ee;
+      --surface: rgba(255,255,255,0.92);
+      --text:    #1f2937;
+      --muted:   #6b7280;
+      --border:  rgba(15,23,42,0.08);
+      --tc:      #2563eb;
+      --hanabi:  #f97316;
+      --accent:  #e11d48;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      display: flex;
+      font-family: "Outfit", "Noto Sans JP", sans-serif;
+      background: var(--bg);
       height: 100vh;
-      font-family: system-ui, sans-serif;
-      background: #1a1a2e;
-      color: #e0e0e0;
+      overflow: hidden;
+      color: var(--text);
     }
 
+    /* ── Map full screen ── */
+    #map {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+    }
+
+    /* ── Sidebar flottante ── */
     #sidebar {
-      width: 280px;
-      min-width: 280px;
-      background: #16213e;
-      padding: 20px;
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      bottom: 16px;
+      width: 360px;
+      z-index: 1000;
+      background: var(--surface);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,0.7);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.05);
       display: flex;
       flex-direction: column;
-      gap: 20px;
-      overflow-y: auto;
-      border-right: 1px solid #0f3460;
-      z-index: 1000;
+      overflow: hidden;
     }
 
-    #sidebar h1 {
-      font-size: 1.3rem;
+    .sidebar-fixed {
+      padding: 22px 20px 0;
+      flex-shrink: 0;
+    }
+
+    /* Header */
+    .sidebar-header { margin-bottom: 16px; }
+
+    .sidebar-header h1 {
+      font-size: 26px;
       font-weight: 700;
-      color: #e94560;
-      letter-spacing: 1px;
+      letter-spacing: -0.04em;
+      color: var(--text);
+      line-height: 1;
     }
 
-    #sidebar h1 span {
-      color: #e0e0e0;
+    .sidebar-header h1 em {
+      color: var(--accent);
+      font-style: normal;
     }
 
-    .section-title {
-      font-size: 0.7rem;
+    .sidebar-header p {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 4px;
+      font-weight: 400;
+    }
+
+    /* Search */
+    .search-wrap {
+      position: relative;
+      margin-bottom: 14px;
+    }
+
+    .search-wrap input {
+      width: 100%;
+      padding: 11px 14px 11px 38px;
+      border-radius: 14px;
+      border: 1.5px solid var(--border);
+      background: rgba(255,255,255,0.7);
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-wrap input:focus { border-color: var(--accent); }
+    .search-wrap input::placeholder { color: var(--muted); }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      pointer-events: none;
+    }
+
+    /* Section label */
+    .section-label {
+      font-size: 10.5px;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 1.5px;
-      color: #888;
+      letter-spacing: 1.3px;
+      color: var(--muted);
       margin-bottom: 8px;
     }
 
-    .filter-group {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    label.checkbox-label {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      cursor: pointer;
-      font-size: 0.85rem;
-    }
-
-    label.checkbox-label input[type="checkbox"] {
-      width: 15px;
-      height: 15px;
-      accent-color: #e94560;
-      flex-shrink: 0;
-    }
-
-    .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .dot-tc { background: #4a9eff; }
-    .dot-hanabi { background: #ff6b35; }
-
-    .date-range {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .date-range-row {
+    /* Date range */
+    .date-row {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 0.75rem;
-      color: #888;
+      margin-bottom: 6px;
     }
 
-    .date-range-row span {
-      width: 22px;
+    .date-row span {
+      font-size: 12px;
+      color: var(--muted);
+      width: 20px;
       flex-shrink: 0;
     }
 
     input[type="date"] {
       flex: 1;
-      padding: 7px 8px;
-      background: #0f3460;
-      border: 1px solid #1a4a7a;
-      border-radius: 6px;
-      color: #e0e0e0;
-      font-size: 0.8rem;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      background: rgba(255,255,255,0.7);
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--text);
       outline: none;
       min-width: 0;
-    }
-    input[type="date"]:focus {
-      border-color: #e94560;
+      transition: border-color 0.2s;
     }
 
-    #categories-group {
+    input[type="date"]:focus { border-color: var(--accent); }
+
+    /* Pills */
+    .pills-wrap { margin-top: 14px; }
+
+    .pills {
       display: flex;
-      flex-direction: column;
-      gap: 6px;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 8px;
     }
 
-    .cat-label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    .pill {
+      padding: 7px 13px;
+      border-radius: 999px;
+      border: 1.5px solid var(--border);
+      background: white;
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--muted);
       cursor: pointer;
-      font-size: 0.82rem;
-      text-transform: capitalize;
+      transition: all 0.18s ease;
+      font-weight: 500;
+      line-height: 1;
     }
 
-    .cat-label input[type="checkbox"] {
-      width: 14px;
-      height: 14px;
-      accent-color: #4a9eff;
+    .pill:hover { transform: translateY(-1px); border-color: #d1d5db; color: var(--text); }
+
+    .pill.active {
+      background: var(--text);
+      color: white;
+      border-color: var(--text);
+    }
+
+    .pill.active.h {
+      background: var(--hanabi);
+      border-color: var(--hanabi);
+    }
+
+    /* Reset */
+    .reset-btn {
+      display: inline-block;
+      margin-top: 14px;
+      padding: 0;
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .reset-btn:hover { color: var(--accent); }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 14px 0 10px;
+    }
+
+    /* Stats */
+    #stats {
+      font-size: 12px;
+      color: var(--muted);
+      padding: 0 20px 10px;
       flex-shrink: 0;
     }
 
-    .cat-count {
-      margin-left: auto;
-      font-size: 0.7rem;
-      color: #555;
-    }
+    #stats strong { color: var(--text); }
 
-    button#reset-filters {
-      padding: 8px;
-      background: transparent;
-      border: 1px solid #444;
-      border-radius: 6px;
-      color: #888;
-      cursor: pointer;
-      font-size: 0.8rem;
-      transition: all 0.2s;
-    }
-    button#reset-filters:hover {
-      border-color: #e94560;
-      color: #e94560;
-    }
-
-    #stats {
-      font-size: 0.8rem;
-      color: #888;
-      line-height: 1.6;
-      margin-top: auto;
-      padding-top: 10px;
-      border-top: 1px solid #0f3460;
-    }
-    #stats strong {
-      color: #e0e0e0;
-    }
-
-    #map {
+    /* Event list */
+    #event-list {
       flex: 1;
+      overflow-y: auto;
+      padding: 0 12px 16px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0,0,0,0.1) transparent;
     }
 
-    /* Custom popup style */
-    .leaflet-popup-content-wrapper {
-      background: #16213e;
-      color: #e0e0e0;
-      border: 1px solid #0f3460;
-      border-radius: 8px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    }
-    .leaflet-popup-tip {
-      background: #16213e;
-    }
-    .popup-title {
-      font-weight: 700;
-      font-size: 0.95rem;
+    #event-list::-webkit-scrollbar { width: 4px; }
+    #event-list::-webkit-scrollbar-track { background: transparent; }
+    #event-list::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 4px; }
+
+    .event-card {
+      background: white;
+      border-radius: 16px;
+      padding: 12px 14px;
       margin-bottom: 8px;
-      color: #fff;
-      line-height: 1.3;
+      cursor: pointer;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.15s;
+      border: 1.5px solid transparent;
     }
-    .popup-row {
-      font-size: 0.8rem;
-      color: #aaa;
-      margin-bottom: 3px;
+
+    .event-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
     }
-    .popup-row span {
-      color: #e0e0e0;
+
+    .event-card.highlighted { border-color: var(--accent); }
+
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 4px;
     }
-    .popup-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-size: 0.7rem;
+
+    .card-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+
+    .card-dot.tc     { background: var(--tc); }
+    .card-dot.hanabi { background: var(--hanabi); }
+
+    .card-title {
+      font-size: 13px;
       font-weight: 600;
-      margin-bottom: 8px;
+      color: var(--text);
+      line-height: 1.35;
     }
-    .badge-tc { background: #1a3a6e; color: #4a9eff; }
-    .badge-hanabi { background: #3d1f10; color: #ff6b35; }
-    .popup-link {
-      display: inline-block;
-      margin-top: 8px;
-      padding: 4px 12px;
-      background: #0f3460;
-      border-radius: 4px;
-      color: #4a9eff;
+
+    .card-meta {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+      padding-left: 16px;
+    }
+
+    /* ── Markers ── */
+    .m-tc {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--tc);
+      border: 3px solid white;
+      box-shadow: 0 2px 8px rgba(37,99,235,0.45);
+    }
+
+    .m-hanabi {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #fff 0%, #ffd699 35%, #f97316 75%);
+      box-shadow: 0 0 0 5px rgba(249,115,22,0.15), 0 0 16px rgba(249,115,22,0.55);
+      animation: hpulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes hpulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 5px rgba(249,115,22,0.15), 0 0 16px rgba(249,115,22,0.55); }
+      50%       { transform: scale(1.12); box-shadow: 0 0 0 8px rgba(249,115,22,0.10), 0 0 24px rgba(249,115,22,0.70); }
+    }
+
+    /* ── Clusters ── */
+    .marker-cluster { background: rgba(17,24,39,0.07) !important; }
+    .marker-cluster div {
+      background: #111827 !important;
+      color: white !important;
+      border: 3px solid white !important;
+      font-weight: 700 !important;
+      border-radius: 50% !important;
+      font-family: "Outfit", sans-serif !important;
+      font-size: 13px !important;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.18) !important;
+    }
+
+    /* ── Popups ── */
+    .leaflet-popup-content-wrapper {
+      border-radius: 22px !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15) !important;
+      border: none !important;
+    }
+
+    .leaflet-popup-tip-container { display: none !important; }
+    .leaflet-popup-content { margin: 0 !important; width: auto !important; }
+
+    .pop { width: 280px; font-family: "Outfit", "Noto Sans JP", sans-serif; }
+
+    .pop-bar { height: 6px; }
+    .pop-bar.tc     { background: var(--tc); }
+    .pop-bar.hanabi { background: linear-gradient(90deg, #f97316, #fbbf24); }
+
+    .pop-body { padding: 16px 18px 18px; }
+
+    .pop-source {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.3px;
+      margin-bottom: 6px;
+    }
+    .pop-source.tc     { color: var(--tc); }
+    .pop-source.hanabi { color: var(--hanabi); }
+
+    .pop-title {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.25;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+
+    .pop-meta {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.8;
+      margin-bottom: 10px;
+    }
+
+    .pop-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .pop-badge {
+      font-size: 12px;
+      padding: 3px 9px;
+      border-radius: 8px;
+      background: #f3f4f6;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .pop-actions { display: flex; gap: 8px; }
+
+    .pop-btn {
+      flex: 1;
+      padding: 9px 12px;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
       text-decoration: none;
-      font-size: 0.75rem;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s;
+      display: block;
     }
-    .popup-link:hover { background: #1a4a7a; }
+
+    .pop-btn:hover { opacity: 0.82; }
+    .pop-btn.primary   { background: var(--text); color: white; }
+    .pop-btn.secondary { background: #f3f4f6; color: var(--text); }
+
+    /* Leaflet controls offset */
+    .leaflet-top.leaflet-right  { top: 16px; right: 16px; }
+    .leaflet-bottom.leaflet-right { right: 16px; bottom: 16px; }
   </style>
 </head>
 <body>
 
-<div id="sidebar">
-  <h1>Event<span>Maps</span></h1>
+<div id="map"></div>
 
-  <!-- Date range -->
-  <div>
-    <div class="section-title">Période</div>
-    <div class="date-range">
-      <div class="date-range-row">
+<div id="sidebar">
+  <div class="sidebar-fixed">
+
+    <div class="sidebar-header">
+      <h1>Event<em>Maps</em></h1>
+      <p>Discover events across Tokyo</p>
+    </div>
+
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search-input" placeholder="Événement, lieu, station…" />
+    </div>
+
+    <div>
+      <div class="section-label">Période</div>
+      <div class="date-row">
         <span>Du</span>
         <input type="date" id="filter-date-from" />
       </div>
-      <div class="date-range-row">
+      <div class="date-row">
         <span>Au</span>
         <input type="date" id="filter-date-to" />
       </div>
     </div>
-  </div>
 
-  <!-- Types (Hanabi + TC categories merged) -->
-  <div id="categories-section">
-    <div class="section-title">Types</div>
-    <div id="categories-group" class="filter-group">
-      <span style="font-size:0.75rem;color:#555">Chargement...</span>
+    <div class="pills-wrap">
+      <div class="section-label">Types</div>
+      <div id="pills" class="pills"></div>
     </div>
+
+    <button class="reset-btn" id="reset-filters">Réinitialiser les filtres</button>
+    <div class="divider"></div>
   </div>
 
-  <button id="reset-filters">Réinitialiser les filtres</button>
-
-  <div id="stats">Chargement...</div>
+  <div id="stats">Chargement…</div>
+  <div id="event-list"></div>
 </div>
 
-<div id="map"></div>
-
 <script>
-  const map = L.map('map').setView([35.68, 139.69], 10);
+  // ── Map ──────────────────────────────────────────────────────────────
+  const map = L.map('map').setView([35.68, 139.69], 11);
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/">CARTO</a>',
-    maxZoom: 19,
+  L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png', {
+    maxZoom: 20,
+    attribution: '© <a href="https://stadiamaps.com/">Stadia Maps</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   }).addTo(map);
 
-  function makeIcon(color) {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="24" height="36">
-      <path d="M12 0C5.373 0 0 5.373 0 12c0 9 12 24 12 24s12-15 12-24C24 5.373 18.627 0 12 0z"
-        fill="${color}" stroke="rgba(0,0,0,0.3)" stroke-width="1"/>
-      <circle cx="12" cy="12" r="5" fill="rgba(255,255,255,0.8)"/>
-    </svg>`;
-    return L.divIcon({
-      html: svg,
-      className: '',
-      iconSize: [24, 36],
-      iconAnchor: [12, 36],
-      popupAnchor: [0, -36],
-    });
-  }
+  // ── Icons ─────────────────────────────────────────────────────────────
+  const iconTC = L.divIcon({
+    html: '<div class="m-tc"></div>',
+    className: '',
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+    popupAnchor: [0, -12],
+  });
 
-  const iconTC = makeIcon('#4a9eff');
-  const iconHanabi = makeIcon('#ff6b35');
+  const iconHanabi = L.divIcon({
+    html: '<div class="m-hanabi"></div>',
+    className: '',
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+    popupAnchor: [0, -14],
+  });
 
-  let allEvents = [];
-  const clusterGroup = L.markerClusterGroup({ chunkedLoading: true });
+  // ── Cluster ───────────────────────────────────────────────────────────
+  const clusterGroup = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 });
   map.addLayer(clusterGroup);
 
-  function formatDate(d) {
-    if (!d) return '—';
-    return d.replace(/\//g, '-');
-  }
+  // ── Constants ─────────────────────────────────────────────────────────
+  let allEvents = [];
+  const TC_EXCLUDED_CATS = ['fireworks'];
 
-  function toSlash(d) {
-    return d ? d.replace(/-/g, '/') : null;
-  }
+  const CAT_EMOJI = {
+    hanabi:'🎆', food:'🍜', art:'🎨', anime:'🎌', beer:'🍺',
+    dance:'💃', festival:'🏮', film:'🎬', illumination:'✨',
+    living:'🏠', market:'🛍', nature:'🌿', show:'🎭',
+    sport:'⚽', theater:'🎭', volunteering:'🤝',
+  };
+
+  // ── Popup builder ─────────────────────────────────────────────────────
+  function fmtDate(d) { return d ? d.replace(/\//g, '-') : '—'; }
 
   function buildPopup(ev) {
     if (ev.source === 'tc') {
-      const loc = ev.location_name || '—';
-      const date = ev.end_date && ev.end_date !== ev.start_date
-        ? `${formatDate(ev.start_date)} → ${formatDate(ev.end_date)}`
-        : formatDate(ev.start_date);
-      const time = ev.start_time ? `${ev.start_time}${ev.end_time ? ' - ' + ev.end_time : ''}` : '';
-      const price = ev.price || '—';
-      const cats = (ev.categories || []).join(', ') || '—';
-      return `
-        <div class="popup-title">${ev.title}</div>
-        <div class="popup-badge badge-tc">Tokyo Cheapo</div>
-        <div class="popup-row">📅 <span>${date}</span>${time ? ` &nbsp;🕐 <span>${time}</span>` : ''}</div>
-        <div class="popup-row">📍 <span>${loc}</span></div>
-        <div class="popup-row">💰 <span>${price}</span></div>
-        <div class="popup-row">🏷 <span>${cats}</span></div>
-        <a class="popup-link" href="${ev.url}" target="_blank">Voir l'événement →</a>
-        <a class="popup-link" href="https://www.google.com/maps/dir/?api=1&destination=${ev.lat},${ev.lng}" target="_blank">🗺 Y aller</a>
-      `;
+      const date  = ev.end_date && ev.end_date !== ev.start_date
+        ? `📅 ${fmtDate(ev.start_date)} → ${fmtDate(ev.end_date)}`
+        : `📅 ${fmtDate(ev.start_date)}`;
+      const time  = ev.start_time ? `🕐 ${ev.start_time}${ev.end_time ? ' – ' + ev.end_time : ''}` : '';
+      const loc   = ev.location_name ? `📍 ${ev.location_name}` : '';
+      const meta  = [date, time, loc].filter(Boolean).join('<br>');
+      const badge = ev.price ? `<div class="pop-badges"><span class="pop-badge">${ev.price}</span></div>` : '';
+      return `<div class="pop">
+        <div class="pop-bar tc"></div>
+        <div class="pop-body">
+          <div class="pop-source tc">Tokyo Cheapo</div>
+          <div class="pop-title">${ev.title}</div>
+          <div class="pop-meta">${meta}</div>
+          ${badge}
+          <div class="pop-actions">
+            <a class="pop-btn primary" href="${ev.url}" target="_blank">Voir →</a>
+            <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.lat},${ev.lng}" target="_blank">🗺 Y aller</a>
+          </div>
+        </div>
+      </div>`;
     } else {
-      const date = formatDate(ev.start_date);
-      const time = ev.start_time ? `${ev.start_time}${ev.end_time ? ' - ' + ev.end_time : ''}` : '';
-      const venue = ev.venue || '—';
-      const count = ev.fireworks_count || '—';
-      const crowd = ev.expected_crowd || '—';
-      return `
-        <div class="popup-title">${ev.title}</div>
-        <div class="popup-badge badge-hanabi">🎆 Hanabi</div>
-        <div class="popup-row">📅 <span>${date}</span>${time ? ` &nbsp;🕐 <span>${time}</span>` : ''}</div>
-        <div class="popup-row">📍 <span>${venue}</span></div>
-        <div class="popup-row">🎇 <span>${count}</span></div>
-        <div class="popup-row">👥 <span>${crowd}</span></div>
-        <a class="popup-link" href="${ev.url}" target="_blank">Voir l'événement →</a>
-        <a class="popup-link" href="https://www.google.com/maps/dir/?api=1&destination=${ev.lat},${ev.lng}" target="_blank">🗺 Y aller</a>
-      `;
+      const date   = `📅 ${fmtDate(ev.start_date)}`;
+      const time   = ev.start_time ? `🕐 ${ev.start_time}${ev.end_time ? ' – ' + ev.end_time : ''}` : '';
+      const venue  = ev.venue  ? `📍 ${ev.venue}`  : '';
+      const access = ev.access ? `🚉 ${ev.access}` : '';
+      const meta   = [date, time, venue, access].filter(Boolean).join('<br>');
+      const bs = [
+        ev.fireworks_count ? `🎇 ${ev.fireworks_count}` : null,
+        ev.expected_crowd  ? `👥 ${ev.expected_crowd}`  : null,
+        ev.food_stalls === 'あり'    ? '🍢 Food stalls'  : null,
+        ev.paid_seating === 'あり'  ? '🎫 Paid seating' : null,
+      ].filter(Boolean);
+      const badges = bs.length ? `<div class="pop-badges">${bs.map(b => `<span class="pop-badge">${b}</span>`).join('')}</div>` : '';
+      return `<div class="pop">
+        <div class="pop-bar hanabi"></div>
+        <div class="pop-body">
+          <div class="pop-source hanabi">🎆 Hanabi</div>
+          <div class="pop-title">${ev.title}</div>
+          <div class="pop-meta">${meta}</div>
+          ${badges}
+          <div class="pop-actions">
+            <a class="pop-btn primary" href="${ev.url}" target="_blank">Voir →</a>
+            <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.lat},${ev.lng}" target="_blank">🗺 Y aller</a>
+          </div>
+        </div>
+      </div>`;
     }
   }
 
-  function getCheckedTypes() {
-    const checked = new Set();
-    document.querySelectorAll('#categories-group input[type="checkbox"]:checked')
-      .forEach(cb => checked.add(cb.value));
-    return checked;
+  // ── Helpers ───────────────────────────────────────────────────────────
+  function toSlash(d) { return d ? d.replace(/-/g, '/') : null; }
+
+  function getActivePills() {
+    const s = new Set();
+    document.querySelectorAll('.pill.active').forEach(p => s.add(p.dataset.type));
+    return s;
   }
 
+  // ── Render ────────────────────────────────────────────────────────────
+  const markerMap = new Map();
+
   function renderMarkers() {
-    const checkedTypes = getCheckedTypes();
-    const fromSlash = toSlash(document.getElementById('filter-date-from').value);
-    const toSlash_ = toSlash(document.getElementById('filter-date-to').value);
+    const active    = getActivePills();
+    const fromS     = toSlash(document.getElementById('filter-date-from').value);
+    const toS       = toSlash(document.getElementById('filter-date-to').value);
+    const query     = document.getElementById('search-input').value.trim().toLowerCase();
 
     clusterGroup.clearLayers();
+    markerMap.clear();
 
-    let visibleCount = 0, tcCount = 0, hanabiCount = 0;
+    const visible = [];
 
     allEvents.forEach(ev => {
       if (!ev.lat || !ev.lng) return;
 
-      // Date range filter
+      // Date range
       const evStart = ev.start_date || ev.date;
-      const evEnd = ev.end_date || evStart;
-      if (fromSlash && evEnd < fromSlash) return;
-      if (toSlash_ && evStart > toSlash_) return;
+      const evEnd   = ev.end_date || evStart;
+      if (fromS && evEnd   < fromS) return;
+      if (toS   && evStart > toS)   return;
 
-      // Type filter: hanabi uses 'hanabi' key, TC events use their categories
+      // Type filter
       if (ev.source === 'hanabi') {
-        if (!checkedTypes.has('hanabi')) return;
+        if (!active.has('hanabi')) return;
       } else {
-        const evCats = (ev.categories || []).filter(c => !TC_EXCLUDED_CATS.includes(c));
-        if (TC_EXCLUDED_CATS.every(c => (ev.categories || []).includes(c)) && evCats.length === 0) return;
-        if (!evCats.some(c => checkedTypes.has(c)) && evCats.length > 0) return;
-        if (evCats.length === 0 && checkedTypes.size === 0) return;
+        const cats = (ev.categories || []).filter(c => !TC_EXCLUDED_CATS.includes(c));
+        const onlyFW = TC_EXCLUDED_CATS.every(c => (ev.categories || []).includes(c)) && cats.length === 0;
+        if (onlyFW) return;
+        if (cats.length > 0 && !cats.some(c => active.has(c))) return;
       }
 
-      const icon = ev.source === 'tc' ? iconTC : iconHanabi;
-      const marker = L.marker([ev.lat, ev.lng], { icon });
-      marker.bindPopup(buildPopup(ev), { maxWidth: 280 });
-      clusterGroup.addLayer(marker);
+      // Search
+      if (query) {
+        const hay = [ev.title, ev.location_name, ev.venue, ev.access]
+          .filter(Boolean).join(' ').toLowerCase();
+        if (!hay.includes(query)) return;
+      }
 
-      visibleCount++;
-      if (ev.source === 'tc') tcCount++;
-      else hanabiCount++;
+      const icon   = ev.source === 'tc' ? iconTC : iconHanabi;
+      const marker = L.marker([ev.lat, ev.lng], { icon });
+      marker.bindPopup(buildPopup(ev), { maxWidth: 300, minWidth: 280 });
+      clusterGroup.addLayer(marker);
+      markerMap.set(ev.id, marker);
+      visible.push(ev);
     });
 
-    document.getElementById('stats').innerHTML = `
-      <strong>${visibleCount}</strong> événement${visibleCount !== 1 ? 's' : ''} affichés<br>
-      <span style="color:#4a9eff">●</span> TC : <strong>${tcCount}</strong><br>
-      <span style="color:#ff6b35">●</span> Hanabi : <strong>${hanabiCount}</strong>
-    `;
+    const tc     = visible.filter(e => e.source === 'tc').length;
+    const hanabi = visible.filter(e => e.source === 'hanabi').length;
+    document.getElementById('stats').innerHTML =
+      `<strong>${visible.length}</strong> événement${visible.length !== 1 ? 's' : ''} &nbsp;·&nbsp; ` +
+      `<span style="color:var(--tc)">●</span> ${tc} &nbsp;` +
+      `<span style="color:var(--hanabi)">●</span> ${hanabi}`;
+
+    buildEventList(visible);
   }
 
-  const TC_EXCLUDED_CATS = ['fireworks'];
+  // ── Event cards ───────────────────────────────────────────────────────
+  function buildEventList(events) {
+    const list = document.getElementById('event-list');
+    list.innerHTML = '';
 
-  function buildCategoryFilters() {
-    const container = document.getElementById('categories-group');
+    if (!events.length) {
+      list.innerHTML = '<div style="text-align:center;padding:32px 20px;font-size:13px;color:var(--muted)">Aucun événement</div>';
+      return;
+    }
+
+    events.forEach(ev => {
+      const card = document.createElement('div');
+      card.className = 'event-card';
+
+      const date = fmtDate(ev.start_date || ev.date);
+      const sub  = ev.source === 'tc'
+        ? [ev.location_name, ev.price].filter(Boolean).join(' · ')
+        : [ev.venue, ev.fireworks_count].filter(Boolean).join(' · ');
+
+      card.innerHTML = `
+        <div class="card-header">
+          <div class="card-dot ${ev.source}"></div>
+          <div class="card-title">${ev.title}</div>
+        </div>
+        <div class="card-meta">${date}${sub ? '<br>' + sub : ''}</div>`;
+
+      card.addEventListener('click', () => {
+        map.setView([ev.lat, ev.lng], 15, { animate: true });
+        const m = markerMap.get(ev.id);
+        if (m) setTimeout(() => m.openPopup(), 350);
+        document.querySelectorAll('.event-card').forEach(c => c.classList.remove('highlighted'));
+        card.classList.add('highlighted');
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+
+      list.appendChild(card);
+    });
+  }
+
+  // ── Pills builder ─────────────────────────────────────────────────────
+  function buildPills() {
+    const container = document.getElementById('pills');
     container.innerHTML = '';
 
-    // Hanabi entry first
-    const hanabiCount = allEvents.filter(ev => ev.source === 'hanabi').length;
-    const hanabiLabel = document.createElement('label');
-    hanabiLabel.className = 'cat-label checkbox-label';
-    hanabiLabel.innerHTML = `
-      <input type="checkbox" value="hanabi" checked />
-      <span class="dot dot-hanabi" style="width:10px;height:10px;border-radius:50%;flex-shrink:0"></span>
-      Hanabi
-      <span class="cat-count">${hanabiCount}</span>
-    `;
-    hanabiLabel.querySelector('input').addEventListener('change', renderMarkers);
-    container.appendChild(hanabiLabel);
+    const hCount = allEvents.filter(e => e.source === 'hanabi').length;
+    addPill(container, 'hanabi', `🎆 Hanabi`, true);
 
-    // Separator
-    const sep = document.createElement('div');
-    sep.style.cssText = 'border-top:1px solid #1a3050;margin:4px 0';
-    container.appendChild(sep);
-
-    // TC categories
     const catCounts = {};
     allEvents.forEach(ev => {
       if (ev.source !== 'tc') return;
       (ev.categories || []).forEach(c => { catCounts[c] = (catCounts[c] || 0) + 1; });
     });
 
-    Object.entries(catCounts).filter(([cat]) => !TC_EXCLUDED_CATS.includes(cat)).sort((a, b) => b[1] - a[1]).forEach(([cat, count]) => {
-      const label = document.createElement('label');
-      label.className = 'cat-label checkbox-label';
-      label.innerHTML = `
-        <input type="checkbox" value="${cat}" checked />
-        <span class="dot dot-tc" style="width:10px;height:10px;border-radius:50%;flex-shrink:0"></span>
-        ${cat}
-        <span class="cat-count">${count}</span>
-      `;
-      label.querySelector('input').addEventListener('change', renderMarkers);
-      container.appendChild(label);
+    Object.entries(catCounts)
+      .filter(([c]) => !TC_EXCLUDED_CATS.includes(c))
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([cat]) => {
+        const emoji = CAT_EMOJI[cat] || '';
+        addPill(container, cat, `${emoji} ${cat}`);
+      });
+  }
+
+  function addPill(container, type, label, isHanabi = false) {
+    const btn = document.createElement('button');
+    btn.className = 'pill active' + (isHanabi ? ' h' : '');
+    btn.dataset.type = type;
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('active');
+      renderMarkers();
     });
+    container.appendChild(btn);
   }
 
-  function resetFilters() {
+  // ── Reset ─────────────────────────────────────────────────────────────
+  document.getElementById('reset-filters').addEventListener('click', () => {
     document.getElementById('filter-date-from').value = '';
-    document.getElementById('filter-date-to').value = '';
-    document.querySelectorAll('#categories-group input[type="checkbox"]')
-      .forEach(cb => cb.checked = true);
+    document.getElementById('filter-date-to').value   = '';
+    document.getElementById('search-input').value     = '';
+    document.querySelectorAll('.pill').forEach(p => p.classList.add('active'));
     renderMarkers();
-  }
+  });
 
+  // ── Listeners ─────────────────────────────────────────────────────────
+  document.getElementById('filter-date-from').addEventListener('change', renderMarkers);
+  document.getElementById('filter-date-to').addEventListener('change', renderMarkers);
+  document.getElementById('search-input').addEventListener('input', renderMarkers);
+
+  // ── Init ──────────────────────────────────────────────────────────────
   async function loadEvents() {
     try {
       const res = await fetch('/events?limit=1000');
       allEvents = await res.json();
-      buildCategoryFilters();
+      buildPills();
       renderMarkers();
     } catch (e) {
       document.getElementById('stats').textContent = 'Erreur de chargement.';
       console.error(e);
     }
   }
-
-  document.getElementById('filter-date-from').addEventListener('change', renderMarkers);
-  document.getElementById('filter-date-to').addEventListener('change', renderMarkers);
-  document.getElementById('reset-filters').addEventListener('click', resetFilters);
 
   loadEvents();
 </script>
