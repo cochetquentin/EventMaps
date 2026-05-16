@@ -55,20 +55,70 @@ def _extract_time(text: str) -> tuple[str | None, str | None]:
     return None, None
 
 
+# Tokens pour le format 年M/D : année, M/D, fin-range ～D, jour additionnel ・D
+_SLASH_TOKEN_RE = re.compile(
+    r"(\d{4})年"                    # groupe 1 : année
+    r"|(\d{1,2})/(\d{1,2})"        # groupes 2,3 : mois/jour
+    r"|～(\d{1,2})"                 # groupe 4 : fin de range
+    r"|[・、,](\d{1,2})(?![/\d])"  # groupe 5 : jour additionnel (pas suivi de / ou chiffre)
+)
+
+
+def _parse_slash_dates(text: str) -> list[str]:
+    """Parse les formats 年M/D・D avec listes (・) et ranges (～), multi-années."""
+    results: set[Date] = set()
+    year = ctx_month = prev_day = None
+
+    for m in _SLASH_TOKEN_RE.finditer(text):
+        if m.group(1):                          # nouvelle année
+            year = int(m.group(1))
+            ctx_month = prev_day = None
+        elif m.group(2) and m.group(3):         # M/D
+            if year is None:
+                continue
+            ctx_month, day = int(m.group(2)), int(m.group(3))
+            try:
+                results.add(Date(year, ctx_month, day))
+                prev_day = day
+            except ValueError:
+                pass
+        elif m.group(4) and year and ctx_month and prev_day:  # ～D (range)
+            end_day = int(m.group(4))
+            d = Date(year, ctx_month, prev_day + 1)
+            end = Date(year, ctx_month, end_day)
+            while d <= end:
+                results.add(d)
+                d += timedelta(days=1)
+            prev_day = end_day
+        elif m.group(5) and year and ctx_month:  # ・D (jour additionnel)
+            day = int(m.group(5))
+            try:
+                results.add(Date(year, ctx_month, day))
+                prev_day = day
+            except ValueError:
+                pass
+
+    return sorted(d.strftime("%Y/%m/%d") for d in results)
+
+
 def _extract_dates(raw: str) -> list[str]:
     """
     Retourne la liste de toutes les dates YYYY/MM/DD trouvées dans le texte.
-    Gère les listes (・/、) et les plages (～). Fallback sur la première date
-    pour les formats complexes avec /.
+    Gère les listes (・/、), les plages (～) et le format 年M/D.
     """
     text = raw.replace("〜", "～")
 
-    # Formats non-japonais trop complexes (ex: '2026/7/20・26～31')
-    if re.search(r"年\d{1,2}/|\d{4}/\d{1,2}[・～]", text):
-        m = _FULL_DATE_RE.search(text)
-        return [f"{m.group(1)}/{int(m.group(2)):02d}/{int(m.group(3)):02d}"] if m else [raw]
+    # Format 年M/D (ex: '2026年4/4・5・11', '2026年5/30(土)、6/27')
+    if re.search(r"年\d{1,2}/", text):
+        dates = _parse_slash_dates(text)
+        if dates:
+            return dates
 
+    # Format YYYY/M/D sans 年月日 : trop complexe, fallback première date
     first = _FULL_DATE_RE.search(text)
+    if re.search(r"\d{4}/\d{1,2}[・～]", text):
+        return [f"{first.group(1)}/{int(first.group(2)):02d}/{int(first.group(3)):02d}"] if first else [raw]
+
     if not first:
         return [raw]
 
