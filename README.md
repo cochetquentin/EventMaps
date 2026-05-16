@@ -21,7 +21,26 @@ scraper = TokyoCheapo()
 events = scraper.scrape_all(max_pages=10)
 ```
 
-**Champs retournés :** `url`, `title`, `date`, `time`, `price`, `description`, `categories`, `tags`, `official_link`, `locations` (liste avec `name`, `lat`, `lng`, `address`)
+**Champs retournés :**
+
+| Champ | Description |
+|---|---|
+| `url` | URL de la page Tokyo Cheapo |
+| `title` | Nom de l'événement |
+| `start_date` | Date de début au format `YYYY/MM/DD` |
+| `end_date` | Date de fin au format `YYYY/MM/DD` (identique à `start_date` si événement sur un seul jour) |
+| `start_time` | Heure de début (`HH:MM`, 24h) |
+| `end_time` | Heure de fin (`HH:MM`, 24h) |
+| `price` | Prix (ex: `Free`, `¥1,000 – ¥2,500`, `¥500 (advance sales)`) |
+| `categories` | Catégories séparées par des virgules |
+| `tags` | Tags séparés par des virgules |
+| `official_link` | URL du site officiel de l'événement |
+| `locations` | Liste de lieux avec `name`, `lat`, `lng`, `address` |
+
+**Normalisation des dates :**
+- Dates précises (`Fri, May 15`, `May 16 - May 17`) → `YYYY/MM/DD`
+- Plages floues (`Mid May`, `Mid ~ Late May`, `Early Apr ~ Early Jun`) → converties via Early=1-10, Mid=11-20, Late=21-fin du mois
+- Dates non parsables → conservées telles quelles
 
 ---
 
@@ -77,9 +96,22 @@ Les événements sur plusieurs jours sont automatiquement dupliqués — une lig
 
 ## Export CSV
 
+### Tokyo Cheapo
+
+```bash
+uv run python main.py > output.csv
+```
+
+Colonnes : `title`, `start_date`, `end_date`, `start_time`, `end_time`, `price`, `categories`, `tags`, `official_link`, `url`, `location_name`, `lat`, `lng`
+
+Les événements multi-lieux génèrent une ligne par lieu.
+
+### Hanabi Walker
+
 ```python
 import pandas as pd
 
+scraper = HanabiWalker()
 events = scraper.scrape_all()
-pd.DataFrame(events).to_csv("output.csv", index=False, encoding="utf-8-sig")
+pd.DataFrame(events).to_csv("output_hanabi.csv", index=False, encoding="utf-8-sig")
 ```

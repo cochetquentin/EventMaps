@@ -1,7 +1,10 @@
+import html as _html
 import json
 import re
 import requests
 from bs4 import BeautifulSoup
+import calendar
+from datetime import date as Date
 
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -22,6 +25,136 @@ _EXCLUDE_LINKS = {
 }
 
 BASE_URL = "https://tokyocheapo.com"
+
+_MONTH_ABBREVS = {
+    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+    'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+}
+
+
+def _clean_whitespace(text: str) -> str:
+    return re.sub(r'\s+', ' ', text).strip()
+
+
+def _is_price_text(text: str) -> bool:
+    t = text.strip()
+    return bool(re.match(r'^(Free|¥|\$|€)', t, re.IGNORECASE)) \
+        or bool(re.search(r'advance sales|at the door', t, re.IGNORECASE))
+
+
+def _parse_12h_time(token: str) -> str:
+    """'7:30pm' → '19:30'. Retourne le token original si non parseable."""
+    m = re.match(r'^(\d{1,2}):(\d{2})\s*(am|pm)$', token.strip(), re.IGNORECASE)
+    if not m:
+        return token.strip()
+    h, mn, period = int(m.group(1)), int(m.group(2)), m.group(3).lower()
+    if period == 'pm' and h != 12:
+        h += 12
+    elif period == 'am' and h == 12:
+        h = 0
+    return f"{h:02d}:{mn:02d}"
+
+
+def _split_time(time_str: str) -> tuple[str, str]:
+    """'7:30pm – 10:00pm' → ('19:30', '22:00'). Retourne ('', '') si vide."""
+    parts = re.split(r'\s*[–—\-]\s*', time_str.strip(), maxsplit=1)
+    if len(parts) == 2:
+        return _parse_12h_time(parts[0]), _parse_12h_time(parts[1])
+    if parts[0]:
+        return _parse_12h_time(parts[0]), ''
+    return '', ''
+
+
+def _parse_date_part(text: str, year: int) -> Date | None:
+    """Parse 'May 15', 'Fri, May 15', 'Mar 27' → date object."""
+    text = re.sub(r'^(Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s*', '', text, flags=re.IGNORECASE).strip()
+    m = re.match(r'^([A-Za-z]{3,})\s+(\d{1,2})$', text)
+    if m:
+        month = _MONTH_ABBREVS.get(m.group(1)[:3].lower())
+        if month:
+            return Date(year, month, int(m.group(2)))
+    return None
+
+
+_FUZZY_PERIODS = {"early": (1, 10), "mid": (11, 20), "late": (21, None)}
+
+# "Early May", "Mid ~ Late May", "Early Apr ~ Early Jun"
+_FUZZY_SINGLE_RE = re.compile(r'^(early|mid|late)\s+([a-z]+)$', re.IGNORECASE)
+_FUZZY_SAME_MONTH_RE = re.compile(r'^(early|mid|late)\s*~\s*(early|mid|late)\s+([a-z]+)$', re.IGNORECASE)
+_FUZZY_CROSS_MONTH_RE = re.compile(r'^(early|mid|late)\s+([a-z]+)\s*~\s*(early|mid|late)\s+([a-z]+)$', re.IGNORECASE)
+
+
+def _fuzzy_start(period: str, month: int, year: int) -> Date:
+    return Date(year, month, _FUZZY_PERIODS[period.lower()][0])
+
+
+def _fuzzy_end(period: str, month: int, year: int) -> Date:
+    day = _FUZZY_PERIODS[period.lower()][1] or calendar.monthrange(year, month)[1]
+    return Date(year, month, day)
+
+
+def _parse_fuzzy_date_range(date_str: str, year: int) -> tuple[str, str] | None:
+    m = _FUZZY_SINGLE_RE.match(date_str)
+    if m:
+        period, mon = m.group(1), m.group(2)
+        month = _MONTH_ABBREVS.get(mon[:3].lower())
+        if month:
+            return (
+                _fuzzy_start(period, month, year).strftime('%Y/%m/%d'),
+                _fuzzy_end(period, month, year).strftime('%Y/%m/%d'),
+            )
+
+    m = _FUZZY_SAME_MONTH_RE.match(date_str)
+    if m:
+        p1, p2, mon = m.group(1), m.group(2), m.group(3)
+        month = _MONTH_ABBREVS.get(mon[:3].lower())
+        if month:
+            return (
+                _fuzzy_start(p1, month, year).strftime('%Y/%m/%d'),
+                _fuzzy_end(p2, month, year).strftime('%Y/%m/%d'),
+            )
+
+    m = _FUZZY_CROSS_MONTH_RE.match(date_str)
+    if m:
+        p1, mon1, p2, mon2 = m.group(1), m.group(2), m.group(3), m.group(4)
+        month1 = _MONTH_ABBREVS.get(mon1[:3].lower())
+        month2 = _MONTH_ABBREVS.get(mon2[:3].lower())
+        if month1 and month2:
+            return (
+                _fuzzy_start(p1, month1, year).strftime('%Y/%m/%d'),
+                _fuzzy_end(p2, month2, year).strftime('%Y/%m/%d'),
+            )
+
+    return None
+
+
+def _parse_date_range(date_str: str, year: int | None = None) -> tuple[str, str]:
+    """
+    Retourne (start_date, end_date) en format YYYY/MM/DD.
+    - Date unique → (date, "")
+    - Plage → (start, end) normalisés
+    - Dates fuzzy ('Mid May') → (date_str, "")
+    """
+    if year is None:
+        year = Date.today().year
+
+    range_m = re.match(r'^(.+?)\s+-\s+(.+)$', date_str.strip())
+    if range_m:
+        start = _parse_date_part(range_m.group(1).strip(), year)
+        end = _parse_date_part(range_m.group(2).strip(), year)
+        if start and end:
+            return start.strftime('%Y/%m/%d'), end.strftime('%Y/%m/%d')
+        return date_str, ""
+
+    single = _parse_date_part(date_str.strip(), year)
+    if single:
+        d = single.strftime('%Y/%m/%d')
+        return d, d
+
+    fuzzy = _parse_fuzzy_date_range(date_str.strip(), year)
+    if fuzzy:
+        return fuzzy
+    return date_str, ""
 
 
 class TokyoCheapo:
@@ -79,9 +212,14 @@ class TokyoCheapo:
     def parse_time_and_price(self, soup: BeautifulSoup) -> tuple[str, str | None]:
         header = soup.find_all("header")[-1]
         attrs = header.find_all("div", class_="event__attribute")
-        time = attrs[0].text.strip() if attrs else ""
-        price = attrs[1].text.strip() if len(attrs) > 1 else None
-        return time, price
+        if not attrs:
+            return "", None
+        first = _clean_whitespace(attrs[0].text)
+        second = _clean_whitespace(attrs[1].text) if len(attrs) > 1 else None
+        # Détecter si le premier attr est un prix (pas un horaire)
+        if _is_price_text(first) and second is None:
+            return "", first
+        return first, second
 
     def parse_description(self, soup: BeautifulSoup) -> str:
         return soup.find("div", class_="entry-content__text").text.strip()
@@ -134,7 +272,7 @@ class TokyoCheapo:
         if locations:
             return [
                 {
-                    "name": loc[0],
+                    "name": _html.unescape(loc[0]),
                     "lat": float(loc[1]),
                     "lng": float(loc[2]),
                     "address": loc[3] if len(loc) > 3 else "",
@@ -145,7 +283,7 @@ class TokyoCheapo:
         # Fallback: un seul lieu
         return [
             {
-                "name": data.get("title", ""),
+                "name": _html.unescape(data.get("title", "")),
                 "lat": float(data["lat"]),
                 "lng": float(data["lng"]),
                 "address": data.get("addr") or data.get("dispaddr", ""),
@@ -155,12 +293,17 @@ class TokyoCheapo:
     def scrape_event(self, url: str) -> dict:
         """Scrape toutes les infos d'un événement depuis son URL."""
         soup = self.get_event_page(url)
-        time, price = self.parse_time_and_price(soup)
+        time_raw, price = self.parse_time_and_price(soup)
+        start_time, end_time = _split_time(time_raw) if time_raw else ('', '')
+        date_raw = self.parse_date(soup)
+        start_date, end_date = _parse_date_range(date_raw)
         return {
             "url": url,
             "title": self.parse_title(soup),
-            "date": self.parse_date(soup),
-            "time": time,
+            "start_date": start_date,
+            "end_date": end_date,
+            "start_time": start_time,
+            "end_time": end_time,
             "price": price,
             "description": self.parse_description(soup),
             "categories": self.parse_categories(soup),

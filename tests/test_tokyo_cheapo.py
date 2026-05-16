@@ -1,7 +1,14 @@
 import json
 import pytest
 from bs4 import BeautifulSoup
-from scrapers.tokyo_cheapo import TokyoCheapo
+from scrapers.tokyo_cheapo import (
+    TokyoCheapo,
+    _clean_whitespace,
+    _is_price_text,
+    _parse_12h_time,
+    _split_time,
+    _parse_date_range,
+)
 
 
 @pytest.fixture
@@ -89,6 +96,41 @@ def test_parse_time_and_price_no_price(tc):
     time, price = tc.parse_time_and_price(soup)
     assert time == "7:30pm – 10:00pm"
     assert price is None
+
+
+def test_parse_time_and_price_price_only(tc):
+    # Un seul attr qui est un prix → time vide, price rempli
+    soup = make_soup("""
+    <header>
+        <div class="event__attribute">Free</div>
+    </header>
+    """)
+    time, price = tc.parse_time_and_price(soup)
+    assert time == ""
+    assert price == "Free"
+
+
+def test_parse_time_and_price_yen_only(tc):
+    soup = make_soup("""
+    <header>
+        <div class="event__attribute">¥3,800\t\t\t – ¥40,000</div>
+    </header>
+    """)
+    time, price = tc.parse_time_and_price(soup)
+    assert time == ""
+    assert price == "¥3,800 – ¥40,000"
+
+
+def test_parse_time_and_price_tabs_cleaned(tc):
+    soup = make_soup("""
+    <header>
+        <div class="event__attribute">9:00am – 5:00pm</div>
+        <div class="event__attribute">¥1,000\t\t\t – ¥2,500</div>
+    </header>
+    """)
+    time, price = tc.parse_time_and_price(soup)
+    assert time == "9:00am – 5:00pm"
+    assert price == "¥1,000 – ¥2,500"
 
 
 def test_parse_time_and_price_empty(tc):
@@ -203,3 +245,133 @@ def test_parse_locations_single_fallback(tc):
 def test_parse_locations_no_map(tc):
     soup = make_soup("<div></div>")
     assert tc.parse_locations(soup) == []
+
+
+def test_parse_locations_html_entity(tc):
+    data = {"lat": "35.69", "lng": "139.76", "title": "WeLearn Community 80&#8217;s Café"}
+    soup = make_soup(f"""
+    <div async-component="1" component-name="apple-maps">
+        <script type="application/json">{json.dumps(data)}</script>
+    </div>
+    """)
+    locs = tc.parse_locations(soup)
+    assert locs[0]["name"] == "WeLearn Community 80\u2019s Café"
+
+
+# --- _clean_whitespace ---
+
+def test_clean_whitespace_tabs():
+    assert _clean_whitespace("¥3,800\t\t\t\t – ¥40,000") == "¥3,800 – ¥40,000"
+
+
+def test_clean_whitespace_newlines():
+    assert _clean_whitespace("hello\n  world") == "hello world"
+
+
+def test_clean_whitespace_already_clean():
+    assert _clean_whitespace("Free") == "Free"
+
+
+# --- _is_price_text ---
+
+def test_is_price_free():
+    assert _is_price_text("Free") is True
+
+
+def test_is_price_yen():
+    assert _is_price_text("¥1,000") is True
+
+
+def test_is_price_advance_sales():
+    assert _is_price_text("¥500 (advance sales)") is True
+
+
+def test_is_price_at_the_door():
+    assert _is_price_text("¥2,600 (at the door)") is True
+
+
+def test_is_price_time():
+    assert _is_price_text("7:30pm – 10:00pm") is False
+
+
+def test_is_price_empty():
+    assert _is_price_text("") is False
+
+
+# --- _parse_12h_time ---
+
+def test_parse_12h_time_pm():
+    assert _parse_12h_time("7:30pm") == "19:30"
+
+
+def test_parse_12h_time_am():
+    assert _parse_12h_time("6:00am") == "06:00"
+
+
+def test_parse_12h_time_noon():
+    assert _parse_12h_time("12:00pm") == "12:00"
+
+
+def test_parse_12h_time_midnight():
+    assert _parse_12h_time("12:00am") == "00:00"
+
+
+def test_parse_12h_time_uppercase():
+    assert _parse_12h_time("9:30AM") == "09:30"
+
+
+# --- _split_time ---
+
+def test_split_time_range():
+    assert _split_time("7:30pm – 10:00pm") == ("19:30", "22:00")
+
+
+def test_split_time_am_pm():
+    assert _split_time("9:00am – 2:30pm") == ("09:00", "14:30")
+
+
+def test_split_time_start_only():
+    assert _split_time("12:00pm") == ("12:00", "")
+
+
+def test_split_time_empty():
+    assert _split_time("") == ("", "")
+
+
+# --- _parse_date_range ---
+
+def test_parse_date_range_single_with_weekday():
+    assert _parse_date_range("Fri, May 15", year=2026) == ("2026/05/15", "2026/05/15")
+
+
+def test_parse_date_range_single():
+    assert _parse_date_range("May 16", year=2026) == ("2026/05/16", "2026/05/16")
+
+
+def test_parse_date_range_short_range():
+    assert _parse_date_range("May 15 - May 17", year=2026) == ("2026/05/15", "2026/05/17")
+
+
+def test_parse_date_range_long_range():
+    assert _parse_date_range("Mar 27 - Sep 30", year=2026) == ("2026/03/27", "2026/09/30")
+
+
+def test_parse_date_range_cross_month():
+    assert _parse_date_range("May 30 - Jun 2", year=2026) == ("2026/05/30", "2026/06/02")
+
+
+def test_parse_date_range_fuzzy_single():
+    assert _parse_date_range("Mid May", year=2026) == ("2026/05/11", "2026/05/20")
+
+
+def test_parse_date_range_fuzzy_same_month():
+    assert _parse_date_range("Mid ~ Late May", year=2026) == ("2026/05/11", "2026/05/31")
+
+
+def test_parse_date_range_fuzzy_cross_month():
+    assert _parse_date_range("Early Apr ~ Early Jun", year=2026) == ("2026/04/01", "2026/06/10")
+
+
+def test_parse_date_range_fuzzy_late_month_end():
+    # Late Feb → dernier jour de février
+    assert _parse_date_range("Late Feb", year=2026) == ("2026/02/21", "2026/02/28")
