@@ -1,4 +1,5 @@
 import re
+from datetime import date as Date, timedelta
 import requests
 from bs4 import BeautifulSoup
 
@@ -33,7 +34,10 @@ _FIELD_MAP = {
 
 BASE_URL = "https://hanabi.walkerplus.com"
 
-_DATE_RE = re.compile(r"(\d{4})年(\d{1,2})月(\d{1,2})日[（(][月火水木金土日祝][）)]")
+_FULL_DATE_RE = re.compile(r"(\d{4})年(\d{1,2})月(\d{1,2})日")
+_MONTH_DAY_RE = re.compile(r"(\d{1,2})月(\d{1,2})日")
+_DAY_WEEKDAY_RE = re.compile(r"(?<!\d)(\d{1,2})日[（(][月火水木金土日祝][）)]")
+_RANGE_RE = re.compile(r"(\d{1,2})日[（(][月火水木金土日祝][）)]～(\d{1,2})日")
 _TIME_RANGE_RE = re.compile(r"\d{1,2}:\d{2}[～〜]\d{1,2}:\d{2}")
 _TIME_START_RE = re.compile(r"\d{1,2}:\d{2}[～〜]")
 
@@ -51,13 +55,50 @@ def _extract_time(text: str) -> tuple[str | None, str | None]:
     return None, None
 
 
-def _extract_date(text: str) -> str:
-    """Extrait la première date et la retourne au format YYYY/MM/DD."""
-    m = _DATE_RE.search(text)
-    if not m:
-        return text
-    year, month, day = m.group(1), m.group(2).zfill(2), m.group(3).zfill(2)
-    return f"{year}/{month}/{day}"
+def _extract_dates(raw: str) -> list[str]:
+    """
+    Retourne la liste de toutes les dates YYYY/MM/DD trouvées dans le texte.
+    Gère les listes (・/、) et les plages (～). Fallback sur la première date
+    pour les formats complexes avec /.
+    """
+    text = raw.replace("〜", "～")
+
+    # Formats non-japonais trop complexes (ex: '2026/7/20・26～31')
+    if re.search(r"年\d{1,2}/|\d{4}/\d{1,2}[・～]", text):
+        m = _FULL_DATE_RE.search(text)
+        return [f"{m.group(1)}/{int(m.group(2)):02d}/{int(m.group(3)):02d}"] if m else [raw]
+
+    first = _FULL_DATE_RE.search(text)
+    if not first:
+        return [raw]
+
+    year = int(first.group(1))
+    collected: set[Date] = set()
+
+    # 1. Plages explicites : DD日(X)～DD日
+    for m in _RANGE_RE.finditer(text):
+        prefix = text[: m.start()]
+        months_found = re.findall(r"(\d{1,2})月", prefix)
+        month = int(months_found[-1]) if months_found else int(first.group(2))
+        d = Date(year, month, int(m.group(1)))
+        end = Date(year, month, int(m.group(2)))
+        while d <= end:
+            collected.add(d)
+            d += timedelta(days=1)
+
+    # 2. Toutes les références MM月DD日
+    for m in _MONTH_DAY_RE.finditer(text):
+        collected.add(Date(year, int(m.group(1)), int(m.group(2))))
+
+    # 3. DD日(weekday) standalone avec contexte du dernier mois vu
+    ctx_month = int(first.group(2))
+    for m in _DAY_WEEKDAY_RE.finditer(text):
+        prefix = text[: m.start()]
+        months_found = re.findall(r"(\d{1,2})月", prefix)
+        month = int(months_found[-1]) if months_found else ctx_month
+        collected.add(Date(year, month, int(m.group(1))))
+
+    return sorted(d.strftime("%Y/%m/%d") for d in collected)
 
 
 def _split_paid_seating(text: str) -> tuple[str, str | None]:
@@ -128,7 +169,7 @@ class HanabiWalker:
                 elif english_key == "time":
                     result["start_time"], result["end_time"] = _extract_time(td.text.strip())
                 elif english_key == "date":
-                    result[english_key] = _extract_date(td.text.strip())
+                    result["dates"] = _extract_dates(td.text.strip())
                 elif english_key == "paid_seating":
                     flag, details = _split_paid_seating(td.text.strip())
                     result["paid_seating"] = flag
@@ -165,12 +206,15 @@ class HanabiWalker:
         return event
 
     def scrape_all(self, max_pages: int = 20) -> list[dict]:
-        """Scrape tous les événements. Ignore les erreurs par événement."""
+        """Scrape tous les événements. Explose les multi-jours en une ligne par jour."""
         paths = self.get_event_links(max_pages=max_pages)
         events = []
         for path in paths:
             try:
-                events.append(self.scrape_event(path))
+                event = self.scrape_event(path)
+                dates = event.pop("dates")
+                for date in dates:
+                    events.append({**event, "date": date})
             except Exception as e:
                 print(f"[SKIP] {path} — {e}")
         return events
