@@ -1,7 +1,10 @@
 import argparse
 import csv
+import logging
 import sys
 from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 from scrapers.tokyo_cheapo import TokyoCheapo
 from scrapers.hanabi_walker import HanabiWalker
@@ -113,7 +116,7 @@ def cmd_tc(args):
     if args.output == "db":
         with EventStore(args.db) as store:
             store.upsert_tokyo_cheapo(events)
-        print(f"Tokyo Cheapo: {len(events)} rows → {args.db}", file=sys.stderr)
+        logger.info("Tokyo Cheapo: %d rows → %s", len(events), args.db)
     else:
         _write_tc_csv(events)
 
@@ -124,7 +127,7 @@ def cmd_hanabi(args):
     if args.output == "db":
         with EventStore(args.db) as store:
             store.upsert_hanabi(events)
-        print(f"Hanabi Walker: {len(events)} rows → {args.db}", file=sys.stderr)
+        logger.info("Hanabi Walker: %d rows → %s", len(events), args.db)
     else:
         _write_hanabi_csv(events)
 
@@ -138,9 +141,9 @@ def cmd_all(args):
         with EventStore(args.db) as store:
             store.upsert_tokyo_cheapo(tc_events)
             store.upsert_hanabi(hanabi_events)
-        print(f"Tokyo Cheapo: {len(tc_events)} rows", file=sys.stderr)
-        print(f"Hanabi Walker: {len(hanabi_events)} rows", file=sys.stderr)
-        print(f"Stored in {args.db}", file=sys.stderr)
+        logger.info("Tokyo Cheapo: %d rows", len(tc_events))
+        logger.info("Hanabi Walker: %d rows", len(hanabi_events))
+        logger.info("Stored in %s", args.db)
     else:
         _write_tc_csv(tc_events)
         _write_hanabi_csv(hanabi_events)
@@ -161,6 +164,7 @@ def main():
     p_all = sub.add_parser("all", help="Scrape all sources")
     p_all.add_argument("--region", default="ar0300", metavar="CODE")
 
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s")
     args = parser.parse_args()
 
     if args.source == "tc":

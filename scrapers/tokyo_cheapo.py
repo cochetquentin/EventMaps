@@ -1,10 +1,13 @@
 import html as _html
 import json
+import logging
 import re
 import requests
 from bs4 import BeautifulSoup
 import calendar
 from datetime import date as Date
+
+logger = logging.getLogger(__name__)
 
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -320,5 +323,5 @@ class TokyoCheapo:
             try:
                 events.append(self.scrape_event(url))
             except Exception as e:
-                print(f"[SKIP] {url} — {e}")
+                logger.warning("SKIP %s — %s", url, e)
         return events
