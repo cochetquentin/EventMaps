@@ -83,6 +83,10 @@ class EventStore:
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.execute(_TC_DDL)
         self._conn.execute(_HANABI_DDL)
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_tc_start_date ON tokyo_cheapo(start_date)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_tc_coords ON tokyo_cheapo(lat, lng)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_hanabi_date ON hanabi(date)")
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_hanabi_coords ON hanabi(lat, lng)")
         self._conn.commit()
 
     def __enter__(self):

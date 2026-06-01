@@ -1,7 +1,10 @@
+import logging
 import re
 from datetime import date as Date, timedelta
 import requests
 from bs4 import BeautifulSoup
+
+logger = logging.getLogger(__name__)
 
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -266,5 +269,5 @@ class HanabiWalker:
                 for date in dates:
                     events.append({**event, "date": date})
             except Exception as e:
-                print(f"[SKIP] {path} — {e}")
+                logger.warning("SKIP %s — %s", path, e)
         return events
