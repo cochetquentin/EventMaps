@@ -20,7 +20,7 @@ jobs:
       - uses: astral-sh/setup-uv@v4
 
       - name: Installer les dépendances
-        run: uv sync --all-groups
+        run: uv sync --all-groups --locked
 
       - name: Lancer les tests
-        run: uv run python -m pytest tests/ -v
+        run: uv run --locked python -m pytest tests/ -v
