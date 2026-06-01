@@ -164,6 +164,7 @@ def main():
     p_all = sub.add_parser("all", help="Scrape all sources")
     p_all.add_argument("--region", default="ar0300", metavar="CODE")
 
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s")
     args = parser.parse_args()
 
     if args.source == "tc":
