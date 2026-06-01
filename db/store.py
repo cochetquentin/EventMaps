@@ -1,6 +1,7 @@
 import csv
 import hashlib
 import json
+import os
 import sqlite3
 import sys
 from datetime import datetime
@@ -78,6 +79,8 @@ CREATE TABLE IF NOT EXISTS hanabi (
 
 class EventStore:
     def __init__(self, db_path: str = "data/events.db"):
+        if parent := os.path.dirname(db_path):
+            os.makedirs(parent, exist_ok=True)
         self._conn = sqlite3.connect(db_path)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
