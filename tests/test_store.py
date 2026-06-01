@@ -1,10 +1,9 @@
-import csv
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import pytest
 
 from db.store import EventStore, _make_id
-from models.event import HanabiEvent, TokyoCheapoEvent
+from models.event import Event
 
 
 # --- Fixtures ---
@@ -14,58 +13,69 @@ _TC_URL = "https://tokyocheapo.com/event/foo"
 _HW_URL = "https://hanabi.walkerplus.com/detail/ar0300e001/"
 
 
-def make_tc(**kwargs) -> TokyoCheapoEvent:
+def make_tc(**kwargs) -> Event:
     defaults = dict(
         id=_make_id([_TC_URL, "Yoyogi Park"]),
-        scraped_at=_NOW,
+        source="tc",
         title="Foo Festival",
         url=_TC_URL,
-        start_date="2026/05/15",
-        end_date="2026/05/15",
-        start_time="10:00",
-        end_time="18:00",
+        start_date=date(2026, 5, 15),
+        end_date=date(2026, 5, 15),
+        times="10:00-18:00",
+        latitude=35.671,
+        longitude=139.694,
         price="Free",
-        categories=["festival", "free"],
-        tags=["outdoor"],
-        official_link="https://example.com",
-        location_name="Yoyogi Park",
-        lat=35.671,
-        lng=139.694,
+        attributes={
+            "categories": ["festival", "free"],
+            "tags": ["outdoor"],
+            "official_link": "https://example.com",
+            "location_name": "Yoyogi Park",
+        },
+        created_at=_NOW,
     )
     defaults.update(kwargs)
     if "id" not in kwargs:
-        defaults["id"] = _make_id([defaults["url"], defaults.get("location_name") or ""])
-    return TokyoCheapoEvent(**defaults)
+        loc = defaults.get("attributes", {}).get("location_name") or ""
+        defaults["id"] = _make_id([defaults["url"], loc])
+    return Event(**defaults)
 
 
-def make_hanabi(**kwargs) -> HanabiEvent:
+def make_hanabi(**kwargs) -> Event:
     defaults = dict(
         id=_make_id([_HW_URL, "2026/07/25"]),
-        scraped_at=_NOW,
+        source="hanabi",
         title="Sumida River Fireworks",
         url=_HW_URL,
-        start_date="2026/07/25",
-        start_time="19:05",
-        end_time="20:30",
-        lat=35.711,
-        lng=139.801,
-        fireworks_count="約2万発",
-        fireworks_duration="90分",
-        expected_crowd="約95万人",
-        rain_policy="雨天決行",
-        paid_seating="あり",
-        paid_seating_details="S席: ¥5,000",
-        food_stalls="あり",
+        start_date=date(2026, 7, 25),
+        times="19:05-20:30",
         venue="隅田川",
-        access="浅草駅",
-        parking="なし",
-        official_site="https://sumidagawa-hanabi.com",
-        contact="03-1234-5678",
+        latitude=35.711,
+        longitude=139.801,
+        attributes={
+            "fireworks_count": "約2万発",
+            "fireworks_duration": "90分",
+            "expected_crowd": "約95万人",
+            "rain_policy": "雨天決行",
+            "paid_seating": "あり",
+            "paid_seating_details": "S席: ¥5,000",
+            "food_stalls": "あり",
+            "access": "浅草駅",
+            "parking": "なし",
+            "official_site": "https://sumidagawa-hanabi.com",
+            "contact": "03-1234-5678",
+        },
+        created_at=_NOW,
     )
     defaults.update(kwargs)
     if "id" not in kwargs:
-        defaults["id"] = _make_id([defaults["url"], defaults.get("start_date") or ""])
-    return HanabiEvent(**defaults)
+        # Préserver la logique d'ID basée sur YYYY/MM/DD brut
+        sd = defaults.get("start_date")
+        if isinstance(sd, date):
+            raw_date = sd.strftime("%Y/%m/%d")
+        else:
+            raw_date = str(sd) if sd else ""
+        defaults["id"] = _make_id([defaults["url"], raw_date])
+    return Event(**defaults)
 
 
 # --- _make_id ---
@@ -77,77 +87,84 @@ def test_make_id_stable():
     assert result.isalnum()
 
 
-# --- TokyoCheapo ---
+# --- upsert_events (TC) ---
 
 def test_upsert_tc_inserts_row(tmp_path):
     db = str(tmp_path / "events.db")
     with EventStore(db) as store:
-        store.upsert_tokyo_cheapo([make_tc()])
-        rows = store._conn.execute("SELECT * FROM tokyo_cheapo").fetchall()
+        store.upsert_events([make_tc()])
+        rows = store._conn.execute("SELECT id, title, latitude FROM events WHERE source='tc'").fetchall()
     assert len(rows) == 1
     assert rows[0][1] == "Foo Festival"
-    assert rows[0][11] == "Yoyogi Park"
-    assert rows[0][12] == pytest.approx(35.671)
+    assert rows[0][2] == pytest.approx(35.671)
 
 
 def test_upsert_tc_updates_on_rerun(tmp_path):
     db = str(tmp_path / "events.db")
     with EventStore(db) as store:
-        store.upsert_tokyo_cheapo([make_tc()])
-        store.upsert_tokyo_cheapo([make_tc(price="¥500")])
-        rows = store._conn.execute("SELECT * FROM tokyo_cheapo").fetchall()
-    assert len(rows) == 1
-    assert rows[0][6] == "¥500"
+        store.upsert_events([make_tc()])
+        store.upsert_events([make_tc(price="¥500")])
+        result = store.get_event(make_tc().id)
+    assert result is not None
+    assert result.price == "¥500"
 
 
 def test_upsert_tc_multi_location(tmp_path):
     db = str(tmp_path / "events.db")
+    e1 = make_tc(attributes={"categories": [], "tags": [], "official_link": None, "location_name": "Yoyogi Park"})
+    e2 = make_tc(
+        latitude=35.685, longitude=139.710,
+        attributes={"categories": [], "tags": [], "official_link": None, "location_name": "Shinjuku Gyoen"},
+    )
     with EventStore(db) as store:
-        store.upsert_tokyo_cheapo([
-            make_tc(location_name="Yoyogi Park"),
-            make_tc(location_name="Shinjuku Gyoen", lat=35.685, lng=139.710),
-        ])
+        store.upsert_events([e1, e2])
         rows = store._conn.execute(
-            "SELECT id, location_name FROM tokyo_cheapo ORDER BY location_name"
+            "SELECT id, attributes FROM events WHERE source='tc' ORDER BY id"
         ).fetchall()
     assert len(rows) == 2
     assert rows[0][0] != rows[1][0]
-    assert {r[1] for r in rows} == {"Yoyogi Park", "Shinjuku Gyoen"}
+    import json
+    loc_names = {json.loads(r[1]).get("location_name") for r in rows}
+    assert loc_names == {"Yoyogi Park", "Shinjuku Gyoen"}
 
 
-# --- Hanabi ---
+# --- upsert_events (Hanabi) ---
 
 def test_upsert_hanabi_inserts_row(tmp_path):
     db = str(tmp_path / "events.db")
     with EventStore(db) as store:
-        store.upsert_hanabi([make_hanabi()])
-        rows = store._conn.execute("SELECT * FROM hanabi").fetchall()
+        store.upsert_events([make_hanabi()])
+        rows = store._conn.execute("SELECT title, start_date FROM events WHERE source='hanabi'").fetchall()
     assert len(rows) == 1
-    assert rows[0][1] == "Sumida River Fireworks"
-    assert rows[0][20] == "2026/07/25"
+    assert rows[0][0] == "Sumida River Fireworks"
+    assert rows[0][1] == "2026-07-25"
 
 
 def test_upsert_hanabi_multiday(tmp_path):
     db = str(tmp_path / "events.db")
     with EventStore(db) as store:
-        store.upsert_hanabi([
-            make_hanabi(start_date="2026/07/25"),
-            make_hanabi(start_date="2026/07/26"),
+        store.upsert_events([
+            make_hanabi(start_date=date(2026, 7, 25)),
+            make_hanabi(start_date=date(2026, 7, 26)),
         ])
-        rows = store._conn.execute("SELECT id, date FROM hanabi ORDER BY date").fetchall()
+        rows = store._conn.execute(
+            "SELECT id, start_date FROM events WHERE source='hanabi' ORDER BY start_date"
+        ).fetchall()
     assert len(rows) == 2
     assert rows[0][0] != rows[1][0]
-    assert {r[1] for r in rows} == {"2026/07/25", "2026/07/26"}
+    assert {r[1] for r in rows} == {"2026-07-25", "2026-07-26"}
 
 
 def test_upsert_hanabi_updates_on_rerun(tmp_path):
     db = str(tmp_path / "events.db")
     with EventStore(db) as store:
-        store.upsert_hanabi([make_hanabi()])
-        store.upsert_hanabi([make_hanabi(expected_crowd="約100万人")])
-        rows = store._conn.execute("SELECT expected_crowd FROM hanabi").fetchall()
-    assert len(rows) == 1
-    assert rows[0][0] == "約100万人"
+        store.upsert_events([make_hanabi()])
+        updated = make_hanabi()
+        updated.attributes["expected_crowd"] = "約100万人"
+        store.upsert_events([updated])
+        result = store.get_event(make_hanabi().id)
+    assert result is not None
+    assert result.attributes["expected_crowd"] == "約100万人"
 
 
 # --- Query ---
@@ -155,8 +172,7 @@ def test_upsert_hanabi_updates_on_rerun(tmp_path):
 def test_get_events_all(tmp_path):
     db = str(tmp_path / "events.db")
     with EventStore(db) as store:
-        store.upsert_tokyo_cheapo([make_tc()])
-        store.upsert_hanabi([make_hanabi()])
+        store.upsert_events([make_tc(), make_hanabi()])
         results = store.get_events()
     assert len(results) == 2
     sources = {e.source for e in results}
@@ -166,8 +182,7 @@ def test_get_events_all(tmp_path):
 def test_get_events_by_source(tmp_path):
     db = str(tmp_path / "events.db")
     with EventStore(db) as store:
-        store.upsert_tokyo_cheapo([make_tc()])
-        store.upsert_hanabi([make_hanabi()])
+        store.upsert_events([make_tc(), make_hanabi()])
         tc_only = store.get_events(source="tc")
         hw_only = store.get_events(source="hanabi")
     assert len(tc_only) == 1 and tc_only[0].source == "tc"
@@ -178,7 +193,7 @@ def test_get_event_by_id(tmp_path):
     db = str(tmp_path / "events.db")
     event = make_tc()
     with EventStore(db) as store:
-        store.upsert_tokyo_cheapo([event])
+        store.upsert_events([event])
         result = store.get_event(event.id)
     assert result is not None
     assert result.title == "Foo Festival"
@@ -192,36 +207,47 @@ def test_get_event_not_found(tmp_path):
     assert result is None
 
 
-# --- CSV export ---
+# --- Scrape jobs ---
 
-def test_export_tc_csv_roundtrip(tmp_path):
+def test_start_finish_job(tmp_path):
     db = str(tmp_path / "events.db")
-    out = str(tmp_path / "out.csv")
     with EventStore(db) as store:
-        store.upsert_tokyo_cheapo([make_tc()])
-        store.export_tokyo_cheapo_csv(out)
+        job_id = store.start_job("tc")
+        last = store.get_last_job()
+        assert last is not None
+        assert last["status"] == "running"
+        store.finish_job(job_id, 42)
+        last = store.get_last_job()
+        assert last["status"] == "done"
+        assert last["events_scraped"] == 42
 
-    with open(out, encoding="utf-8-sig") as f:
-        rows = list(csv.DictReader(f))
-    assert len(rows) == 1
-    assert rows[0]["title"] == "Foo Festival"
-    assert rows[0]["categories"] == "festival, free"
-    assert rows[0]["location_name"] == "Yoyogi Park"
 
-
-def test_export_hanabi_csv_roundtrip(tmp_path):
+def test_fail_job(tmp_path):
     db = str(tmp_path / "events.db")
-    out = str(tmp_path / "out.csv")
     with EventStore(db) as store:
-        store.upsert_hanabi([make_hanabi()])
-        store.export_hanabi_csv(out)
+        job_id = store.start_job("hanabi")
+        store.fail_job(job_id, "timeout")
+        last = store.get_last_job("hanabi")
+        assert last is not None
+        assert last["status"] == "failed"
+        assert last["error"] == "timeout"
 
-    with open(out, encoding="utf-8-sig") as f:
-        rows = list(csv.DictReader(f))
-    assert len(rows) == 1
-    assert rows[0]["title"] == "Sumida River Fireworks"
-    assert rows[0]["date"] == "2026/07/25"
-    assert rows[0]["paid_seating"] == "あり"
+
+def test_get_last_job_none(tmp_path):
+    db = str(tmp_path / "events.db")
+    with EventStore(db) as store:
+        assert store.get_last_job() is None
+
+
+def test_get_last_job_by_source(tmp_path):
+    db = str(tmp_path / "events.db")
+    with EventStore(db) as store:
+        store.start_job("tc")
+        store.start_job("hanabi")
+        last_tc = store.get_last_job("tc")
+        last_hanabi = store.get_last_job("hanabi")
+    assert last_tc["source"] == "tc"
+    assert last_hanabi["source"] == "hanabi"
 
 
 # --- Context manager ---
@@ -229,6 +255,88 @@ def test_export_hanabi_csv_roundtrip(tmp_path):
 def test_context_manager(tmp_path):
     db = str(tmp_path / "events.db")
     with EventStore(db) as store:
-        store.upsert_tokyo_cheapo([make_tc()])
+        store.upsert_events([make_tc()])
     with pytest.raises(Exception):
         store._conn.execute("SELECT 1")
+
+
+# --- Migration ---
+
+def test_migration_from_old_schema(tmp_path):
+    """Vérifie que les vieilles tables tokyo_cheapo et hanabi sont migrées automatiquement."""
+    import json
+    import sqlite3
+
+    db = str(tmp_path / "events.db")
+    conn = sqlite3.connect(db)
+    conn.execute("PRAGMA journal_mode=WAL")
+
+    # Créer les vieilles tables
+    conn.execute("""
+        CREATE TABLE tokyo_cheapo (
+            id TEXT PRIMARY KEY, title TEXT, start_date TEXT, end_date TEXT,
+            start_time TEXT, end_time TEXT, price TEXT, categories TEXT, tags TEXT,
+            official_link TEXT, url TEXT NOT NULL, location_name TEXT,
+            lat REAL, lng REAL, scraped_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        INSERT INTO tokyo_cheapo VALUES (
+            'abc123', 'Old TC Event', '2026/05/15', '2026/05/15',
+            '10:00', '18:00', 'Free', '["festival"]', '["outdoor"]',
+            'https://example.com', 'https://tokyocheapo.com/event/old', 'Yoyogi Park',
+            35.671, 139.694, '2026-05-01T00:00:00+00:00'
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE hanabi (
+            id TEXT PRIMARY KEY, title TEXT, fireworks_count TEXT,
+            fireworks_duration TEXT, expected_crowd TEXT, start_time TEXT, end_time TEXT,
+            rain_policy TEXT, paid_seating TEXT, paid_seating_details TEXT,
+            food_stalls TEXT, notes TEXT, venue TEXT, access TEXT, parking TEXT,
+            official_site TEXT, official_x TEXT, url TEXT NOT NULL,
+            lat REAL, lng REAL, date TEXT, contact TEXT, contact2 TEXT,
+            scraped_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        INSERT INTO hanabi VALUES (
+            'def456', 'Old Hanabi', '約1万発', NULL, NULL, '19:00', '20:30',
+            NULL, NULL, NULL, NULL, NULL, '隅田川', NULL, NULL, NULL, NULL,
+            'https://hanabi.walkerplus.com/detail/ar0300e001/',
+            35.711, 139.801, '2026/07/25', NULL, NULL,
+            '2026-05-01T00:00:00+00:00'
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+    # Ouvrir via EventStore → déclenche la migration
+    with EventStore(db) as store:
+        events = store.get_events()
+        tc = next(e for e in events if e.source == "tc")
+        hw = next(e for e in events if e.source == "hanabi")
+
+    # Vérifier que les données sont bien migrées
+    assert tc.id == "abc123"
+    assert tc.title == "Old TC Event"
+    assert str(tc.start_date) == "2026-05-15"
+    assert tc.times == "10:00-18:00"
+    assert tc.attributes["categories"] == ["festival"]
+    assert tc.attributes["location_name"] == "Yoyogi Park"
+    assert tc.venue is None
+
+    assert hw.id == "def456"
+    assert hw.title == "Old Hanabi"
+    assert str(hw.start_date) == "2026-07-25"
+    assert hw.venue == "隅田川"
+    assert hw.attributes["fireworks_count"] == "約1万発"
+
+    # Vérifier que les vieilles tables ont été supprimées
+    with EventStore(db) as store:
+        tables = {r[0] for r in store._conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()}
+    assert "tokyo_cheapo" not in tables
+    assert "hanabi" not in tables

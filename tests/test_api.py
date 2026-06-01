@@ -1,45 +1,57 @@
 import pytest
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from fastapi.testclient import TestClient
 
 from api.app import app
 from db.store import EventStore, _make_id
-from models.event import HanabiEvent, TokyoCheapoEvent
+from models.event import Event
 
 _NOW = datetime(2026, 5, 16, 12, 0, 0, tzinfo=timezone.utc)
 _TC_URL = "https://tokyocheapo.com/event/foo"
 _HW_URL = "https://hanabi.walkerplus.com/detail/ar0300e001/"
 
 
-def make_tc(**kwargs) -> TokyoCheapoEvent:
+def make_tc(**kwargs) -> Event:
     defaults = dict(
-        scraped_at=_NOW,
+        source="tc",
         title="Foo Festival",
         url=_TC_URL,
-        start_date="2026/05/15",
-        location_name="Yoyogi Park",
-        categories=["festival"],
-        tags=[],
-        lat=35.671,
-        lng=139.694,
+        start_date=date(2026, 5, 15),
+        latitude=35.671,
+        longitude=139.694,
+        attributes={
+            "categories": ["festival"],
+            "tags": [],
+            "official_link": None,
+            "location_name": "Yoyogi Park",
+        },
+        created_at=_NOW,
     )
     defaults.update(kwargs)
-    defaults.setdefault("id", _make_id([defaults["url"], defaults.get("location_name") or ""]))
-    return TokyoCheapoEvent(**defaults)
+    defaults.setdefault(
+        "id",
+        _make_id([defaults["url"], defaults.get("attributes", {}).get("location_name") or ""])
+    )
+    return Event(**defaults)
 
 
-def make_hanabi(**kwargs) -> HanabiEvent:
+def make_hanabi(**kwargs) -> Event:
     defaults = dict(
-        scraped_at=_NOW,
+        source="hanabi",
         title="Sumida Fireworks",
         url=_HW_URL,
-        start_date="2026/07/25",
-        lat=35.711,
-        lng=139.801,
+        start_date=date(2026, 7, 25),
+        venue="隅田川",
+        latitude=35.711,
+        longitude=139.801,
+        attributes={},
+        created_at=_NOW,
     )
     defaults.update(kwargs)
-    defaults.setdefault("id", _make_id([defaults["url"], defaults.get("start_date") or ""]))
-    return HanabiEvent(**defaults)
+    sd = defaults.get("start_date")
+    raw_date = sd.strftime("%Y/%m/%d") if isinstance(sd, date) else str(sd) if sd else ""
+    defaults.setdefault("id", _make_id([defaults["url"], raw_date]))
+    return Event(**defaults)
 
 
 @pytest.fixture()
@@ -48,8 +60,7 @@ def db(tmp_path):
     import api.routes.events as route_module
     db_path = str(tmp_path / "events.db")
     with EventStore(db_path) as store:
-        store.upsert_tokyo_cheapo([make_tc()])
-        store.upsert_hanabi([make_hanabi()])
+        store.upsert_events([make_tc(), make_hanabi()])
     original = route_module.DB_PATH
     route_module.DB_PATH = db_path
     yield db_path
@@ -91,7 +102,7 @@ def test_list_events_filter_hanabi(client):
 
 
 def test_list_events_filter_by_date(client):
-    resp = client.get("/events?date=2026/07/25")
+    resp = client.get("/events?date=2026-07-25")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 1
@@ -101,8 +112,11 @@ def test_list_events_filter_by_date(client):
 def test_list_events_pagination(db):
     import api.routes.events as route_module
     with EventStore(db) as store:
-        store.upsert_tokyo_cheapo([
-            make_tc(url=f"https://tokyocheapo.com/event/{i}", location_name=f"Loc {i}")
+        store.upsert_events([
+            make_tc(
+                url=f"https://tokyocheapo.com/event/{i}",
+                attributes={"categories": [], "tags": [], "official_link": None, "location_name": f"Loc {i}"},
+            )
             for i in range(5)
         ])
     client = TestClient(app)
@@ -137,7 +151,7 @@ def test_get_event_tc(client):
     assert data["id"] == event.id
     assert data["source"] == "tc"
     assert data["title"] == "Foo Festival"
-    assert data["categories"] == ["festival"]
+    assert data["attributes"]["categories"] == ["festival"]
 
 
 def test_get_event_hanabi(client):
@@ -158,12 +172,12 @@ def test_get_event_not_found(client):
 def test_event_shape_tc(client):
     event = make_tc()
     data = client.get(f"/events/{event.id}").json()
-    for field in ["id", "source", "title", "url", "start_date", "lat", "lng", "categories", "tags"]:
+    for field in ["id", "source", "title", "url", "start_date", "latitude", "longitude", "attributes"]:
         assert field in data
 
 
 def test_event_shape_hanabi(client):
     event = make_hanabi()
     data = client.get(f"/events/{event.id}").json()
-    for field in ["id", "source", "title", "url", "start_date", "lat", "lng"]:
+    for field in ["id", "source", "title", "url", "start_date", "latitude", "longitude"]:
         assert field in data
