@@ -296,29 +296,84 @@
       border: 1px solid rgba(255,255,255,0.7);
       box-shadow: 0 4px 24px rgba(0,0,0,0.08);
       border-radius: 20px;
-      padding: 12px 16px 14px;
+      max-height: 320px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
 
     #stats {
       font-size: 12px;
       color: var(--muted);
-      margin-bottom: 10px;
+      padding: 12px 16px 8px;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
     }
 
     #stats strong { color: var(--text); }
 
     #event-list {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0,0,0,0.1) transparent;
+    }
+
+    #event-list::-webkit-scrollbar { width: 4px; }
+    #event-list::-webkit-scrollbar-track { background: transparent; }
+    #event-list::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 4px; }
+
+    /* Category groups */
+    .cat-group + .cat-group { border-top: 1px solid var(--border); }
+
+    .cat-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+
+    .cat-header:hover { background: rgba(0,0,0,0.02); }
+
+    .cat-label {
+      flex: 1;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .cat-count {
+      font-size: 11px;
+      color: var(--muted);
+      background: rgba(0,0,0,0.06);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-weight: 500;
+    }
+
+    .cat-chevron {
+      font-size: 11px;
+      color: var(--muted);
+      transition: transform 0.2s;
+    }
+
+    .cat-header.collapsed .cat-chevron { transform: rotate(-90deg); }
+
+    .cat-cards {
       display: flex;
       gap: 10px;
       overflow-x: auto;
+      padding: 0 16px 12px;
       scrollbar-width: thin;
       scrollbar-color: rgba(0,0,0,0.1) transparent;
-      padding-bottom: 2px;
     }
 
-    #event-list::-webkit-scrollbar { height: 4px; }
-    #event-list::-webkit-scrollbar-track { background: transparent; }
-    #event-list::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 4px; }
+    .cat-cards::-webkit-scrollbar { height: 3px; }
+    .cat-cards::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 3px; }
+    .cat-cards.hidden { display: none; }
 
     .event-card {
       flex-shrink: 0;
@@ -638,49 +693,101 @@
     buildEventList(visible);
   }
 
-  // ── Event list (horizontal) ───────────────────────────────────────────
+  // ── Event list (grouped accordion) ───────────────────────────────────
   function buildEventList(events) {
     const list = document.getElementById('event-list');
     list.innerHTML = '';
 
     if (!events.length) {
-      list.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:4px 0">Aucun événement</div>';
+      list.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:12px 16px">Aucun événement</div>';
       return;
     }
 
-    // Sort by start date
-    const sorted = [...events].sort((a, b) => {
-      const da = a.start_date || a.date || '';
-      const db = b.start_date || b.date || '';
-      return da.localeCompare(db);
+    // Group by category
+    const groups = new Map(); // key → { label, isHanabi, events[] }
+
+    events.forEach(ev => {
+      let key;
+      if (ev.source === 'hanabi') {
+        key = 'hanabi';
+        if (!groups.has(key)) groups.set(key, { label: '🎆 Hanabi', isHanabi: true, events: [] });
+      } else {
+        const cats = (ev.categories || []).filter(c => !TC_EXCLUDED_CATS.includes(c));
+        key = cats[0] || 'other';
+        if (!groups.has(key)) {
+          const emoji = CAT_EMOJI[key] || '📌';
+          const name  = key === 'other' ? 'Divers' : key.charAt(0).toUpperCase() + key.slice(1);
+          groups.set(key, { label: `${emoji} ${name}`, isHanabi: false, events: [] });
+        }
+      }
+      groups.get(key).events.push(ev);
     });
 
-    sorted.forEach(ev => {
-      const card = document.createElement('div');
-      card.className = 'event-card';
+    // Sort groups: hanabi first, then by count desc
+    const sorted = [...groups.entries()].sort(([ka, a], [kb, b]) => {
+      if (ka === 'hanabi') return -1;
+      if (kb === 'hanabi') return  1;
+      return b.events.length - a.events.length;
+    });
 
-      const date = fmtDate(ev.start_date || ev.date);
-      const sub  = ev.source === 'tc'
-        ? [ev.location_name, ev.price].filter(Boolean).join(' · ')
-        : [ev.venue, ev.fireworks_count].filter(Boolean).join(' · ');
+    sorted.forEach(([key, group]) => {
+      // Sort events within group by date
+      group.events.sort((a, b) => (a.start_date || a.date || '').localeCompare(b.start_date || b.date || ''));
 
-      card.innerHTML = `
-        <div class="card-header">
-          <div class="card-dot ${ev.source}"></div>
-          <div class="card-title">${ev.title}</div>
-        </div>
-        <div class="card-meta">${date}${sub ? ' · ' + sub : ''}</div>`;
+      const groupEl = document.createElement('div');
+      groupEl.className = 'cat-group';
 
-      card.addEventListener('click', () => {
-        map.setView([ev.lat, ev.lng], 15, { animate: true });
-        const m = markerMap.get(ev.id);
-        if (m) setTimeout(() => m.openPopup(), 350);
-        document.querySelectorAll('.event-card').forEach(c => c.classList.remove('highlighted'));
-        card.classList.add('highlighted');
-        card.scrollIntoView({ behavior: 'smooth', inline: 'nearest' });
+      const header = document.createElement('div');
+      header.className = 'cat-header';
+      header.innerHTML = `
+        <span class="cat-label">${group.label}</span>
+        <span class="cat-count">${group.events.length}</span>
+        <span class="cat-chevron">▾</span>`;
+
+      const cardsRow = document.createElement('div');
+      cardsRow.className = 'cat-cards';
+
+      group.events.forEach(ev => {
+        const card = document.createElement('div');
+        card.className = 'event-card';
+
+        const date = fmtDate(ev.start_date || ev.date);
+        const sub  = ev.source === 'tc'
+          ? [ev.location_name, ev.price].filter(Boolean).join(' · ')
+          : [ev.venue, ev.fireworks_count].filter(Boolean).join(' · ');
+
+        card.innerHTML = `
+          <div class="card-header">
+            <div class="card-dot ${ev.source}"></div>
+            <div class="card-title">${ev.title}</div>
+          </div>
+          <div class="card-meta">${date}${sub ? ' · ' + sub : ''}</div>`;
+
+        card.addEventListener('click', () => {
+          map.setView([ev.lat, ev.lng], 15, { animate: true });
+          const m = markerMap.get(ev.id);
+          if (m) setTimeout(() => m.openPopup(), 350);
+          document.querySelectorAll('.event-card').forEach(c => c.classList.remove('highlighted'));
+          card.classList.add('highlighted');
+          // Expand group if collapsed
+          if (cardsRow.classList.contains('hidden')) {
+            cardsRow.classList.remove('hidden');
+            header.classList.remove('collapsed');
+          }
+          card.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+        });
+
+        cardsRow.appendChild(card);
       });
 
-      list.appendChild(card);
+      header.addEventListener('click', () => {
+        const isCollapsed = cardsRow.classList.toggle('hidden');
+        header.classList.toggle('collapsed', isCollapsed);
+      });
+
+      groupEl.appendChild(header);
+      groupEl.appendChild(cardsRow);
+      list.appendChild(groupEl);
     });
   }
 

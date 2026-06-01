@@ -14,3 +14,10 @@ data/
 
 # Local docs
 docs/
+
+# Claude Code local config
+.claude/
+
+# Database & generated data files
+*.db
+*.csv
