@@ -34,10 +34,8 @@ map.on('moveend', () => {
   setFetchDebounceTimer(setTimeout(fetchEventsByBbox, 300));
 });
 
-// ── Popup fav button (event delegation via popupopen) ─────────────────────
-map.on('popupopen', (e) => {
-  const btn = e.popup.getElement().querySelector('[data-fav-id]');
-  if (!btn) return;
+// ── Popup fav button ──────────────────────────────────────────────────────
+function attachFavHandler(btn) {
   btn.addEventListener('click', () => {
     const id = btn.dataset.favId;
     toggleFavorite(id);
@@ -50,11 +48,27 @@ map.on('popupopen', (e) => {
       if (ev) {
         marker.setIcon(getIcon(ev, fav));
         marker.setPopupContent(buildPopup(ev));
+        // Popup is still open — re-attach handler to the freshly built button
+        if (marker.isPopupOpen()) {
+          const newBtn = marker.getPopup().getElement().querySelector('[data-fav-id]');
+          if (newBtn) attachFavHandler(newBtn);
+        }
       }
     }
     updateFavPill();
     if (showOnlyFavorites && !fav) renderMarkers();
   });
+}
+
+map.on('popupopen', (e) => {
+  const btn = e.popup.getElement().querySelector('[data-fav-id]');
+  if (btn) attachFavHandler(btn);
+});
+
+// events-list.js dispatches this after setPopupContent when popup is open
+document.addEventListener('popup-fav-rebind', (e) => {
+  const btn = e.detail.marker.getPopup().getElement().querySelector('[data-fav-id]');
+  if (btn) attachFavHandler(btn);
 });
 
 // ── Date presets ──────────────────────────────────────────────────────────

@@ -84,6 +84,9 @@ export function buildEventList(events) {
         if (m) {
           m.setIcon(getIcon(ev, fav));
           m.setPopupContent(buildPopup(ev));
+          if (m.isPopupOpen()) {
+            document.dispatchEvent(new CustomEvent('popup-fav-rebind', { detail: { marker: m } }));
+          }
         }
         updateFavPill();
         if (showOnlyFavorites && !fav) renderMarkers();
