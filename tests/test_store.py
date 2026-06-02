@@ -173,7 +173,7 @@ def test_get_events_all(tmp_path):
     db = str(tmp_path / "events.db")
     with EventStore(db) as store:
         store.upsert_events([make_tc(), make_hanabi()])
-        results = store.get_events()
+        results = store.get_events(upcoming=False)
     assert len(results) == 2
     sources = {e.source for e in results}
     assert sources == {"tc", "hanabi"}
@@ -183,8 +183,8 @@ def test_get_events_by_source(tmp_path):
     db = str(tmp_path / "events.db")
     with EventStore(db) as store:
         store.upsert_events([make_tc(), make_hanabi()])
-        tc_only = store.get_events(source="tc")
-        hw_only = store.get_events(source="hanabi")
+        tc_only = store.get_events(source="tc", upcoming=False)
+        hw_only = store.get_events(source="hanabi", upcoming=False)
     assert len(tc_only) == 1 and tc_only[0].source == "tc"
     assert len(hw_only) == 1 and hw_only[0].source == "hanabi"
 
@@ -314,7 +314,7 @@ def test_migration_from_old_schema(tmp_path):
 
     # Ouvrir via EventStore → déclenche la migration
     with EventStore(db) as store:
-        events = store.get_events()
+        events = store.get_events(upcoming=False)
         tc = next(e for e in events if e.source == "tc")
         hw = next(e for e in events if e.source == "hanabi")
 
@@ -340,3 +340,123 @@ def test_migration_from_old_schema(tmp_path):
         ).fetchall()}
     assert "tokyo_cheapo" not in tables
     assert "hanabi" not in tables
+
+
+# --- Upcoming filter ---
+
+def test_upcoming_excludes_past(tmp_path):
+    from datetime import timedelta
+    db = str(tmp_path / "events.db")
+    today = date.today()
+    past = make_tc(start_date=today - timedelta(days=10), end_date=today - timedelta(days=5))
+    future = make_hanabi(start_date=today + timedelta(days=10))
+    with EventStore(db) as store:
+        store.upsert_events([past, future])
+        results = store.get_events()
+    assert len(results) == 1
+    assert results[0].source == "hanabi"
+
+
+def test_upcoming_keeps_ongoing(tmp_path):
+    from datetime import timedelta
+    db = str(tmp_path / "events.db")
+    today = date.today()
+    ongoing = make_tc(start_date=today - timedelta(days=2), end_date=today + timedelta(days=2))
+    with EventStore(db) as store:
+        store.upsert_events([ongoing])
+        results = store.get_events()
+    assert len(results) == 1
+
+
+def test_upcoming_false_returns_all(tmp_path):
+    from datetime import timedelta
+    db = str(tmp_path / "events.db")
+    today = date.today()
+    past = make_tc(start_date=today - timedelta(days=30), end_date=today - timedelta(days=25))
+    with EventStore(db) as store:
+        store.upsert_events([past])
+        results = store.get_events(upcoming=False)
+    assert len(results) == 1
+
+
+def test_date_param_overrides_upcoming(tmp_path):
+    from datetime import timedelta
+    db = str(tmp_path / "events.db")
+    today = date.today()
+    past = make_tc(start_date=today - timedelta(days=10), end_date=today - timedelta(days=10))
+    with EventStore(db) as store:
+        store.upsert_events([past])
+        date_str = (today - timedelta(days=10)).isoformat()
+        results = store.get_events(date=date_str)
+    assert len(results) == 1
+
+
+def test_start_from_returns_past_events(tmp_path):
+    from datetime import timedelta
+    db = str(tmp_path / "events.db")
+    today = date.today()
+    past = make_tc(start_date=today - timedelta(days=10), end_date=today - timedelta(days=5))
+    future = make_hanabi(start_date=today + timedelta(days=5))
+    with EventStore(db) as store:
+        store.upsert_events([past, future])
+        start_from = (today - timedelta(days=15)).isoformat()
+        results = store.get_events(start_from=start_from)
+    assert len(results) == 2
+
+
+def test_start_from_overrides_upcoming(tmp_path):
+    """start_from disables the JST-today default when provided."""
+    from datetime import timedelta
+    db = str(tmp_path / "events.db")
+    today = date.today()
+    past = make_tc(start_date=today - timedelta(days=10), end_date=today - timedelta(days=5))
+    with EventStore(db) as store:
+        store.upsert_events([past])
+        # Without start_from, upcoming=True filters past event out
+        assert store.get_events() == []
+        # With start_from in the past, event is included
+        results = store.get_events(start_from=(today - timedelta(days=15)).isoformat())
+    assert len(results) == 1
+
+
+# --- Bbox filter ---
+
+def test_bbox_filters_by_coords(tmp_path):
+    db = str(tmp_path / "events.db")
+    # TC: lat=35.671, lon=139.694 → inside
+    # Hanabi: lat=35.711, lon=139.801 → outside
+    bbox = (139.68, 35.65, 139.71, 35.69)
+    with EventStore(db) as store:
+        store.upsert_events([make_tc(), make_hanabi()])
+        results = store.get_events(bbox=bbox, upcoming=False)
+    assert len(results) == 1
+    assert results[0].source == "tc"
+
+
+def test_bbox_excludes_null_coords(tmp_path):
+    db = str(tmp_path / "events.db")
+    no_coords = make_tc(latitude=None, longitude=None)
+    bbox = (139.0, 35.0, 140.0, 36.0)
+    with EventStore(db) as store:
+        store.upsert_events([no_coords])
+        results = store.get_events(bbox=bbox, upcoming=False)
+    assert len(results) == 0
+
+
+def test_no_bbox_includes_null_coords(tmp_path):
+    db = str(tmp_path / "events.db")
+    no_coords = make_tc(latitude=None, longitude=None)
+    with EventStore(db) as store:
+        store.upsert_events([no_coords])
+        results = store.get_events(upcoming=False)
+    assert len(results) == 1
+
+
+def test_bbox_combined_with_source(tmp_path):
+    db = str(tmp_path / "events.db")
+    bbox = (139.68, 35.65, 139.71, 35.69)
+    with EventStore(db) as store:
+        store.upsert_events([make_tc(), make_hanabi()])
+        results = store.get_events(source="tc", bbox=bbox, upcoming=False)
+    assert len(results) == 1
+    assert results[0].source == "tc"

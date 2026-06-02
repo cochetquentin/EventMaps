@@ -1,5 +1,5 @@
 import pytest
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from fastapi.testclient import TestClient
 
 from api.app import app
@@ -11,12 +11,16 @@ _TC_URL = "https://tokyocheapo.com/event/foo"
 _HW_URL = "https://hanabi.walkerplus.com/detail/ar0300e001/"
 
 
+_TC_START  = date.today() + timedelta(days=90)   # always in the future
+_HW_START  = date.today() + timedelta(days=60)   # always in the future, < TC
+
+
 def make_tc(**kwargs) -> Event:
     defaults = dict(
         source="tc",
         title="Foo Festival",
         url=_TC_URL,
-        start_date=date(2026, 5, 15),
+        start_date=_TC_START,
         latitude=35.671,
         longitude=139.694,
         attributes={
@@ -40,7 +44,7 @@ def make_hanabi(**kwargs) -> Event:
         source="hanabi",
         title="Sumida Fireworks",
         url=_HW_URL,
-        start_date=date(2026, 7, 25),
+        start_date=_HW_START,
         venue="隅田川",
         latitude=35.711,
         longitude=139.801,
@@ -100,7 +104,8 @@ def test_list_events_filter_hanabi(client):
 
 
 def test_list_events_filter_by_date(client):
-    resp = client.get("/events?date=2026-07-25")
+    hanabi = make_hanabi()
+    resp = client.get(f"/events?date={hanabi.start_date.isoformat()}")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 1
@@ -203,3 +208,74 @@ def test_limit_above_max_returns_422(client):
 def test_limit_max_accepted(client):
     resp = client.get("/events?limit=500")
     assert resp.status_code == 200
+
+
+# --- iCal export ---
+
+def test_ical_returns_vcalendar(client):
+    event = make_tc()
+    resp = client.get(f"/events/{event.id}.ics")
+    assert resp.status_code == 200
+    assert "text/calendar" in resp.headers["content-type"]
+    body = resp.text
+    assert "BEGIN:VCALENDAR" in body
+    assert "BEGIN:VEVENT" in body
+    assert "END:VEVENT" in body
+    assert "END:VCALENDAR" in body
+
+
+def test_ical_has_summary(client):
+    event = make_tc()
+    resp = client.get(f"/events/{event.id}.ics")
+    assert resp.status_code == 200
+    assert "SUMMARY:Foo Festival" in resp.text
+
+
+def test_ical_dtstart_is_date(client):
+    event = make_tc()
+    resp = client.get(f"/events/{event.id}.ics")
+    assert "DTSTART;VALUE=DATE:" in resp.text
+
+
+def test_ical_dtend_is_day_after(client):
+    event = make_tc()
+    resp = client.get(f"/events/{event.id}.ics")
+    assert "DTEND;VALUE=DATE:" in resp.text
+
+
+def test_ical_not_found(client):
+    resp = client.get("/events/doesnotexist.ics")
+    assert resp.status_code == 404
+
+
+def test_ical_hanabi_has_location(client):
+    event = make_hanabi()
+    resp = client.get(f"/events/{event.id}.ics")
+    assert resp.status_code == 200
+    assert "LOCATION" in resp.text
+
+
+# --- Bbox filter ---
+
+def test_bbox_returns_tc_event(client):
+    # TC: lat=35.671, lon=139.694 → inside; Hanabi: lat=35.711, lon=139.801 → outside
+    bbox = "139.68,35.65,139.71,35.69"
+    resp = client.get(f"/events?bbox={bbox}")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert all(e["source"] == "tc" for e in data)
+
+
+def test_bbox_invalid_format_422(client):
+    resp = client.get("/events?bbox=not,a,valid,bbox")
+    assert resp.status_code == 422
+
+
+def test_bbox_wrong_count_422(client):
+    resp = client.get("/events?bbox=139.0,35.0,140.0")
+    assert resp.status_code == 422
+
+
+def test_bbox_inverted_range_422(client):
+    resp = client.get("/events?bbox=140.0,35.0,139.0,36.0")
+    assert resp.status_code == 422

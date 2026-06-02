@@ -3,7 +3,14 @@ import json
 import os
 import sqlite3
 from datetime import date as _date
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+
+_JST = timezone(timedelta(hours=9))
+
+
+def _today_jst() -> str:
+    """Return today's date in JST (UTC+9) as YYYY-MM-DD."""
+    return datetime.now(_JST).date().isoformat()
 
 from models.event import Event
 
@@ -234,6 +241,9 @@ class EventStore:
         self,
         source: str | None = None,
         date: str | None = None,
+        bbox: tuple[float, float, float, float] | None = None,
+        upcoming: bool = True,
+        start_from: str | None = None,
         limit: int = 100,
         offset: int = 0,
     ) -> list[Event]:
@@ -243,8 +253,23 @@ class EventStore:
             clauses.append("source = ?")
             params.append(source)
         if date:
+            # Explicit overlap filter — overrides everything
             clauses.append("start_date <= ? AND COALESCE(end_date, start_date) >= ?")
             params.extend([date, date])
+        elif start_from is not None:
+            # Client-supplied lower bound (e.g. date picker set to a past date)
+            clauses.append("COALESCE(end_date, start_date) >= ?")
+            params.append(start_from)
+        elif upcoming:
+            # Default: events that are not yet over as of today JST
+            clauses.append("COALESCE(end_date, start_date) >= ?")
+            params.append(_today_jst())
+        if bbox:
+            min_lon, min_lat, max_lon, max_lat = bbox
+            clauses.append(
+                "latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?"
+            )
+            params.extend([min_lat, max_lat, min_lon, max_lon])
         where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
         rows = self._conn.execute(
             f"SELECT * FROM events {where} ORDER BY start_date LIMIT ? OFFSET ?",

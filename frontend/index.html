@@ -129,7 +129,28 @@
       transition: all 0.2s;
     }
 
-    #scrape-btn:hover { border-color: var(--accent); color: var(--accent); }
+    #scrape-btn:hover, #locate-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    #locate-btn {
+      flex-shrink: 0;
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      background: var(--glass);
+      border: 1.5px solid var(--border);
+      color: var(--text);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .m-user {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: #6366f1;
+      border: 3px solid white;
+      box-shadow: 0 2px 12px rgba(99,102,241,0.5);
+    }
 
     #scrape-btn.running {
       animation: spin 1s linear infinite;
@@ -524,6 +545,7 @@
       <span class="search-icon">🔍</span>
       <input type="text" id="search-input" placeholder="Événement, lieu, station…" />
     </div>
+    <button id="locate-btn" title="Me localiser">📍</button>
     <button id="scrape-btn" title="Relancer le scraping">↻</button>
   </div>
 
@@ -610,9 +632,13 @@
         <div class="pop-source tc">Tokyo Cheapo</div>
         <div class="pop-title">${ev.title}</div>
         <div class="pop-meta">${meta}</div>${badge}
-        <div class="pop-actions">
-          <a class="pop-btn primary" href="${ev.url}" target="_blank">Voir →</a>
-          <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.latitude},${ev.longitude}" target="_blank">🗺 Y aller</a>
+        <div class="pop-actions" style="flex-direction:column;gap:6px;">
+          <a class="pop-btn primary" href="${ev.url}" target="_blank">Voir l'événement →</a>
+          <div style="display:flex;gap:6px;">
+            <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.latitude},${ev.longitude}" target="_blank">🗺 Google</a>
+            <a class="pop-btn secondary" href="https://maps.apple.com/?daddr=${ev.latitude},${ev.longitude}" target="_blank"> Apple</a>
+          </div>
+          <a href="/events/${ev.id}.ics" style="font-size:11px;text-align:center;color:var(--muted);text-decoration:underline;">📅 Ajouter au calendrier</a>
         </div></div></div>`;
     } else {
       const [st, et] = parseTimes(ev);
@@ -632,9 +658,13 @@
         <div class="pop-source hanabi">🎆 Hanabi</div>
         <div class="pop-title">${ev.title}</div>
         <div class="pop-meta">${meta}</div>${badges}
-        <div class="pop-actions">
-          <a class="pop-btn primary" href="${ev.url}" target="_blank">Voir →</a>
-          <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.latitude},${ev.longitude}" target="_blank">🗺 Y aller</a>
+        <div class="pop-actions" style="flex-direction:column;gap:6px;">
+          <a class="pop-btn primary" href="${ev.url}" target="_blank">Voir l'événement →</a>
+          <div style="display:flex;gap:6px;">
+            <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.latitude},${ev.longitude}" target="_blank">🗺 Google</a>
+            <a class="pop-btn secondary" href="https://maps.apple.com/?daddr=${ev.latitude},${ev.longitude}" target="_blank"> Apple</a>
+          </div>
+          <a href="/events/${ev.id}.ics" style="font-size:11px;text-align:center;color:var(--muted);text-decoration:underline;">📅 Ajouter au calendrier</a>
         </div></div></div>`;
     }
   }
@@ -803,6 +833,8 @@
   }
 
   // ── Pills builder ─────────────────────────────────────────────────────
+  const deactivatedPills = new Set();
+
   function buildPills() {
     const container = document.getElementById('pills');
     container.innerHTML = '';
@@ -819,6 +851,11 @@
       .filter(([c]) => !TC_EXCLUDED_CATS.includes(c))
       .sort((a, b) => b[1] - a[1])
       .forEach(([cat]) => addPill(container, cat, `${CAT_EMOJI[cat] || ''} ${cat}`));
+
+    // Restore deactivated state after rebuild
+    container.querySelectorAll('.pill').forEach(p => {
+      if (deactivatedPills.has(p.dataset.type)) p.classList.remove('active');
+    });
   }
 
   function addPill(container, type, label, isHanabi = false) {
@@ -826,7 +863,12 @@
     btn.className = 'pill active' + (isHanabi ? ' h' : '');
     btn.dataset.type = type;
     btn.textContent = label;
-    btn.addEventListener('click', () => { btn.classList.toggle('active'); renderMarkers(); });
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('active');
+      if (btn.classList.contains('active')) deactivatedPills.delete(type);
+      else deactivatedPills.add(type);
+      renderMarkers();
+    });
     container.appendChild(btn);
   }
 
@@ -867,18 +909,25 @@
     document.getElementById('filter-date-from').value = from;
     document.getElementById('filter-date-to').value   = to;
     document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === name));
-    renderMarkers();
+    // Programmatic .value change doesn't fire 'change' → trigger server refetch
+    clearTimeout(fetchDebounceTimer);
+    fetchDebounceTimer = setTimeout(fetchEventsByBbox, 300);
   }
 
   document.querySelectorAll('.preset-btn[data-preset]').forEach(btn => {
     btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
   });
 
-  ['filter-date-from', 'filter-date-to'].forEach(id => {
-    document.getElementById(id).addEventListener('change', () => {
-      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-      renderMarkers();
-    });
+  document.getElementById('filter-date-from').addEventListener('change', () => {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    // start_from changed → server-side lower bound changes → re-fetch
+    clearTimeout(fetchDebounceTimer);
+    fetchDebounceTimer = setTimeout(fetchEventsByBbox, 300);
+  });
+
+  document.getElementById('filter-date-to').addEventListener('change', () => {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    renderMarkers();
   });
 
   // ── Reset ─────────────────────────────────────────────────────────────
@@ -886,36 +935,109 @@
     document.getElementById('filter-date-from').value = isoDate(todayJST());
     document.getElementById('filter-date-to').value   = '';
     document.getElementById('search-input').value     = '';
+    deactivatedPills.clear();
     document.querySelectorAll('.pill').forEach(p => p.classList.add('active'));
     document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('date-dropdown').classList.add('hidden');
-    renderMarkers();
+    // Programmatic .value change doesn't fire 'change' → trigger fetch manually
+    clearTimeout(fetchDebounceTimer);
+    fetchDebounceTimer = setTimeout(fetchEventsByBbox, 300);
   });
 
   // ── Listeners ─────────────────────────────────────────────────────────
   document.getElementById('search-input').addEventListener('input', renderMarkers);
 
-  // ── Init ──────────────────────────────────────────────────────────────
-  async function loadEvents() {
+  // ── Bbox fetch ────────────────────────────────────────────────────────
+  let bboxFetchEnabled = false;
+  let fetchDebounceTimer = null;
+  let bboxFetchController = null;
+
+  async function fetchEventsByBbox() {
+    if (bboxFetchController) bboxFetchController.abort();
+    bboxFetchController = new AbortController();
+    const signal = bboxFetchController.signal;
     try {
+      const b = map.getBounds(), sw = b.getSouthWest(), ne = b.getNorthEast();
+      const minLon = Math.max(-180, sw.lng), maxLon = Math.min(180, ne.lng);
+      const minLat = Math.max(-90,  sw.lat), maxLat = Math.min(90,  ne.lat);
+      // If the clamped box is degenerate (whole-world zoom or wrapped edge),
+      // fall back to no-bbox so the server returns all upcoming events.
+      const bbox = (minLon < maxLon && minLat < maxLat)
+        ? `${minLon},${minLat},${maxLon},${maxLat}`
+        : null;
       const PAGE = 500;
-      allEvents = [];
+      const events = [];
       let offset = 0;
       while (true) {
-        const res = await fetch(`/events?limit=${PAGE}&offset=${offset}`);
+        const params = { limit: String(PAGE), offset: String(offset) };
+        if (bbox) params.bbox = bbox;
+        const fromS = document.getElementById('filter-date-from').value;
+        if (fromS) params.start_from = fromS;
+        const res = await fetch(`/events?${new URLSearchParams(params)}`, { signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const page = await res.json();
-        allEvents = allEvents.concat(page);
+        events.push(...page);
         if (page.length < PAGE) break;
         offset += PAGE;
       }
-      document.getElementById('filter-date-from').value = isoDate(todayJST());
+      allEvents = events;
       buildPills();
       renderMarkers();
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      document.getElementById('stats').textContent = 'Erreur de chargement.';
+      console.error(e);
+    }
+  }
+
+  map.on('moveend', () => {
+    if (!bboxFetchEnabled) return;
+    clearTimeout(fetchDebounceTimer);
+    fetchDebounceTimer = setTimeout(fetchEventsByBbox, 300);
+  });
+
+  // ── Init ──────────────────────────────────────────────────────────────
+  async function loadEvents() {
+    document.getElementById('filter-date-from').value = isoDate(todayJST());
+    try {
+      await fetchEventsByBbox();
+      bboxFetchEnabled = true;
     } catch (e) {
       document.getElementById('stats').textContent = 'Erreur de chargement.';
       console.error(e);
     }
   }
+
+  // ── Geolocation ───────────────────────────────────────────────────────
+  const iconUser = L.divIcon({ html: '<div class="m-user"></div>', className: '', iconSize: [20, 20], iconAnchor: [10, 10] });
+  let userMarker = null;
+
+  document.getElementById('locate-btn').addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      alert('La géolocalisation n\'est pas supportée par ce navigateur.');
+      return;
+    }
+    const btn = document.getElementById('locate-btn');
+    btn.textContent = '⏳';
+    btn.disabled = true;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        btn.textContent = '📍';
+        btn.disabled = false;
+        const lat = pos.coords.latitude, lng = pos.coords.longitude;
+        if (userMarker) map.removeLayer(userMarker);
+        userMarker = L.marker([lat, lng], { icon: iconUser })
+          .bindPopup('📍 Vous êtes ici').addTo(map);
+        map.setView([lat, lng], 13, { animate: true });
+      },
+      (err) => {
+        btn.textContent = '📍';
+        btn.disabled = false;
+        alert('Impossible d\'obtenir votre position : ' + err.message);
+      },
+      { timeout: 10000, maximumAge: 60000 }
+    );
+  });
 
   // ── Scrape button ─────────────────────────────────────────────────────
   const scrapeBtn = document.getElementById('scrape-btn');
