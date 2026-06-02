@@ -9,7 +9,9 @@ dependencies = [
     "fastapi>=0.115",
     "pandas>=3.0.3",
     "pydantic>=2.0",
+    "pydantic-settings>=2.0",
     "requests>=2.34.1",
+    "slowapi>=0.1.9",
     "tenacity>=8.0",
     "uvicorn>=0.30",
 ]

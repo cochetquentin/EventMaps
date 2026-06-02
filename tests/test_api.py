@@ -55,16 +55,14 @@ def make_hanabi(**kwargs) -> Event:
 
 
 @pytest.fixture()
-def db(tmp_path):
-    """Return a populated DB path and patch the route to use it."""
-    import api.routes.events as route_module
+def db(tmp_path, monkeypatch):
+    """Return a populated DB path and patch settings to use it."""
+    import config
     db_path = str(tmp_path / "events.db")
     with EventStore(db_path) as store:
         store.upsert_events([make_tc(), make_hanabi()])
-    original = route_module.DB_PATH
-    route_module.DB_PATH = db_path
-    yield db_path
-    route_module.DB_PATH = original
+    monkeypatch.setattr(config.settings, "db_path", db_path)
+    return db_path
 
 
 @pytest.fixture()
@@ -109,8 +107,7 @@ def test_list_events_filter_by_date(client):
     assert data[0]["source"] == "hanabi"
 
 
-def test_list_events_pagination(db):
-    import api.routes.events as route_module
+def test_list_events_pagination(db, monkeypatch):
     with EventStore(db) as store:
         store.upsert_events([
             make_tc(
@@ -129,14 +126,12 @@ def test_list_events_pagination(db):
     assert len(resp2.json()) >= 1
 
 
-def test_list_events_empty_db(tmp_path):
-    import api.routes.events as route_module
+def test_list_events_empty_db(tmp_path, monkeypatch):
+    import config
     db_path = str(tmp_path / "empty.db")
     EventStore(db_path).close()
-    original = route_module.DB_PATH
-    route_module.DB_PATH = db_path
+    monkeypatch.setattr(config.settings, "db_path", db_path)
     resp = TestClient(app).get("/events")
-    route_module.DB_PATH = original
     assert resp.status_code == 200
     assert resp.json() == []
 
@@ -181,3 +176,30 @@ def test_event_shape_hanabi(client):
     data = client.get(f"/events/{event.id}").json()
     for field in ["id", "source", "title", "url", "start_date", "latitude", "longitude"]:
         assert field in data
+
+
+# --- Validation 422 ---
+
+def test_invalid_source_returns_422(client):
+    resp = client.get("/events?source=invalid")
+    assert resp.status_code == 422
+
+
+def test_invalid_date_returns_422(client):
+    resp = client.get("/events?date=not-a-date")
+    assert resp.status_code == 422
+
+
+def test_limit_zero_returns_422(client):
+    resp = client.get("/events?limit=0")
+    assert resp.status_code == 422
+
+
+def test_limit_above_max_returns_422(client):
+    resp = client.get("/events?limit=501")
+    assert resp.status_code == 422
+
+
+def test_limit_max_accepted(client):
+    resp = client.get("/events?limit=500")
+    assert resp.status_code == 200

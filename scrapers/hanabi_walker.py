@@ -186,9 +186,11 @@ def _split_paid_seating(text: str) -> tuple[str, str | None]:
 
 class HanabiWalker(BaseScraper):
     def __init__(self, region: str = "ar0300"):
+        from config import settings
         self.region = region
         self.session = requests.Session()
         self.session.headers.update(_HEADERS)
+        self.session.headers["User-Agent"] = settings.scrape_user_agent
 
     def get_event_links(self, max_pages: int = 20) -> list[str]:
         """Retourne les paths /detail/... de tous les événements paginés (sans doublons)."""
@@ -336,4 +338,9 @@ class HanabiWalker(BaseScraper):
                 },
                 created_at=now,
             ))
+        if not events:
+            logger.critical(
+                "Scraper %s returned 0 events — likely a parser failure (HTML structure changed?)",
+                self.__class__.__name__,
+            )
         return events

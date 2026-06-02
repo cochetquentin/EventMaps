@@ -898,8 +898,16 @@
   // ── Init ──────────────────────────────────────────────────────────────
   async function loadEvents() {
     try {
-      const res = await fetch('/events?limit=1000');
-      allEvents = await res.json();
+      const PAGE = 500;
+      allEvents = [];
+      let offset = 0;
+      while (true) {
+        const res = await fetch(`/events?limit=${PAGE}&offset=${offset}`);
+        const page = await res.json();
+        allEvents = allEvents.concat(page);
+        if (page.length < PAGE) break;
+        offset += PAGE;
+      }
       document.getElementById('filter-date-from').value = isoDate(todayJST());
       buildPills();
       renderMarkers();
