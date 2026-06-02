@@ -589,13 +589,21 @@
   };
 
   // ── Popup builder ─────────────────────────────────────────────────────
-  function fmtDate(d) { return d ? d.replace(/\//g, '-') : '—'; }
+  function fmtDate(d) { return d || '—'; }
+
+  function parseTimes(ev) {
+    if (!ev.times) return ['', ''];
+    const idx = ev.times.indexOf('-');
+    return idx === -1 ? [ev.times, ''] : [ev.times.slice(0, idx), ev.times.slice(idx + 1)];
+  }
 
   function buildPopup(ev) {
+    const attrs = ev.attributes || {};
     if (ev.source === 'tc') {
+      const [st, et] = parseTimes(ev);
       const date  = ev.end_date && ev.end_date !== ev.start_date ? `📅 ${fmtDate(ev.start_date)} → ${fmtDate(ev.end_date)}` : `📅 ${fmtDate(ev.start_date)}`;
-      const time  = ev.start_time ? `🕐 ${ev.start_time}${ev.end_time ? ' – ' + ev.end_time : ''}` : '';
-      const loc   = ev.location_name ? `📍 ${ev.location_name}` : '';
+      const time  = st ? `🕐 ${st}${et ? ' – ' + et : ''}` : '';
+      const loc   = attrs.location_name ? `📍 ${attrs.location_name}` : '';
       const meta  = [date, time, loc].filter(Boolean).join('<br>');
       const badge = ev.price ? `<div class="pop-badges"><span class="pop-badge">${ev.price}</span></div>` : '';
       return `<div class="pop"><div class="pop-bar tc"></div><div class="pop-body">
@@ -607,16 +615,17 @@
           <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.latitude},${ev.longitude}" target="_blank">🗺 Y aller</a>
         </div></div></div>`;
     } else {
+      const [st, et] = parseTimes(ev);
       const date   = `📅 ${fmtDate(ev.start_date)}`;
-      const time   = ev.start_time ? `🕐 ${ev.start_time}${ev.end_time ? ' – ' + ev.end_time : ''}` : '';
-      const venue  = ev.venue  ? `📍 ${ev.venue}`  : '';
-      const access = ev.access ? `🚉 ${ev.access}` : '';
+      const time   = st ? `🕐 ${st}${et ? ' – ' + et : ''}` : '';
+      const venue  = ev.venue         ? `📍 ${ev.venue}`         : '';
+      const access = attrs.access     ? `🚉 ${attrs.access}`     : '';
       const meta   = [date, time, venue, access].filter(Boolean).join('<br>');
       const bs = [
-        ev.fireworks_count ? `🎇 ${ev.fireworks_count}` : null,
-        ev.expected_crowd  ? `👥 ${ev.expected_crowd}`  : null,
-        ev.food_stalls === 'あり'  ? '🍢 Food stalls'  : null,
-        ev.paid_seating === 'あり' ? '🎫 Paid seating' : null,
+        attrs.fireworks_count ? `🎇 ${attrs.fireworks_count}` : null,
+        attrs.expected_crowd  ? `👥 ${attrs.expected_crowd}`  : null,
+        attrs.food_stalls === 'あり'  ? '🍢 Food stalls'  : null,
+        attrs.paid_seating === 'あり' ? '🎫 Paid seating' : null,
       ].filter(Boolean);
       const badges = bs.length ? `<div class="pop-badges">${bs.map(b => `<span class="pop-badge">${b}</span>`).join('')}</div>` : '';
       return `<div class="pop"><div class="pop-bar hanabi"></div><div class="pop-body">
@@ -644,8 +653,8 @@
 
   function renderMarkers() {
     const active = getActivePills();
-    const fromS  = toSlash(document.getElementById('filter-date-from').value);
-    const toS    = toSlash(document.getElementById('filter-date-to').value);
+    const fromS  = document.getElementById('filter-date-from').value || null;
+    const toS    = document.getElementById('filter-date-to').value   || null;
     const query  = document.getElementById('search-input').value.trim().toLowerCase();
 
     clusterGroup.clearLayers();
@@ -664,14 +673,15 @@
       if (ev.source === 'hanabi') {
         if (!active.has('hanabi')) return;
       } else {
-        const cats = (ev.categories || []).filter(c => !TC_EXCLUDED_CATS.includes(c));
-        const onlyFW = TC_EXCLUDED_CATS.every(c => (ev.categories || []).includes(c)) && cats.length === 0;
+        const cats = ((ev.attributes || {}).categories || []).filter(c => !TC_EXCLUDED_CATS.includes(c));
+        const onlyFW = TC_EXCLUDED_CATS.every(c => ((ev.attributes || {}).categories || []).includes(c)) && cats.length === 0;
         if (onlyFW) return;
         if (cats.length > 0 && !cats.some(c => active.has(c))) return;
       }
 
       if (query) {
-        const hay = [ev.title, ev.location_name, ev.venue, ev.access].filter(Boolean).join(' ').toLowerCase();
+        const attrs = ev.attributes || {};
+        const hay = [ev.title, attrs.location_name, ev.venue, attrs.access].filter(Boolean).join(' ').toLowerCase();
         if (!hay.includes(query)) return;
       }
 
@@ -712,7 +722,7 @@
         key = 'hanabi';
         if (!groups.has(key)) groups.set(key, { label: '🎆 Hanabi', isHanabi: true, events: [] });
       } else {
-        const cats = (ev.categories || []).filter(c => !TC_EXCLUDED_CATS.includes(c));
+        const cats = ((ev.attributes || {}).categories || []).filter(c => !TC_EXCLUDED_CATS.includes(c));
         key = cats[0] || 'other';
         if (!groups.has(key)) {
           const emoji = CAT_EMOJI[key] || '📌';
@@ -752,9 +762,10 @@
         card.className = 'event-card';
 
         const date = fmtDate(ev.start_date || ev.date);
+        const attrs = ev.attributes || {};
         const sub  = ev.source === 'tc'
-          ? [ev.location_name, ev.price].filter(Boolean).join(' · ')
-          : [ev.venue, ev.fireworks_count].filter(Boolean).join(' · ');
+          ? [attrs.location_name, ev.price].filter(Boolean).join(' · ')
+          : [ev.venue, attrs.fireworks_count].filter(Boolean).join(' · ');
 
         card.innerHTML = `
           <div class="card-header">
@@ -801,7 +812,7 @@
     const catCounts = {};
     allEvents.forEach(ev => {
       if (ev.source !== 'tc') return;
-      (ev.categories || []).forEach(c => { catCounts[c] = (catCounts[c] || 0) + 1; });
+      ((ev.attributes || {}).categories || []).forEach(c => { catCounts[c] = (catCounts[c] || 0) + 1; });
     });
 
     Object.entries(catCounts)
@@ -908,7 +919,7 @@
     pollInterval = setInterval(async () => {
       const res  = await fetch('/scrape/status');
       const data = await res.json();
-      if (!data.running) {
+      if (data.status !== 'running') {
         clearInterval(pollInterval);
         scrapeBtn.classList.remove('running');
         await loadEvents();

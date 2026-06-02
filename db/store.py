@@ -231,8 +231,8 @@ class EventStore:
             clauses.append("source = ?")
             params.append(source)
         if date:
-            clauses.append("start_date = ?")
-            params.append(date)
+            clauses.append("start_date <= ? AND COALESCE(end_date, start_date) >= ?")
+            params.extend([date, date])
         where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
         rows = self._conn.execute(
             f"SELECT * FROM events {where} ORDER BY start_date LIMIT ? OFFSET ?",
