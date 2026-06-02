@@ -129,7 +129,28 @@
       transition: all 0.2s;
     }
 
-    #scrape-btn:hover { border-color: var(--accent); color: var(--accent); }
+    #scrape-btn:hover, #locate-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    #locate-btn {
+      flex-shrink: 0;
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      background: var(--glass);
+      border: 1.5px solid var(--border);
+      color: var(--text);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .m-user {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: #6366f1;
+      border: 3px solid white;
+      box-shadow: 0 2px 12px rgba(99,102,241,0.5);
+    }
 
     #scrape-btn.running {
       animation: spin 1s linear infinite;
@@ -524,6 +545,7 @@
       <span class="search-icon">🔍</span>
       <input type="text" id="search-input" placeholder="Événement, lieu, station…" />
     </div>
+    <button id="locate-btn" title="Me localiser">📍</button>
     <button id="scrape-btn" title="Relancer le scraping">↻</button>
   </div>
 
@@ -610,9 +632,13 @@
         <div class="pop-source tc">Tokyo Cheapo</div>
         <div class="pop-title">${ev.title}</div>
         <div class="pop-meta">${meta}</div>${badge}
-        <div class="pop-actions">
-          <a class="pop-btn primary" href="${ev.url}" target="_blank">Voir →</a>
-          <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.latitude},${ev.longitude}" target="_blank">🗺 Y aller</a>
+        <div class="pop-actions" style="flex-direction:column;gap:6px;">
+          <a class="pop-btn primary" href="${ev.url}" target="_blank">Voir l'événement →</a>
+          <div style="display:flex;gap:6px;">
+            <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.latitude},${ev.longitude}" target="_blank">🗺 Google</a>
+            <a class="pop-btn secondary" href="https://maps.apple.com/?daddr=${ev.latitude},${ev.longitude}" target="_blank"> Apple</a>
+          </div>
+          <a href="/events/${ev.id}.ics" style="font-size:11px;text-align:center;color:var(--muted);text-decoration:underline;">📅 Ajouter au calendrier</a>
         </div></div></div>`;
     } else {
       const [st, et] = parseTimes(ev);
@@ -632,9 +658,13 @@
         <div class="pop-source hanabi">🎆 Hanabi</div>
         <div class="pop-title">${ev.title}</div>
         <div class="pop-meta">${meta}</div>${badges}
-        <div class="pop-actions">
-          <a class="pop-btn primary" href="${ev.url}" target="_blank">Voir →</a>
-          <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.latitude},${ev.longitude}" target="_blank">🗺 Y aller</a>
+        <div class="pop-actions" style="flex-direction:column;gap:6px;">
+          <a class="pop-btn primary" href="${ev.url}" target="_blank">Voir l'événement →</a>
+          <div style="display:flex;gap:6px;">
+            <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.latitude},${ev.longitude}" target="_blank">🗺 Google</a>
+            <a class="pop-btn secondary" href="https://maps.apple.com/?daddr=${ev.latitude},${ev.longitude}" target="_blank"> Apple</a>
+          </div>
+          <a href="/events/${ev.id}.ics" style="font-size:11px;text-align:center;color:var(--muted);text-decoration:underline;">📅 Ajouter au calendrier</a>
         </div></div></div>`;
     }
   }
@@ -895,20 +925,17 @@
   // ── Listeners ─────────────────────────────────────────────────────────
   document.getElementById('search-input').addEventListener('input', renderMarkers);
 
-  // ── Init ──────────────────────────────────────────────────────────────
-  async function loadEvents() {
+  // ── Bbox fetch ────────────────────────────────────────────────────────
+  let bboxFetchEnabled = false;
+  let fetchDebounceTimer = null;
+
+  async function fetchEventsByBbox() {
     try {
-      const PAGE = 500;
-      allEvents = [];
-      let offset = 0;
-      while (true) {
-        const res = await fetch(`/events?limit=${PAGE}&offset=${offset}`);
-        const page = await res.json();
-        allEvents = allEvents.concat(page);
-        if (page.length < PAGE) break;
-        offset += PAGE;
-      }
-      document.getElementById('filter-date-from').value = isoDate(todayJST());
+      const b = map.getBounds(), sw = b.getSouthWest(), ne = b.getNorthEast();
+      const bbox = `${sw.lng},${sw.lat},${ne.lng},${ne.lat}`;
+      const res = await fetch(`/events?${new URLSearchParams({ bbox, limit: '500' })}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      allEvents = await res.json();
       buildPills();
       renderMarkers();
     } catch (e) {
@@ -916,6 +943,55 @@
       console.error(e);
     }
   }
+
+  map.on('moveend', () => {
+    if (!bboxFetchEnabled) return;
+    clearTimeout(fetchDebounceTimer);
+    fetchDebounceTimer = setTimeout(fetchEventsByBbox, 300);
+  });
+
+  // ── Init ──────────────────────────────────────────────────────────────
+  async function loadEvents() {
+    try {
+      await fetchEventsByBbox();
+      document.getElementById('filter-date-from').value = isoDate(todayJST());
+      bboxFetchEnabled = true;
+    } catch (e) {
+      document.getElementById('stats').textContent = 'Erreur de chargement.';
+      console.error(e);
+    }
+  }
+
+  // ── Geolocation ───────────────────────────────────────────────────────
+  const iconUser = L.divIcon({ html: '<div class="m-user"></div>', className: '', iconSize: [20, 20], iconAnchor: [10, 10] });
+  let userMarker = null;
+
+  document.getElementById('locate-btn').addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      alert('La géolocalisation n\'est pas supportée par ce navigateur.');
+      return;
+    }
+    const btn = document.getElementById('locate-btn');
+    btn.textContent = '⏳';
+    btn.disabled = true;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        btn.textContent = '📍';
+        btn.disabled = false;
+        const lat = pos.coords.latitude, lng = pos.coords.longitude;
+        if (userMarker) map.removeLayer(userMarker);
+        userMarker = L.marker([lat, lng], { icon: iconUser })
+          .bindPopup('📍 Vous êtes ici').addTo(map);
+        map.setView([lat, lng], 13, { animate: true });
+      },
+      (err) => {
+        btn.textContent = '📍';
+        btn.disabled = false;
+        alert('Impossible d\'obtenir votre position : ' + err.message);
+      },
+      { timeout: 10000, maximumAge: 60000 }
+    );
+  });
 
   // ── Scrape button ─────────────────────────────────────────────────────
   const scrapeBtn = document.getElementById('scrape-btn');

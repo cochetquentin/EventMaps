@@ -234,6 +234,8 @@ class EventStore:
         self,
         source: str | None = None,
         date: str | None = None,
+        bbox: tuple[float, float, float, float] | None = None,
+        upcoming: bool = True,
         limit: int = 100,
         offset: int = 0,
     ) -> list[Event]:
@@ -245,6 +247,15 @@ class EventStore:
         if date:
             clauses.append("start_date <= ? AND COALESCE(end_date, start_date) >= ?")
             params.extend([date, date])
+        elif upcoming:
+            clauses.append("COALESCE(end_date, start_date) >= ?")
+            params.append(_date.today().isoformat())
+        if bbox:
+            min_lon, min_lat, max_lon, max_lat = bbox
+            clauses.append(
+                "latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?"
+            )
+            params.extend([min_lat, max_lat, min_lon, max_lon])
         where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
         rows = self._conn.execute(
             f"SELECT * FROM events {where} ORDER BY start_date LIMIT ? OFFSET ?",
