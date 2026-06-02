@@ -949,12 +949,20 @@
     const signal = bboxFetchController.signal;
     try {
       const b = map.getBounds(), sw = b.getSouthWest(), ne = b.getNorthEast();
-      const bbox = `${sw.lng},${sw.lat},${ne.lng},${ne.lat}`;
+      const minLon = Math.max(-180, sw.lng), maxLon = Math.min(180, ne.lng);
+      const minLat = Math.max(-90,  sw.lat), maxLat = Math.min(90,  ne.lat);
+      // If the clamped box is degenerate (whole-world zoom or wrapped edge),
+      // fall back to no-bbox so the server returns all upcoming events.
+      const bbox = (minLon < maxLon && minLat < maxLat)
+        ? `${minLon},${minLat},${maxLon},${maxLat}`
+        : null;
       const PAGE = 500;
       const events = [];
       let offset = 0;
       while (true) {
-        const res = await fetch(`/events?${new URLSearchParams({ bbox, limit: String(PAGE), offset: String(offset) })}`, { signal });
+        const params = { limit: String(PAGE), offset: String(offset) };
+        if (bbox) params.bbox = bbox;
+        const res = await fetch(`/events?${new URLSearchParams(params)}`, { signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const page = await res.json();
         events.push(...page);
