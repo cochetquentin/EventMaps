@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Query
 
@@ -11,6 +12,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 DB_PATH = "data/events.db"
+_SCRAPE_TIMEOUT_HOURS = 2
+
+
+def _is_stale(job: dict) -> bool:
+    """Return True if a 'running' job was started more than _SCRAPE_TIMEOUT_HOURS ago."""
+    try:
+        started = datetime.fromisoformat(job["started_at"])
+        age = datetime.now(timezone.utc) - started
+        return age.total_seconds() > _SCRAPE_TIMEOUT_HOURS * 3600
+    except (ValueError, TypeError, KeyError):
+        return True
 
 
 def _do_scrape(source: str, region: str) -> None:
@@ -45,10 +57,15 @@ def trigger_scrape(
     region: str = Query("ar0300"),
 ):
     with EventStore(DB_PATH) as store:
-        running = [
-            s for s in _conflicting_sources(source)
-            if (j := store.get_last_job(s)) and j["status"] == "running"
-        ]
+        running = []
+        for s in _conflicting_sources(source):
+            j = store.get_last_job(s)
+            if j and j["status"] == "running":
+                if _is_stale(j):
+                    store.fail_job(j["id"], "stale: process killed or server restarted")
+                    logger.warning("Cleared stale scrape job %s (source=%s)", j["id"], s)
+                else:
+                    running.append(s)
     if running:
         return {"status": "already_running", "running_sources": running}
     background_tasks.add_task(_do_scrape, source, region)

@@ -49,6 +49,18 @@ _EVENTS_HEADERS = [
 ]
 
 
+def _safe_iso_date(raw: str | None) -> str | None:
+    """Normalize YYYY/MM/DD or YYYY-MM-DD to YYYY-MM-DD; return None if unparseable."""
+    if not raw:
+        return None
+    normalized = raw.replace("/", "-")
+    try:
+        _date.fromisoformat(normalized)
+        return normalized
+    except ValueError:
+        return None
+
+
 def _migrate(conn: sqlite3.Connection) -> None:
     """Migrate tokyo_cheapo + hanabi tables → events table if they still exist."""
     tables = {r[0] for r in conn.execute(
@@ -77,8 +89,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
             lng = row[13]
             scraped_at = row[14]
 
-            norm_start = start_date.replace("/", "-") if start_date else None
-            norm_end = end_date.replace("/", "-") if end_date else None
+            norm_start = _safe_iso_date(start_date)
+            norm_end = _safe_iso_date(end_date)
 
             times = None
             if start_time and end_time:
@@ -137,7 +149,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
             contact2 = row[22] or None
             scraped_at = row[23]
 
-            norm_start = date_val.replace("/", "-") if date_val else None
+            norm_start = _safe_iso_date(date_val)
 
             times = None
             if start_time and end_time:
