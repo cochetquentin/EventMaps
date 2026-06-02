@@ -336,4 +336,9 @@ class HanabiWalker(BaseScraper):
                 },
                 created_at=now,
             ))
+        if not events:
+            logger.critical(
+                "Scraper %s returned 0 events — likely a parser failure (HTML structure changed?)",
+                self.__class__.__name__,
+            )
         return events

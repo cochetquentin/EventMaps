@@ -1,8 +1,11 @@
 import logging
 from datetime import datetime, timezone
+from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, Query
+from fastapi import APIRouter, BackgroundTasks, Query, Request
 
+from api.limiter import limiter
+from config import settings
 from db.store import EventStore
 from scrapers.hanabi_walker import HanabiWalker
 from scrapers.tokyo_cheapo import TokyoCheapo
@@ -11,22 +14,19 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-DB_PATH = "data/events.db"
-_SCRAPE_TIMEOUT_HOURS = 2
-
 
 def _is_stale(job: dict) -> bool:
-    """Return True if a 'running' job was started more than _SCRAPE_TIMEOUT_HOURS ago."""
+    """Return True if a 'running' job was started more than scrape_timeout_hours ago."""
     try:
         started = datetime.fromisoformat(job["started_at"])
         age = datetime.now(timezone.utc) - started
-        return age.total_seconds() > _SCRAPE_TIMEOUT_HOURS * 3600
+        return age.total_seconds() > settings.scrape_timeout_hours * 3600
     except (ValueError, TypeError, KeyError):
         return True
 
 
 def _do_scrape(source: str, region: str) -> None:
-    with EventStore(DB_PATH) as store:
+    with EventStore(settings.db_path) as store:
         job_id = store.start_job(source)
         try:
             events = []
@@ -51,12 +51,14 @@ def _conflicting_sources(source: str) -> list[str]:
 
 
 @router.post("")
-def trigger_scrape(
+@limiter.limit("2/hour")
+async def trigger_scrape(
+    request: Request,
     background_tasks: BackgroundTasks,
-    source: str = Query("all", description="tc | hanabi | all"),
+    source: Literal["tc", "hanabi", "all"] = Query("all"),
     region: str = Query("ar0300"),
 ):
-    with EventStore(DB_PATH) as store:
+    with EventStore(settings.db_path) as store:
         running = []
         for s in _conflicting_sources(source):
             j = store.get_last_job(s)
@@ -74,7 +76,7 @@ def trigger_scrape(
 
 @router.get("/status")
 def scrape_status(source: str | None = Query(None)):
-    with EventStore(DB_PATH) as store:
+    with EventStore(settings.db_path) as store:
         last = store.get_last_job(source)
     if last is None:
         return {"status": "never_run"}
