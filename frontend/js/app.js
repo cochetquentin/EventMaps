@@ -2,6 +2,7 @@
 import { setMap, setClusterGroup, deactivatedPills, setShowOnlyFavorites, showOnlyFavorites, markerMap, allEvents } from './state.js';
 import { isoDate, todayJST, computePresets } from './utils.js';
 import { toggleFavorite, isFavorite, getIcon, updateFavPill } from './favorites.js';
+import { buildPopup } from './popups.js';
 import { renderMarkers } from './markers.js';
 import { buildPills } from './filters.js';
 import {
@@ -46,7 +47,10 @@ map.on('popupopen', (e) => {
     const marker = markerMap.get(id);
     if (marker) {
       const ev = allEvents.find(ev => ev.id === id);
-      if (ev) marker.setIcon(getIcon(ev, fav));
+      if (ev) {
+        marker.setIcon(getIcon(ev, fav));
+        marker.setPopupContent(buildPopup(ev));
+      }
     }
     updateFavPill();
     if (showOnlyFavorites && !fav) renderMarkers();

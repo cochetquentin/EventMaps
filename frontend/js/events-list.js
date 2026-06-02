@@ -4,6 +4,7 @@ import { fmtDate } from './utils.js';
 import { TC_EXCLUDED_CATS, CAT_EMOJI } from './config.js';
 import { isFavorite, toggleFavorite, getIcon, updateFavPill } from './favorites.js';
 import { renderMarkers } from './markers.js';
+import { buildPopup } from './popups.js';
 
 export function buildEventList(events) {
   const list = document.getElementById('event-list');
@@ -80,7 +81,10 @@ export function buildEventList(events) {
         e.currentTarget.textContent = fav ? '★' : '☆';
         e.currentTarget.classList.toggle('active', fav);
         const m = markerMap.get(ev.id);
-        if (m) m.setIcon(getIcon(ev, fav));
+        if (m) {
+          m.setIcon(getIcon(ev, fav));
+          m.setPopupContent(buildPopup(ev));
+        }
         updateFavPill();
         if (showOnlyFavorites && !fav) renderMarkers();
       });
