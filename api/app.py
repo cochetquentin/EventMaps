@@ -3,6 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -28,6 +29,7 @@ app.add_middleware(
 )
 app.include_router(router, prefix="/events", tags=["events"])
 app.include_router(scrape_router, prefix="/scrape", tags=["scrape"])
+app.mount("/js", StaticFiles(directory="frontend/js"), name="js")
 
 
 @app.get("/")
