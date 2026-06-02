@@ -70,12 +70,12 @@ Ajouté dans `api/app.py`. Notes d'implémentation :
 
 ---
 
-## Phase 1 — Architecture core
+## Phase 1 — Architecture core ✅ DONE (PR #4, mergé 2026-06-02)
 
 > **Ordre important.** 1.1 et 1.2 sont liés et doivent être faits ensemble ou dans cet ordre.  
 > 1.3 dépend de 1.1+1.2. 1.4 est indépendant.
 
-### 1.1 — Schéma unifié : 2 tables → 1 table `events`
+### 1.1 — Schéma unifié : 2 tables → 1 table `events` ✅
 
 **Le changement le plus impactant du projet. Consensus fort : 5/5 LLMs.**
 
@@ -114,7 +114,7 @@ Le champ `attributes` en JSON stocke tout ce qui est source-spécifique : `categ
 
 ---
 
-### 1.2 — Modèle canonique `Event` en Python
+### 1.2 — Modèle canonique `Event` en Python ✅
 
 **Dépend de 1.1. À faire en même temps.**
 
@@ -148,7 +148,7 @@ class BaseScraper(ABC):
 
 ---
 
-### 1.3 — Découpler le scraping de l'API
+### 1.3 — Découpler le scraping de l'API ✅
 
 **Dépend de 1.1+1.2. Consensus fort : tous les LLMs l'ont mentionné.**
 
@@ -182,7 +182,7 @@ Le scraper insère un job au début, le met à jour à la fin. L'API lit le dern
 
 ---
 
-### 1.4 — Retry + backoff sur les scrapers
+### 1.4 — Retry + backoff sur les scrapers ✅
 
 **Indépendant de 1.1-1.3.**
 

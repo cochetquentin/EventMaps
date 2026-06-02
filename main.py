@@ -2,151 +2,65 @@ import argparse
 import csv
 import logging
 import sys
-from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
 from scrapers.tokyo_cheapo import TokyoCheapo
 from scrapers.hanabi_walker import HanabiWalker
-from db.store import EventStore, _make_id
-from models.event import HanabiEvent, TokyoCheapoEvent
+from db.store import EventStore
+from models.event import Event
 
 
-def _explode_locations(events: list[dict]) -> list[dict]:
-    flat = []
-    for e in events:
-        locations = e["locations"] or [{"name": "", "lat": None, "lng": None}]
-        for loc in locations:
-            flat.append({**e, "location_name": loc["name"], "lat": loc.get("lat"), "lng": loc.get("lng")})
-    return flat
-
-
-def _to_tc_events(flat_events: list[dict]) -> list[TokyoCheapoEvent]:
-    now = datetime.now(timezone.utc)
-    return [
-        TokyoCheapoEvent(
-            id=_make_id([e["url"], e.get("location_name") or ""]),
-            scraped_at=now,
-            title=e.get("title", ""),
-            url=e["url"],
-            start_date=e.get("start_date", ""),
-            end_date=e.get("end_date") or None,
-            start_time=e.get("start_time") or None,
-            end_time=e.get("end_time") or None,
-            price=e.get("price") or None,
-            categories=e.get("categories") or [],
-            tags=e.get("tags") or [],
-            official_link=e.get("official_link") or None,
-            location_name=e.get("location_name") or None,
-            lat=e.get("lat"),
-            lng=e.get("lng"),
-        )
-        for e in flat_events
-    ]
-
-
-def _to_hanabi_events(events: list[dict]) -> list[HanabiEvent]:
-    now = datetime.now(timezone.utc)
-    return [
-        HanabiEvent(
-            id=_make_id([e["url"], e.get("date") or ""]),
-            scraped_at=now,
-            title=e.get("title", ""),
-            url=e["url"],
-            start_date=e.get("date", ""),
-            start_time=e.get("start_time") or None,
-            end_time=e.get("end_time") or None,
-            lat=e.get("lat"),
-            lng=e.get("lng"),
-            fireworks_count=e.get("fireworks_count") or None,
-            fireworks_duration=e.get("fireworks_duration") or None,
-            expected_crowd=e.get("expected_crowd") or None,
-            rain_policy=e.get("rain_policy") or None,
-            paid_seating=e.get("paid_seating") or None,
-            paid_seating_details=e.get("paid_seating_details") or None,
-            food_stalls=e.get("food_stalls") or None,
-            notes=e.get("notes") or None,
-            venue=e.get("venue") or None,
-            access=e.get("access") or None,
-            parking=e.get("parking") or None,
-            official_site=e.get("official_site") or None,
-            official_x=e.get("official_x") or None,
-            contact=e.get("contact") or None,
-            contact2=e.get("contact2") or None,
-        )
-        for e in events
-    ]
-
-
-def _write_tc_csv(events: list[TokyoCheapoEvent]) -> None:
+def _write_events_csv(events: list[Event]) -> None:
     sys.stdout.reconfigure(encoding="utf-8", newline="")
     writer = csv.writer(sys.stdout)
-    writer.writerow(["title", "start_date", "end_date", "start_time", "end_time", "price",
-                     "categories", "tags", "official_link", "url", "location_name", "lat", "lng"])
+    writer.writerow([
+        "id", "source", "title", "url", "start_date", "end_date",
+        "times", "venue", "latitude", "longitude", "price", "attributes", "created_at",
+    ])
     for e in events:
         writer.writerow([
-            e.title, e.start_date, e.end_date, e.start_time, e.end_time,
-            e.price or "",
-            ", ".join(e.categories),
-            ", ".join(e.tags),
-            e.official_link or "",
-            e.url, e.location_name, e.lat, e.lng,
+            e.id, e.source, e.title, e.url,
+            e.start_date.isoformat() if e.start_date else "",
+            e.end_date.isoformat() if e.end_date else "",
+            e.times or "", e.venue or "",
+            e.latitude, e.longitude, e.price or "",
+            str(e.attributes), e.created_at.isoformat(),
         ])
 
 
-_HANABI_FIELDS = [
-    "title", "fireworks_count", "fireworks_duration", "expected_crowd",
-    "start_time", "end_time", "rain_policy", "paid_seating", "paid_seating_details",
-    "food_stalls", "notes", "venue", "access", "parking", "official_site", "official_x",
-    "url", "lat", "lng", "date", "contact", "contact2",
-]
-
-
-def _write_hanabi_csv(events: list[HanabiEvent]) -> None:
-    sys.stdout.reconfigure(encoding="utf-8", newline="")
-    writer = csv.writer(sys.stdout)
-    writer.writerow(_HANABI_FIELDS)
-    for e in events:
-        writer.writerow([getattr(e, f, "") or "" for f in _HANABI_FIELDS])
-
-
 def cmd_tc(args):
-    raw = _explode_locations(TokyoCheapo().scrape_all())
-    events = _to_tc_events(raw)
+    events = TokyoCheapo().scrape()
     if args.output == "db":
         with EventStore(args.db) as store:
-            store.upsert_tokyo_cheapo(events)
+            store.upsert_events(events)
         logger.info("Tokyo Cheapo: %d rows → %s", len(events), args.db)
     else:
-        _write_tc_csv(events)
+        _write_events_csv(events)
 
 
 def cmd_hanabi(args):
-    raw = HanabiWalker(region=args.region).scrape_all()
-    events = _to_hanabi_events(raw)
+    events = HanabiWalker(region=args.region).scrape()
     if args.output == "db":
         with EventStore(args.db) as store:
-            store.upsert_hanabi(events)
+            store.upsert_events(events)
         logger.info("Hanabi Walker: %d rows → %s", len(events), args.db)
     else:
-        _write_hanabi_csv(events)
+        _write_events_csv(events)
 
 
 def cmd_all(args):
-    tc_raw = _explode_locations(TokyoCheapo().scrape_all())
-    hanabi_raw = HanabiWalker(region=args.region).scrape_all()
-    tc_events = _to_tc_events(tc_raw)
-    hanabi_events = _to_hanabi_events(hanabi_raw)
+    tc_events = TokyoCheapo().scrape()
+    hanabi_events = HanabiWalker(region=args.region).scrape()
     if args.output == "db":
         with EventStore(args.db) as store:
-            store.upsert_tokyo_cheapo(tc_events)
-            store.upsert_hanabi(hanabi_events)
+            store.upsert_events(tc_events)
+            store.upsert_events(hanabi_events)
         logger.info("Tokyo Cheapo: %d rows", len(tc_events))
         logger.info("Hanabi Walker: %d rows", len(hanabi_events))
         logger.info("Stored in %s", args.db)
     else:
-        _write_tc_csv(tc_events)
-        _write_hanabi_csv(hanabi_events)
+        _write_events_csv(tc_events + hanabi_events)
 
 
 def main():

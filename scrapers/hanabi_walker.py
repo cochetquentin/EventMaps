@@ -1,8 +1,14 @@
 import logging
 import re
-from datetime import date as Date, timedelta
+from datetime import date as _date, datetime, timedelta, timezone
 import requests
 from bs4 import BeautifulSoup
+
+from tenacity import retry, stop_after_attempt, wait_exponential, before_log
+
+from db.store import _make_id
+from models.event import Event
+from scrapers.base import BaseScraper
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +51,26 @@ _TIME_RANGE_RE = re.compile(r"\d{1,2}:\d{2}[～〜]\d{1,2}:\d{2}")
 _TIME_START_RE = re.compile(r"\d{1,2}:\d{2}[～〜]")
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(min=2, max=10),
+    before=before_log(logger, logging.WARNING),
+)
+def _fetch(url: str, session: requests.Session) -> requests.Response:
+    response = session.get(url, timeout=10)
+    response.raise_for_status()
+    return response
+
+
+def _parse_iso_date(s: str) -> _date | None:
+    if not s:
+        return None
+    try:
+        return _date.fromisoformat(s.replace("/", "-"))
+    except (ValueError, AttributeError):
+        return None
+
+
 def _extract_time(text: str) -> tuple[str | None, str | None]:
     """Retourne (start_time, end_time) extraits du texte, ou None si absent."""
     m = _TIME_RANGE_RE.search(text)
@@ -69,7 +95,7 @@ _SLASH_TOKEN_RE = re.compile(
 
 def _parse_slash_dates(text: str) -> list[str]:
     """Parse les formats 年M/D・D avec listes (・) et ranges (～), multi-années."""
-    results: set[Date] = set()
+    results: set[_date] = set()
     year = ctx_month = prev_day = None
 
     for m in _SLASH_TOKEN_RE.finditer(text):
@@ -81,14 +107,14 @@ def _parse_slash_dates(text: str) -> list[str]:
                 continue
             ctx_month, day = int(m.group(2)), int(m.group(3))
             try:
-                results.add(Date(year, ctx_month, day))
+                results.add(_date(year, ctx_month, day))
                 prev_day = day
             except ValueError:
                 pass
         elif m.group(4) and year and ctx_month and prev_day:  # ～D (range)
             end_day = int(m.group(4))
-            d = Date(year, ctx_month, prev_day + 1)
-            end = Date(year, ctx_month, end_day)
+            d = _date(year, ctx_month, prev_day + 1)
+            end = _date(year, ctx_month, end_day)
             while d <= end:
                 results.add(d)
                 d += timedelta(days=1)
@@ -96,7 +122,7 @@ def _parse_slash_dates(text: str) -> list[str]:
         elif m.group(5) and year and ctx_month:  # ・D (jour additionnel)
             day = int(m.group(5))
             try:
-                results.add(Date(year, ctx_month, day))
+                results.add(_date(year, ctx_month, day))
                 prev_day = day
             except ValueError:
                 pass
@@ -111,13 +137,11 @@ def _extract_dates(raw: str) -> list[str]:
     """
     text = raw.replace("〜", "～")
 
-    # Format 年M/D (ex: '2026年4/4・5・11', '2026年5/30(土)、6/27')
     if re.search(r"年\d{1,2}/", text):
         dates = _parse_slash_dates(text)
         if dates:
             return dates
 
-    # Format YYYY/M/D sans 年月日 : trop complexe, fallback première date
     first = _FULL_DATE_RE.search(text)
     if re.search(r"\d{4}/\d{1,2}[・～]", text):
         return [f"{first.group(1)}/{int(first.group(2)):02d}/{int(first.group(3)):02d}"] if first else [raw]
@@ -126,30 +150,27 @@ def _extract_dates(raw: str) -> list[str]:
         return [raw]
 
     year = int(first.group(1))
-    collected: set[Date] = set()
+    collected: set[_date] = set()
 
-    # 1. Plages explicites : DD日(X)～DD日
     for m in _RANGE_RE.finditer(text):
         prefix = text[: m.start()]
         months_found = re.findall(r"(\d{1,2})月", prefix)
         month = int(months_found[-1]) if months_found else int(first.group(2))
-        d = Date(year, month, int(m.group(1)))
-        end = Date(year, month, int(m.group(2)))
+        d = _date(year, month, int(m.group(1)))
+        end = _date(year, month, int(m.group(2)))
         while d <= end:
             collected.add(d)
             d += timedelta(days=1)
 
-    # 2. Toutes les références MM月DD日
     for m in _MONTH_DAY_RE.finditer(text):
-        collected.add(Date(year, int(m.group(1)), int(m.group(2))))
+        collected.add(_date(year, int(m.group(1)), int(m.group(2))))
 
-    # 3. DD日(weekday) standalone avec contexte du dernier mois vu
     ctx_month = int(first.group(2))
     for m in _DAY_WEEKDAY_RE.finditer(text):
         prefix = text[: m.start()]
         months_found = re.findall(r"(\d{1,2})月", prefix)
         month = int(months_found[-1]) if months_found else ctx_month
-        collected.add(Date(year, month, int(m.group(1))))
+        collected.add(_date(year, month, int(m.group(1))))
 
     return sorted(d.strftime("%Y/%m/%d") for d in collected)
 
@@ -163,7 +184,7 @@ def _split_paid_seating(text: str) -> tuple[str, str | None]:
     return text, None
 
 
-class HanabiWalker:
+class HanabiWalker(BaseScraper):
     def __init__(self, region: str = "ar0300"):
         self.region = region
         self.session = requests.Session()
@@ -174,10 +195,12 @@ class HanabiWalker:
         links = []
         for i in range(1, max_pages + 1):
             url = f"{BASE_URL}/list/{self.region}/scheduled/{i}.html"
-            response = self.session.get(url, timeout=10)
-            if response.status_code == 404:
-                break
-            response.raise_for_status()
+            try:
+                response = _fetch(url, self.session)
+            except requests.HTTPError as e:
+                if e.response is not None and e.response.status_code == 404:
+                    break
+                raise
 
             soup = BeautifulSoup(response.content, "html.parser")
             page_links = [
@@ -193,13 +216,11 @@ class HanabiWalker:
         return list(dict.fromkeys(links))
 
     def get_data_page(self, path: str) -> BeautifulSoup:
-        response = self.session.get(f"{BASE_URL}{path}data.html", timeout=10)
-        response.raise_for_status()
+        response = _fetch(f"{BASE_URL}{path}data.html", self.session)
         return BeautifulSoup(response.content, "html.parser")
 
     def get_map_page(self, path: str) -> BeautifulSoup:
-        response = self.session.get(f"{BASE_URL}{path}map.html", timeout=10)
-        response.raise_for_status()
+        response = _fetch(f"{BASE_URL}{path}map.html", self.session)
         return BeautifulSoup(response.content, "html.parser")
 
     def parse_event_table(self, soup: BeautifulSoup) -> dict:
@@ -215,7 +236,6 @@ class HanabiWalker:
                     a = td.find("a")
                     result[english_key] = a.get("href") if a else None
                 elif english_key == "access":
-                    # Retire le lien "MAP" présent en fin de cellule
                     for a in td.find_all("a"):
                         a.decompose()
                     result[english_key] = td.get_text(" ", strip=True)
@@ -270,4 +290,50 @@ class HanabiWalker:
                     events.append({**event, "date": date})
             except Exception as e:
                 logger.warning("SKIP %s — %s", path, e)
+        return events
+
+    def scrape(self, max_pages: int = 20) -> list[Event]:
+        """Retourne les événements sous forme de modèles canoniques Event."""
+        now = datetime.now(timezone.utc)
+        raw_events = self.scrape_all(max_pages=max_pages)
+        events: list[Event] = []
+        for e in raw_events:
+            date_val = e.get("date", "")  # YYYY/MM/DD brut — préserve la stabilité des IDs
+            start_time = e.get("start_time") or ""
+            end_time = e.get("end_time") or ""
+            times = None
+            if start_time and end_time:
+                times = f"{start_time}-{end_time}"
+            elif start_time:
+                times = start_time
+            events.append(Event(
+                id=_make_id([e["url"], date_val]),
+                source="hanabi",
+                title=e.get("title", ""),
+                url=e["url"],
+                start_date=_parse_iso_date(date_val),
+                end_date=None,
+                times=times,
+                venue=e.get("venue") or None,
+                latitude=e.get("lat"),
+                longitude=e.get("lng"),
+                price=None,
+                attributes={
+                    "fireworks_count": e.get("fireworks_count") or None,
+                    "fireworks_duration": e.get("fireworks_duration") or None,
+                    "expected_crowd": e.get("expected_crowd") or None,
+                    "rain_policy": e.get("rain_policy") or None,
+                    "paid_seating": e.get("paid_seating") or None,
+                    "paid_seating_details": e.get("paid_seating_details") or None,
+                    "food_stalls": e.get("food_stalls") or None,
+                    "notes": e.get("notes") or None,
+                    "access": e.get("access") or None,
+                    "parking": e.get("parking") or None,
+                    "official_site": e.get("official_site") or None,
+                    "official_x": e.get("official_x") or None,
+                    "contact": e.get("contact") or None,
+                    "contact2": e.get("contact2") or None,
+                },
+                created_at=now,
+            ))
         return events

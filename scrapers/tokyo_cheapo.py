@@ -5,7 +5,13 @@ import re
 import requests
 from bs4 import BeautifulSoup
 import calendar
-from datetime import date as Date
+from datetime import date as _date, datetime, timezone
+
+from tenacity import retry, stop_after_attempt, wait_exponential, before_log
+
+from db.store import _make_id
+from models.event import Event
+from scrapers.base import BaseScraper
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +39,26 @@ _MONTH_ABBREVS = {
     'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
     'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
 }
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(min=2, max=10),
+    before=before_log(logger, logging.WARNING),
+)
+def _fetch(url: str, session: requests.Session) -> requests.Response:
+    response = session.get(url, timeout=10)
+    response.raise_for_status()
+    return response
+
+
+def _parse_iso_date(s: str) -> _date | None:
+    if not s:
+        return None
+    try:
+        return _date.fromisoformat(s.replace("/", "-"))
+    except (ValueError, AttributeError):
+        return None
 
 
 def _clean_whitespace(text: str) -> str:
@@ -68,32 +94,31 @@ def _split_time(time_str: str) -> tuple[str, str]:
     return '', ''
 
 
-def _parse_date_part(text: str, year: int) -> Date | None:
+def _parse_date_part(text: str, year: int) -> _date | None:
     """Parse 'May 15', 'Fri, May 15', 'Mar 27' → date object."""
     text = re.sub(r'^(Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s*', '', text, flags=re.IGNORECASE).strip()
     m = re.match(r'^([A-Za-z]{3,})\s+(\d{1,2})$', text)
     if m:
         month = _MONTH_ABBREVS.get(m.group(1)[:3].lower())
         if month:
-            return Date(year, month, int(m.group(2)))
+            return _date(year, month, int(m.group(2)))
     return None
 
 
 _FUZZY_PERIODS = {"early": (1, 10), "mid": (11, 20), "late": (21, None)}
 
-# "Early May", "Mid ~ Late May", "Early Apr ~ Early Jun"
 _FUZZY_SINGLE_RE = re.compile(r'^(early|mid|late)\s+([a-z]+)$', re.IGNORECASE)
 _FUZZY_SAME_MONTH_RE = re.compile(r'^(early|mid|late)\s*~\s*(early|mid|late)\s+([a-z]+)$', re.IGNORECASE)
 _FUZZY_CROSS_MONTH_RE = re.compile(r'^(early|mid|late)\s+([a-z]+)\s*~\s*(early|mid|late)\s+([a-z]+)$', re.IGNORECASE)
 
 
-def _fuzzy_start(period: str, month: int, year: int) -> Date:
-    return Date(year, month, _FUZZY_PERIODS[period.lower()][0])
+def _fuzzy_start(period: str, month: int, year: int) -> _date:
+    return _date(year, month, _FUZZY_PERIODS[period.lower()][0])
 
 
-def _fuzzy_end(period: str, month: int, year: int) -> Date:
+def _fuzzy_end(period: str, month: int, year: int) -> _date:
     day = _FUZZY_PERIODS[period.lower()][1] or calendar.monthrange(year, month)[1]
-    return Date(year, month, day)
+    return _date(year, month, day)
 
 
 def _parse_fuzzy_date_range(date_str: str, year: int) -> tuple[str, str] | None:
@@ -139,7 +164,7 @@ def _parse_date_range(date_str: str, year: int | None = None) -> tuple[str, str]
     - Dates fuzzy ('Mid May') → (date_str, "")
     """
     if year is None:
-        year = Date.today().year
+        year = _date.today().year
 
     range_m = re.match(r'^(.+?)\s+-\s+(.+)$', date_str.strip())
     if range_m:
@@ -160,7 +185,7 @@ def _parse_date_range(date_str: str, year: int | None = None) -> tuple[str, str]
     return date_str, ""
 
 
-class TokyoCheapo:
+class TokyoCheapo(BaseScraper):
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update(_HEADERS)
@@ -170,10 +195,12 @@ class TokyoCheapo:
         links = []
         for i in range(1, max_pages + 1):
             url = f"{BASE_URL}/events/this-week/page/{i}/"
-            response = self.session.get(url, timeout=10)
-            if response.status_code == 404:
-                break
-            response.raise_for_status()
+            try:
+                response = _fetch(url, self.session)
+            except requests.HTTPError as e:
+                if e.response is not None and e.response.status_code == 404:
+                    break
+                raise
 
             soup = BeautifulSoup(response.content, "html.parser")
             page_links = {
@@ -193,8 +220,7 @@ class TokyoCheapo:
 
     def get_event_page(self, url: str) -> BeautifulSoup:
         """Télécharge et parse une page événement."""
-        response = self.session.get(url, timeout=10)
-        response.raise_for_status()
+        response = _fetch(url, self.session)
         return BeautifulSoup(response.content, "html.parser")
 
     def parse_title(self, soup: BeautifulSoup) -> str:
@@ -208,7 +234,6 @@ class TokyoCheapo:
             return " - ".join(d.get_text(" ", strip=True) for d in dates)
         day_divs = header.find_all("div", class_="day")
         if not day_divs:
-            # Date non confirmée : "Early Apr", "Mid May ~ Early Jun", etc.
             return dates[0].get_text(" ", strip=True) if dates else ""
         return f"{day_divs[0].text} {dates[0].text}"
 
@@ -219,7 +244,6 @@ class TokyoCheapo:
             return "", None
         first = _clean_whitespace(attrs[0].text)
         second = _clean_whitespace(attrs[1].text) if len(attrs) > 1 else None
-        # Détecter si le premier attr est un prix (pas un horaire)
         if _is_price_text(first) and second is None:
             return "", first
         return first, second
@@ -254,7 +278,6 @@ class TokyoCheapo:
         all_divs = infos.find_all("div")
         for i, div in enumerate(all_divs):
             if div.get_text(strip=True).startswith("External link"):
-                # Le lien peut être dans ce div ou dans le suivant
                 a = div.find("a") or (all_divs[i + 1].find("a") if i + 1 < len(all_divs) else None)
                 return a["href"] if a else None
         return None
@@ -283,7 +306,6 @@ class TokyoCheapo:
                 for loc in locations
             ]
 
-        # Fallback: un seul lieu
         return [
             {
                 "name": _html.unescape(data.get("title", "")),
@@ -324,4 +346,42 @@ class TokyoCheapo:
                 events.append(self.scrape_event(url))
             except Exception as e:
                 logger.warning("SKIP %s — %s", url, e)
+        return events
+
+    def scrape(self, max_pages: int = 10) -> list[Event]:
+        """Retourne les événements sous forme de modèles canoniques Event."""
+        now = datetime.now(timezone.utc)
+        raw_events = self.scrape_all(max_pages=max_pages)
+        events: list[Event] = []
+        for e in raw_events:
+            locations = e.get("locations") or [{"name": "", "lat": None, "lng": None}]
+            for loc in locations:
+                start_time = e.get("start_time") or ""
+                end_time = e.get("end_time") or ""
+                times = None
+                if start_time and end_time:
+                    times = f"{start_time}-{end_time}"
+                elif start_time:
+                    times = start_time
+                location_name = loc.get("name") or ""
+                events.append(Event(
+                    id=_make_id([e["url"], location_name]),
+                    source="tc",
+                    title=e.get("title", ""),
+                    url=e["url"],
+                    start_date=_parse_iso_date(e.get("start_date", "")),
+                    end_date=_parse_iso_date(e.get("end_date", "")),
+                    times=times,
+                    venue=None,
+                    latitude=loc.get("lat"),
+                    longitude=loc.get("lng"),
+                    price=e.get("price") or None,
+                    attributes={
+                        "categories": e.get("categories") or [],
+                        "tags": e.get("tags") or [],
+                        "official_link": e.get("official_link") or None,
+                        "location_name": location_name or None,
+                    },
+                    created_at=now,
+                ))
         return events
