@@ -391,6 +391,34 @@ def test_date_param_overrides_upcoming(tmp_path):
     assert len(results) == 1
 
 
+def test_start_from_returns_past_events(tmp_path):
+    from datetime import timedelta
+    db = str(tmp_path / "events.db")
+    today = date.today()
+    past = make_tc(start_date=today - timedelta(days=10), end_date=today - timedelta(days=5))
+    future = make_hanabi(start_date=today + timedelta(days=5))
+    with EventStore(db) as store:
+        store.upsert_events([past, future])
+        start_from = (today - timedelta(days=15)).isoformat()
+        results = store.get_events(start_from=start_from)
+    assert len(results) == 2
+
+
+def test_start_from_overrides_upcoming(tmp_path):
+    """start_from disables the JST-today default when provided."""
+    from datetime import timedelta
+    db = str(tmp_path / "events.db")
+    today = date.today()
+    past = make_tc(start_date=today - timedelta(days=10), end_date=today - timedelta(days=5))
+    with EventStore(db) as store:
+        store.upsert_events([past])
+        # Without start_from, upcoming=True filters past event out
+        assert store.get_events() == []
+        # With start_from in the past, event is included
+        results = store.get_events(start_from=(today - timedelta(days=15)).isoformat())
+    assert len(results) == 1
+
+
 # --- Bbox filter ---
 
 def test_bbox_filters_by_coords(tmp_path):
