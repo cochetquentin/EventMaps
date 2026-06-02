@@ -23,4 +23,4 @@ jobs:
         run: uv sync --all-groups --locked
 
       - name: Lancer les tests
-        run: uv run --locked python -m pytest tests/ -v
+        run: uv run --locked python -m pytest --cov=. --cov-fail-under=80 tests/ -v
