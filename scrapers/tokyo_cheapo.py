@@ -187,8 +187,10 @@ def _parse_date_range(date_str: str, year: int | None = None) -> tuple[str, str]
 
 class TokyoCheapo(BaseScraper):
     def __init__(self):
+        from config import settings
         self.session = requests.Session()
         self.session.headers.update(_HEADERS)
+        self.session.headers["User-Agent"] = settings.scrape_user_agent
 
     def get_event_links(self, max_pages: int = 10) -> list[str]:
         """Retourne les URLs de tous les événements de la semaine."""
