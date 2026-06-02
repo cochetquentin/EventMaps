@@ -1,5 +1,5 @@
 /* global L */
-import { setMap, setClusterGroup, deactivatedPills, setShowOnlyFavorites, markerMap, allEvents } from './state.js';
+import { setMap, setClusterGroup, deactivatedPills, setShowOnlyFavorites, showOnlyFavorites, markerMap, allEvents } from './state.js';
 import { isoDate, todayJST, computePresets } from './utils.js';
 import { toggleFavorite, isFavorite, getIcon, updateFavPill } from './favorites.js';
 import { renderMarkers } from './markers.js';
@@ -49,6 +49,7 @@ map.on('popupopen', (e) => {
       if (ev) marker.setIcon(getIcon(ev, fav));
     }
     updateFavPill();
+    if (showOnlyFavorites && !fav) renderMarkers();
   });
 });
 

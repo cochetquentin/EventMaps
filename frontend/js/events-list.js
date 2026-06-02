@@ -1,8 +1,9 @@
 /* global L */
-import { allEvents, map, markerMap } from './state.js';
+import { allEvents, map, markerMap, showOnlyFavorites } from './state.js';
 import { fmtDate } from './utils.js';
 import { TC_EXCLUDED_CATS, CAT_EMOJI } from './config.js';
 import { isFavorite, toggleFavorite, getIcon, updateFavPill } from './favorites.js';
+import { renderMarkers } from './markers.js';
 
 export function buildEventList(events) {
   const list = document.getElementById('event-list');
@@ -81,6 +82,7 @@ export function buildEventList(events) {
         const m = markerMap.get(ev.id);
         if (m) m.setIcon(getIcon(ev, fav));
         updateFavPill();
+        if (showOnlyFavorites && !fav) renderMarkers();
       });
 
       card.addEventListener('click', () => {
