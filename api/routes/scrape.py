@@ -31,6 +31,13 @@ def _do_scrape(source: str, region: str) -> None:
             raise
 
 
+def _conflicting_sources(source: str) -> list[str]:
+    """Return all source names that would overlap with the requested source."""
+    if source == "all":
+        return ["tc", "hanabi", "all"]
+    return [source, "all"]
+
+
 @router.post("")
 def trigger_scrape(
     background_tasks: BackgroundTasks,
@@ -38,9 +45,12 @@ def trigger_scrape(
     region: str = Query("ar0300"),
 ):
     with EventStore(DB_PATH) as store:
-        last = store.get_last_job(source)
-    if last and last["status"] == "running":
-        return {"status": "already_running"}
+        running = [
+            s for s in _conflicting_sources(source)
+            if (j := store.get_last_job(s)) and j["status"] == "running"
+        ]
+    if running:
+        return {"status": "already_running", "running_sources": running}
     background_tasks.add_task(_do_scrape, source, region)
     return {"status": "started"}
 

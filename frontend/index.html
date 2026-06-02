@@ -604,7 +604,7 @@
         <div class="pop-meta">${meta}</div>${badge}
         <div class="pop-actions">
           <a class="pop-btn primary" href="${ev.url}" target="_blank">Voir →</a>
-          <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.lat},${ev.lng}" target="_blank">🗺 Y aller</a>
+          <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.latitude},${ev.longitude}" target="_blank">🗺 Y aller</a>
         </div></div></div>`;
     } else {
       const date   = `📅 ${fmtDate(ev.start_date)}`;
@@ -625,7 +625,7 @@
         <div class="pop-meta">${meta}</div>${badges}
         <div class="pop-actions">
           <a class="pop-btn primary" href="${ev.url}" target="_blank">Voir →</a>
-          <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.lat},${ev.lng}" target="_blank">🗺 Y aller</a>
+          <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.latitude},${ev.longitude}" target="_blank">🗺 Y aller</a>
         </div></div></div>`;
     }
   }
@@ -654,7 +654,7 @@
     const visible = [];
 
     allEvents.forEach(ev => {
-      if (!ev.lat || !ev.lng) return;
+      if (!ev.latitude || !ev.longitude) return;
 
       const evStart = ev.start_date || ev.date;
       const evEnd   = ev.end_date || evStart;
@@ -676,7 +676,7 @@
       }
 
       const icon   = ev.source === 'tc' ? iconTC : iconHanabi;
-      const marker = L.marker([ev.lat, ev.lng], { icon });
+      const marker = L.marker([ev.latitude, ev.longitude], { icon });
       marker.bindPopup(buildPopup(ev), { maxWidth: 300, minWidth: 280 });
       clusterGroup.addLayer(marker);
       markerMap.set(ev.id, marker);
@@ -764,7 +764,7 @@
           <div class="card-meta">${date}${sub ? ' · ' + sub : ''}</div>`;
 
         card.addEventListener('click', () => {
-          map.setView([ev.lat, ev.lng], 15, { animate: true });
+          map.setView([ev.latitude, ev.longitude], 15, { animate: true });
           const m = markerMap.get(ev.id);
           if (m) setTimeout(() => m.openPopup(), 350);
           document.querySelectorAll('.event-card').forEach(c => c.classList.remove('highlighted'));
