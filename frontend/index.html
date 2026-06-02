@@ -898,7 +898,7 @@
   // ── Init ──────────────────────────────────────────────────────────────
   async function loadEvents() {
     try {
-      const res = await fetch('/events?limit=1000');
+      const res = await fetch('/events?limit=500');
       allEvents = await res.json();
       document.getElementById('filter-date-from').value = isoDate(todayJST());
       buildPills();
