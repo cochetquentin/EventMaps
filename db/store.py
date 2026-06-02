@@ -3,7 +3,14 @@ import json
 import os
 import sqlite3
 from datetime import date as _date
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+
+_JST = timezone(timedelta(hours=9))
+
+
+def _today_jst() -> str:
+    """Return today's date in JST (UTC+9) as YYYY-MM-DD."""
+    return datetime.now(_JST).date().isoformat()
 
 from models.event import Event
 
@@ -249,7 +256,7 @@ class EventStore:
             params.extend([date, date])
         elif upcoming:
             clauses.append("COALESCE(end_date, start_date) >= ?")
-            params.append(_date.today().isoformat())
+            params.append(_today_jst())
         if bbox:
             min_lon, min_lat, max_lon, max_lat = bbox
             clauses.append(

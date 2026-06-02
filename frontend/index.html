@@ -941,8 +941,12 @@
   // ── Bbox fetch ────────────────────────────────────────────────────────
   let bboxFetchEnabled = false;
   let fetchDebounceTimer = null;
+  let bboxFetchController = null;
 
   async function fetchEventsByBbox() {
+    if (bboxFetchController) bboxFetchController.abort();
+    bboxFetchController = new AbortController();
+    const signal = bboxFetchController.signal;
     try {
       const b = map.getBounds(), sw = b.getSouthWest(), ne = b.getNorthEast();
       const bbox = `${sw.lng},${sw.lat},${ne.lng},${ne.lat}`;
@@ -950,7 +954,7 @@
       const events = [];
       let offset = 0;
       while (true) {
-        const res = await fetch(`/events?${new URLSearchParams({ bbox, limit: String(PAGE), offset: String(offset) })}`);
+        const res = await fetch(`/events?${new URLSearchParams({ bbox, limit: String(PAGE), offset: String(offset) })}`, { signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const page = await res.json();
         events.push(...page);
@@ -961,6 +965,7 @@
       buildPills();
       renderMarkers();
     } catch (e) {
+      if (e.name === 'AbortError') return;
       document.getElementById('stats').textContent = 'Erreur de chargement.';
       console.error(e);
     }
