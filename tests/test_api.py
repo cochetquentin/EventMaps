@@ -1,5 +1,5 @@
 import pytest
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from fastapi.testclient import TestClient
 
 from api.app import app
@@ -11,12 +11,16 @@ _TC_URL = "https://tokyocheapo.com/event/foo"
 _HW_URL = "https://hanabi.walkerplus.com/detail/ar0300e001/"
 
 
+_TC_START  = date.today() + timedelta(days=90)   # always in the future
+_HW_START  = date.today() + timedelta(days=60)   # always in the future, < TC
+
+
 def make_tc(**kwargs) -> Event:
     defaults = dict(
         source="tc",
         title="Foo Festival",
         url=_TC_URL,
-        start_date=date(2026, 8, 15),
+        start_date=_TC_START,
         latitude=35.671,
         longitude=139.694,
         attributes={
@@ -40,7 +44,7 @@ def make_hanabi(**kwargs) -> Event:
         source="hanabi",
         title="Sumida Fireworks",
         url=_HW_URL,
-        start_date=date(2026, 7, 25),
+        start_date=_HW_START,
         venue="隅田川",
         latitude=35.711,
         longitude=139.801,
@@ -100,7 +104,8 @@ def test_list_events_filter_hanabi(client):
 
 
 def test_list_events_filter_by_date(client):
-    resp = client.get("/events?date=2026-07-25")
+    hanabi = make_hanabi()
+    resp = client.get(f"/events?date={hanabi.start_date.isoformat()}")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 1

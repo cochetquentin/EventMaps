@@ -909,7 +909,9 @@
     document.getElementById('filter-date-from').value = from;
     document.getElementById('filter-date-to').value   = to;
     document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === name));
-    renderMarkers();
+    // Programmatic .value change doesn't fire 'change' → trigger server refetch
+    clearTimeout(fetchDebounceTimer);
+    fetchDebounceTimer = setTimeout(fetchEventsByBbox, 300);
   }
 
   document.querySelectorAll('.preset-btn[data-preset]').forEach(btn => {
