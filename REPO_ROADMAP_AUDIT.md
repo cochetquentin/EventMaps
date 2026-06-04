@@ -728,7 +728,7 @@ Objectif : corriger les risques bloquants.
 Tâches :
 
 1. ~~`SEC-001` — protéger/désactiver `POST /scrape` — évite abus serveur et scraping non autorisé~~ **[DONE]**
-2. `SEC-002` — neutraliser XSS frontend — données externes actuellement injectées en HTML — dépendances : TEST-006 recommandé.
+2. ~~`SEC-002` — neutraliser XSS frontend — données externes actuellement injectées en HTML~~ **[DONE]**
 3. ~~`TEST-005` — couvrir `/scrape` — sécurise auth/concurrence/stale jobs~~ **[DONE — auth + config endpoint couverts]**
 4. `BUG-001` — ajouter filtre date range serveur/client — corrige incohérence presets/pagination — dépendances : TEST-002.
 5. `BUG-003` — signaler succès partiels scraper — évite données silencieusement incomplètes — dépendances : ARCH-002 partiel.
@@ -866,7 +866,7 @@ uv run --locked python -m pytest --cov=. --cov-fail-under=80 tests/ -q
 **Peut être fait en parallèle avec :** PR-002, PR-006, PR-007.
 **Ne pas faire dans cette PR :** refactor complet des jobs ou scheduler.
 
-### PR-002 — Échapper les données externes dans le frontend
+### PR-002 — Échapper les données externes dans le frontend ✅ DONE
 
 **Source :** SEC-002, ARCH-003
 **Objectif :** supprimer le risque XSS stocké par les données scrapées.
