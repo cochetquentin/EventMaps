@@ -129,10 +129,15 @@ let pollInterval = null;
 
 async function startScrape() {
   scrapeBtn.classList.add('running');
-  await fetch('/scrape', { method: 'POST' });
+  const res = await fetch('/scrape', { method: 'POST' });
+  if (res.status === 403) {
+    scrapeBtn.classList.remove('running');
+    scrapeBtn.title = 'Scraping non autorisé (token requis)';
+    return;
+  }
   pollInterval = setInterval(async () => {
-    const res  = await fetch('/scrape/status');
-    const data = await res.json();
+    const statusRes  = await fetch('/scrape/status');
+    const data = await statusRes.json();
     if (data.status !== 'running') {
       clearInterval(pollInterval);
       scrapeBtn.classList.remove('running');
@@ -141,7 +146,20 @@ async function startScrape() {
   }, 2000);
 }
 
-scrapeBtn.addEventListener('click', startScrape);
+async function initScrapeButton() {
+  try {
+    const res = await fetch('/scrape/config');
+    const cfg = await res.json();
+    if (!cfg.public) {
+      scrapeBtn.style.display = 'none';
+    }
+  } catch {
+    // si /scrape/config échoue, on laisse le bouton visible (mode dégradé)
+  }
+  scrapeBtn.addEventListener('click', startScrape);
+}
+
+initScrapeButton();
 
 // ── Geolocation ───────────────────────────────────────────────────────────
 setupGeolocation();
