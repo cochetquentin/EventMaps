@@ -1,6 +1,6 @@
 /* global L */
 import { allEvents, map, markerMap, showOnlyFavorites } from './state.js';
-import { fmtDate } from './utils.js';
+import { fmtDate, escapeHtml } from './utils.js';
 import { TC_EXCLUDED_CATS, CAT_EMOJI } from './config.js';
 import { isFavorite, toggleFavorite, getIcon, updateFavPill } from './favorites.js';
 import { renderMarkers } from './markers.js';
@@ -27,7 +27,7 @@ export function buildEventList(events) {
       key = cats[0] || 'other';
       if (!groups.has(key)) {
         const emoji = CAT_EMOJI[key] || '📌';
-        const name  = key === 'other' ? 'Divers' : key.charAt(0).toUpperCase() + key.slice(1);
+        const name  = key === 'other' ? 'Divers' : escapeHtml(key.charAt(0).toUpperCase() + key.slice(1));
         groups.set(key, { label: `${emoji} ${name}`, isHanabi: false, events: [] });
       }
     }
@@ -63,13 +63,13 @@ export function buildEventList(events) {
       const date  = fmtDate(ev.start_date || ev.date);
       const attrs = ev.attributes || {};
       const sub   = ev.source === 'tc'
-        ? [attrs.location_name, ev.price].filter(Boolean).join(' · ')
-        : [ev.venue, attrs.fireworks_count].filter(Boolean).join(' · ');
+        ? [escapeHtml(attrs.location_name), escapeHtml(ev.price)].filter(Boolean).join(' · ')
+        : [escapeHtml(ev.venue), escapeHtml(attrs.fireworks_count)].filter(Boolean).join(' · ');
 
       card.innerHTML = `
         <div class="card-header">
           <div class="card-dot ${ev.source}"></div>
-          <div class="card-title">${ev.title}</div>
+          <div class="card-title">${escapeHtml(ev.title)}</div>
           <button class="fav-btn ${isFavorite(ev.id) ? 'active' : ''}" title="Favoris">${isFavorite(ev.id) ? '★' : '☆'}</button>
         </div>
         <div class="card-meta">${date}${sub ? ' · ' + sub : ''}</div>`;
