@@ -1,4 +1,5 @@
 import json
+from datetime import date as _date_cls
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -467,9 +468,10 @@ def test_scrape_event_full_fixture(tc, monkeypatch):
 
     result = tc.scrape_event("https://tokyocheapo.com/events/kawaii-flea-market-2026/")
 
+    year = _date_cls.today().year
     assert result["title"] == "Kawaii Flea Market"
-    assert result["start_date"] == "2026/05/17"
-    assert result["end_date"] == "2026/05/17"
+    assert result["start_date"] == f"{year}/05/17"
+    assert result["end_date"] == f"{year}/05/17"
     assert result["start_time"] == "10:00"
     assert result["end_time"] == "17:00"
     assert result["price"] == "Free"
