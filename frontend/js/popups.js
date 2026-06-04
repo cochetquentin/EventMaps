@@ -24,7 +24,7 @@ export function buildPopup(ev) {
       <div class="pop-meta">${meta}</div>${badge}
       <div class="pop-actions" style="flex-direction:column;gap:6px;">
         <div style="display:flex;gap:6px;">
-          <a class="pop-btn primary" href="${safeUrl(ev.url)}" target="_blank" style="flex:1">Voir l'événement →</a>
+          <a class="pop-btn primary" href="${escapeHtml(safeUrl(ev.url))}" target="_blank" style="flex:1">Voir l'événement →</a>
           <button class="fav-btn pop-fav-btn ${isFavorite(ev.id) ? 'active' : ''}" data-fav-id="${ev.id}" title="Favoris">${isFavorite(ev.id) ? '★' : '☆'}</button>
         </div>
         ${directions}
@@ -58,7 +58,7 @@ export function buildPopup(ev) {
       <div class="pop-meta">${meta}</div>${badges}
       <div class="pop-actions" style="flex-direction:column;gap:6px;">
         <div style="display:flex;gap:6px;">
-          <a class="pop-btn primary" href="${safeUrl(ev.url)}" target="_blank" style="flex:1">Voir l'événement →</a>
+          <a class="pop-btn primary" href="${escapeHtml(safeUrl(ev.url))}" target="_blank" style="flex:1">Voir l'événement →</a>
           <button class="fav-btn pop-fav-btn ${isFavorite(ev.id) ? 'active' : ''}" data-fav-id="${ev.id}" title="Favoris">${isFavorite(ev.id) ? '★' : '☆'}</button>
         </div>
         ${directions}
