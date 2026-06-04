@@ -8,7 +8,7 @@ export function buildPopup(ev) {
     const date  = ev.end_date && ev.end_date !== ev.start_date
       ? `📅 ${fmtDate(ev.start_date)} → ${fmtDate(ev.end_date)}`
       : `📅 ${fmtDate(ev.start_date)}`;
-    const time  = st ? `🕐 ${st}${et ? ' – ' + et : ''}` : '';
+    const time  = st ? `🕐 ${escapeHtml(st)}${et ? ' – ' + escapeHtml(et) : ''}` : '';
     const loc   = attrs.location_name ? `📍 ${escapeHtml(attrs.location_name)}` : '';
     const meta  = [date, time, loc].filter(Boolean).join('<br>');
     const badge = ev.price ? `<div class="pop-badges"><span class="pop-badge">${escapeHtml(ev.price)}</span></div>` : '';
@@ -33,7 +33,7 @@ export function buildPopup(ev) {
   } else {
     const [st, et] = parseTimes(ev);
     const date   = `📅 ${fmtDate(ev.start_date)}`;
-    const time   = st ? `🕐 ${st}${et ? ' – ' + et : ''}` : '';
+    const time   = st ? `🕐 ${escapeHtml(st)}${et ? ' – ' + escapeHtml(et) : ''}` : '';
     const venue  = ev.venue     ? `📍 ${escapeHtml(ev.venue)}`     : '';
     const access = attrs.access ? `🚉 ${escapeHtml(attrs.access)}` : '';
     const meta   = [date, time, venue, access].filter(Boolean).join('<br>');
