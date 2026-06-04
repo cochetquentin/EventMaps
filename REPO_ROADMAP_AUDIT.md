@@ -727,9 +727,9 @@ Objectif : corriger les risques bloquants.
 
 Tâches :
 
-1. `SEC-001` — protéger/désactiver `POST /scrape` — évite abus serveur et scraping non autorisé — dépendances : DOC-002.
+1. ~~`SEC-001` — protéger/désactiver `POST /scrape` — évite abus serveur et scraping non autorisé~~ **[DONE]**
 2. `SEC-002` — neutraliser XSS frontend — données externes actuellement injectées en HTML — dépendances : TEST-006 recommandé.
-3. `TEST-005` — couvrir `/scrape` — sécurise auth/concurrence/stale jobs — dépendances : SEC-001.
+3. ~~`TEST-005` — couvrir `/scrape` — sécurise auth/concurrence/stale jobs~~ **[DONE — auth + config endpoint couverts]**
 4. `BUG-001` — ajouter filtre date range serveur/client — corrige incohérence presets/pagination — dépendances : TEST-002.
 5. `BUG-003` — signaler succès partiels scraper — évite données silencieusement incomplètes — dépendances : ARCH-002 partiel.
 
@@ -833,7 +833,7 @@ TEST-001
 
 ## 13. PR-Ready Task Breakdown
 
-### PR-001 — Protéger l'endpoint de scraping
+### PR-001 — Protéger l'endpoint de scraping ✅ DONE
 
 **Source :** SEC-001, TEST-005, DOC-002
 **Objectif :** empêcher le déclenchement anonyme de scraping en production.

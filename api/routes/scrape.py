@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 
 from api.limiter import limiter
 from config import settings
@@ -13,6 +13,16 @@ from scrapers.tokyo_cheapo import TokyoCheapo
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def verify_scrape_token(request: Request) -> None:
+    """Raise 403 if a scrape token is configured and the request doesn't provide it."""
+    token = settings.scrape_token
+    if token is None:
+        return
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer ") or auth[7:] != token:
+        raise HTTPException(status_code=403, detail="Invalid or missing scrape token")
 
 
 def _is_stale(job: dict) -> bool:
@@ -50,6 +60,12 @@ def _conflicting_sources(source: str) -> list[str]:
     return [source, "all"]
 
 
+@router.get("/config")
+def scrape_config():
+    """Return whether the scrape endpoint is publicly accessible (no token required)."""
+    return {"public": settings.scrape_token is None}
+
+
 @router.post("")
 @limiter.limit("2/hour")
 async def trigger_scrape(
@@ -57,6 +73,7 @@ async def trigger_scrape(
     background_tasks: BackgroundTasks,
     source: Literal["tc", "hanabi", "all"] = Query("all"),
     region: str = Query("ar0300"),
+    _auth: None = Depends(verify_scrape_token),
 ):
     with EventStore(settings.db_path) as store:
         running = []
