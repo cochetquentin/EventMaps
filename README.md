@@ -151,10 +151,34 @@ Les événements multi-lieux génèrent une ligne par lieu.
 
 Les événements multi-jours génèrent une ligne par jour.
 
+## Configuration
+
+Variables d'environnement préfixées `EVENTMAPS_` :
+
+| Variable | Défaut | Description |
+|---|---|---|
+| `EVENTMAPS_DB_PATH` | `data/events.db` | Chemin vers la base SQLite |
+| `EVENTMAPS_PORT` | `8000` | Port d'écoute uvicorn |
+| `EVENTMAPS_LOG_LEVEL` | `INFO` | Niveau de log (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
+| `EVENTMAPS_ALLOWED_ORIGINS` | `*` | Origines CORS autorisées — CSV (`https://a.com,https://b.com`) ou JSON (`["https://a.com"]`) |
+| `EVENTMAPS_SCRAPE_TOKEN` | _(vide)_ | Token Bearer requis pour `POST /scrape` — laisser vide pour un endpoint public |
+| `EVENTMAPS_SCRAPE_USER_AGENT` | `EventMaps/1.0` | User-Agent HTTP des scrapers |
+| `EVENTMAPS_SCRAPE_TIMEOUT_HOURS` | `2` | Durée max d'un job de scrape avant de le marquer stale (heures) |
+| `EVENTMAPS_SCRAPE_ERROR_THRESHOLD` | `0.5` | Taux d'erreur max avant échec du job (0.0–1.0) |
+
+Copier `.env.example` en `.env` et adapter les valeurs.
+
+**Note de production :** restreindre `EVENTMAPS_ALLOWED_ORIGINS` à l'origine réelle du frontend :
+```
+EVENTMAPS_ALLOWED_ORIGINS=https://monapp.example.com
+```
+Si `EVENTMAPS_SCRAPE_TOKEN` est défini mais que `EVENTMAPS_ALLOWED_ORIGINS` reste à `*`, l'application émet un avertissement au démarrage.
+
 ## Tests
 
 ```bash
-uv run pytest          # tous les tests (115)
+uv run pytest          # tous les tests
 uv run pytest tests/test_store.py   # store SQLite
 uv run pytest tests/test_api.py     # API FastAPI
+uv run pytest --cov=. --cov-fail-under=80 tests/  # avec coverage
 ```

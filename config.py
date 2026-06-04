@@ -1,4 +1,5 @@
 import json
+import warnings
 
 from pydantic_settings import BaseSettings, EnvSettingsSource
 
@@ -30,6 +31,14 @@ class Settings(BaseSettings):
     scrape_error_threshold: float = 0.5
 
     model_config = {"env_prefix": "EVENTMAPS_"}
+
+    def model_post_init(self, __context) -> None:
+        if self.allowed_origins == ["*"] and self.scrape_token is not None:
+            warnings.warn(
+                "CORS wildcard ('*') is active while EVENTMAPS_SCRAPE_TOKEN is set. "
+                "Set EVENTMAPS_ALLOWED_ORIGINS to explicit origins in production.",
+                stacklevel=2,
+            )
 
     @classmethod
     def settings_customise_sources(cls, settings_cls, init_settings, env_settings, **kwargs):
