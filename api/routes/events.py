@@ -38,12 +38,14 @@ def list_events(
     date: DateType | None = Query(None, description="YYYY-MM-DD overlap filter"),
     bbox: str | None = Query(None, description="min_lon,min_lat,max_lon,max_lat"),
     start_from: DateType | None = Query(None, description="Lower bound on event end/start date (overrides upcoming default)"),
+    start_to: DateType | None = Query(None, description="Upper bound on event start date (overrides upcoming default)"),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ):
     date_str = date.isoformat() if date else None
     start_from_str = start_from.isoformat() if start_from else None
-    upcoming = date_str is None and start_from_str is None
+    start_to_str = start_to.isoformat() if start_to else None
+    upcoming = date_str is None and start_from_str is None and start_to_str is None
     parsed_bbox = _parse_bbox(bbox) if bbox else None
     with EventStore(settings.db_path) as store:
         return store.get_events(
@@ -52,6 +54,7 @@ def list_events(
             bbox=parsed_bbox,
             upcoming=upcoming,
             start_from=start_from_str,
+            start_to=start_to_str,
             limit=limit,
             offset=offset,
         )

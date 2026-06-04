@@ -244,6 +244,7 @@ class EventStore:
         bbox: tuple[float, float, float, float] | None = None,
         upcoming: bool = True,
         start_from: str | None = None,
+        start_to: str | None = None,
         limit: int = 100,
         offset: int = 0,
     ) -> list[Event]:
@@ -256,10 +257,14 @@ class EventStore:
             # Explicit overlap filter — overrides everything
             clauses.append("start_date <= ? AND COALESCE(end_date, start_date) >= ?")
             params.extend([date, date])
-        elif start_from is not None:
-            # Client-supplied lower bound (e.g. date picker set to a past date)
-            clauses.append("COALESCE(end_date, start_date) >= ?")
-            params.append(start_from)
+        elif start_from is not None or start_to is not None:
+            # Client-supplied range — disable upcoming default
+            if start_from is not None:
+                clauses.append("COALESCE(end_date, start_date) >= ?")
+                params.append(start_from)
+            if start_to is not None:
+                clauses.append("start_date <= ?")
+                params.append(start_to)
         elif upcoming:
             # Default: events that are not yet over as of today JST
             clauses.append("COALESCE(end_date, start_date) >= ?")

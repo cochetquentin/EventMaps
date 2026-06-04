@@ -730,7 +730,7 @@ Tâches :
 1. ~~`SEC-001` — protéger/désactiver `POST /scrape` — évite abus serveur et scraping non autorisé~~ **[DONE]**
 2. ~~`SEC-002` — neutraliser XSS frontend — données externes actuellement injectées en HTML~~ **[DONE]**
 3. ~~`TEST-005` — couvrir `/scrape` — sécurise auth/concurrence/stale jobs~~ **[DONE — auth + config endpoint couverts]**
-4. `BUG-001` — ajouter filtre date range serveur/client — corrige incohérence presets/pagination — dépendances : TEST-002.
+4. ~~`BUG-001` — ajouter filtre date range serveur/client — corrige incohérence presets/pagination — dépendances : TEST-002.~~ **[DONE]**
 5. `BUG-003` — signaler succès partiels scraper — évite données silencieusement incomplètes — dépendances : ARCH-002 partiel.
 
 ### Phase 1 — Qualité & sécurité
@@ -900,7 +900,7 @@ npm test
 **Peut être fait en parallèle avec :** PR-001, PR-003, PR-006.
 **Ne pas faire dans cette PR :** réécrire toute l'UI en framework.
 
-### PR-003 — Corriger le filtre date range serveur/client
+### PR-003 — Corriger le filtre date range serveur/client ✅ DONE
 
 **Source :** BUG-001, TEST-002, FEAT-001 MVP
 **Objectif :** transmettre et appliquer les bornes `from` et `to` côté API pour les chargements bbox.

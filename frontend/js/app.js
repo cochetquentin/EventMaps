@@ -96,7 +96,8 @@ document.getElementById('filter-date-from').addEventListener('change', () => {
 
 document.getElementById('filter-date-to').addEventListener('change', () => {
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-  renderMarkers();
+  clearTimeout(fetchDebounceTimer);
+  setFetchDebounceTimer(setTimeout(fetchEventsByBbox, 300));
 });
 
 document.getElementById('date-custom-btn').addEventListener('click', () => {

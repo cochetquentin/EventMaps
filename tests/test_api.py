@@ -112,6 +112,33 @@ def test_list_events_filter_by_date(client):
     assert data[0]["source"] == "hanabi"
 
 
+def test_start_to_filters_upper_bound(client):
+    # _HW_START = today+60, _TC_START = today+90
+    # start_to at today+70 should include hanabi but not tc
+    cutoff = (date.today() + timedelta(days=70)).isoformat()
+    resp = client.get(f"/events?start_to={cutoff}")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["source"] == "hanabi"
+
+
+def test_invalid_start_to_returns_422(client):
+    resp = client.get("/events?start_to=not-a-date")
+    assert resp.status_code == 422
+
+
+def test_start_from_and_start_to_combined(client):
+    # Window today+50 → today+70 includes hanabi (today+60) but not tc (today+90)
+    from_date = (date.today() + timedelta(days=50)).isoformat()
+    to_date = (date.today() + timedelta(days=70)).isoformat()
+    resp = client.get(f"/events?start_from={from_date}&start_to={to_date}")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["source"] == "hanabi"
+
+
 def test_list_events_pagination(db, monkeypatch):
     with EventStore(db) as store:
         store.upsert_events([
