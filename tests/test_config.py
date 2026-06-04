@@ -80,3 +80,29 @@ def test_no_warning_when_explicit_origins_with_token():
         Settings(allowed_origins=["https://a.com"], scrape_token="secret")
     user_warnings = [w for w in caught if issubclass(w.category, UserWarning)]
     assert len(user_warnings) == 0
+
+
+# ---------------------------------------------------------------------------
+# scrape_token normalization — empty string → None
+# ---------------------------------------------------------------------------
+
+
+def test_empty_scrape_token_normalized_to_none():
+    s = Settings(scrape_token="")
+    assert s.scrape_token is None
+
+
+def test_blank_scrape_token_normalized_to_none():
+    s = Settings(scrape_token="   ")
+    assert s.scrape_token is None
+
+
+def test_scrape_token_env_empty_string_is_none(monkeypatch):
+    monkeypatch.setenv("EVENTMAPS_SCRAPE_TOKEN", "")
+    s = Settings()
+    assert s.scrape_token is None
+
+
+def test_valid_scrape_token_preserved():
+    s = Settings(scrape_token="mysecret")
+    assert s.scrape_token == "mysecret"

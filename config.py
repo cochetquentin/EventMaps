@@ -1,7 +1,8 @@
 import json
 import warnings
 
-from pydantic_settings import BaseSettings, EnvSettingsSource
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, EnvSettingsSource, SettingsConfigDict
 
 
 class _OriginsEnvSource(EnvSettingsSource):
@@ -30,7 +31,14 @@ class Settings(BaseSettings):
     scrape_token: str | None = None
     scrape_error_threshold: float = 0.5
 
-    model_config = {"env_prefix": "EVENTMAPS_"}
+    model_config = SettingsConfigDict(env_prefix="EVENTMAPS_", env_file=".env", env_file_encoding="utf-8")
+
+    @field_validator("scrape_token", mode="before")
+    @classmethod
+    def normalize_empty_token(cls, v: object) -> object:
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
 
     def model_post_init(self, __context) -> None:
         if self.allowed_origins == ["*"] and self.scrape_token is not None:

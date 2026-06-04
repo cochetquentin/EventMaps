@@ -166,7 +166,8 @@ Variables d'environnement préfixées `EVENTMAPS_` :
 | `EVENTMAPS_SCRAPE_TIMEOUT_HOURS` | `2` | Durée max d'un job de scrape avant de le marquer stale (heures) |
 | `EVENTMAPS_SCRAPE_ERROR_THRESHOLD` | `0.5` | Taux d'erreur max avant échec du job (0.0–1.0) |
 
-Copier `.env.example` en `.env` et adapter les valeurs.
+**Dev local :** copier `.env.example` en `.env` à la racine (chargé automatiquement).
+**Production :** exporter les variables via le process manager (Docker `-e`, systemd `EnvironmentFile`, Kubernetes secrets, etc.).
 
 **Note de production :** restreindre `EVENTMAPS_ALLOWED_ORIGINS` à l'origine réelle du frontend :
 ```
