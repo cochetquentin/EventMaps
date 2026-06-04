@@ -419,6 +419,76 @@ def test_start_from_overrides_upcoming(tmp_path):
     assert len(results) == 1
 
 
+def test_start_to_alone_upper_bound(tmp_path):
+    """start_to alone applies upper bound and disables the upcoming default."""
+    from datetime import timedelta
+    db = str(tmp_path / "events.db")
+    today = date.today()
+    near = make_tc(start_date=today + timedelta(days=3), end_date=None)
+    far = make_hanabi(start_date=today + timedelta(days=30))
+    with EventStore(db) as store:
+        store.upsert_events([near, far])
+        results = store.get_events(start_to=(today + timedelta(days=10)).isoformat())
+    assert len(results) == 1
+    assert results[0].source == "tc"
+
+
+def test_start_from_and_start_to_range(tmp_path):
+    """Both bounds together return only events within the window."""
+    from datetime import timedelta
+    db = str(tmp_path / "events.db")
+    today = date.today()
+    inside = make_tc(start_date=today + timedelta(days=5), end_date=None)
+    before = make_tc(
+        url="https://tokyocheapo.com/event/before",
+        start_date=today - timedelta(days=5),
+        end_date=None,
+        attributes={"categories": [], "tags": [], "official_link": None, "location_name": "Before"},
+    )
+    after = make_hanabi(start_date=today + timedelta(days=20))
+    with EventStore(db) as store:
+        store.upsert_events([inside, before, after])
+        results = store.get_events(
+            start_from=(today + timedelta(days=1)).isoformat(),
+            start_to=(today + timedelta(days=10)).isoformat(),
+        )
+    assert len(results) == 1
+    assert results[0].source == "tc"
+    assert results[0].start_date == today + timedelta(days=5)
+
+
+def test_start_to_includes_multiday_spanning_range(tmp_path):
+    """Multi-day event starting before start_from but ending after is included."""
+    from datetime import timedelta
+    db = str(tmp_path / "events.db")
+    today = date.today()
+    spanning = make_tc(
+        start_date=today - timedelta(days=2),
+        end_date=today + timedelta(days=5),
+    )
+    with EventStore(db) as store:
+        store.upsert_events([spanning])
+        results = store.get_events(
+            start_from=today.isoformat(),
+            start_to=(today + timedelta(days=10)).isoformat(),
+        )
+    assert len(results) == 1
+
+
+def test_start_to_suppresses_upcoming(tmp_path):
+    """start_to alone disables the default upcoming filter."""
+    from datetime import timedelta
+    db = str(tmp_path / "events.db")
+    today = date.today()
+    soon = make_tc(start_date=today + timedelta(days=2), end_date=None)
+    later = make_hanabi(start_date=today + timedelta(days=30))
+    with EventStore(db) as store:
+        store.upsert_events([soon, later])
+        results = store.get_events(start_to=(today + timedelta(days=5)).isoformat())
+    assert len(results) == 1
+    assert results[0].source == "tc"
+
+
 # --- Bbox filter ---
 
 def test_bbox_filters_by_coords(tmp_path):

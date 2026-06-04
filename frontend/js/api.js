@@ -29,6 +29,8 @@ export async function fetchEventsByBbox() {
       if (bbox) params.bbox = bbox;
       const fromS = document.getElementById('filter-date-from').value;
       if (fromS) params.start_from = fromS;
+      const toS = document.getElementById('filter-date-to').value;
+      if (toS) params.start_to = toS;
       const res = await fetch(`/events?${new URLSearchParams(params)}`, { signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const page = await res.json();
