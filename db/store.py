@@ -85,8 +85,9 @@ def _migrate_scrape_jobs(conn: sqlite3.Connection) -> None:
         try:
             conn.execute(sql)
             conn.commit()
-        except sqlite3.OperationalError:
-            pass  # Column already exists
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" not in str(exc).lower():
+                raise
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
@@ -347,11 +348,30 @@ class EventStore:
         )
         self._conn.commit()
 
-    def fail_job(self, job_id: int, error: str) -> None:
+    def fail_job(
+        self,
+        job_id: int,
+        error: str,
+        *,
+        links_seen: int | None = None,
+        events_ok: int | None = None,
+        events_skipped: int | None = None,
+        error_count: int | None = None,
+    ) -> None:
         self._conn.execute(
-            """UPDATE scrape_jobs SET status='failed', finished_at=?, error=?
+            """UPDATE scrape_jobs
+               SET status='failed', finished_at=?, error=?,
+                   links_seen=?, events_ok=?, events_skipped=?, error_count=?
                WHERE id=?""",
-            (datetime.now(timezone.utc).isoformat(), error, job_id),
+            (
+                datetime.now(timezone.utc).isoformat(),
+                error,
+                links_seen,
+                events_ok,
+                events_skipped,
+                error_count,
+                job_id,
+            ),
         )
         self._conn.commit()
 

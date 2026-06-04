@@ -173,7 +173,8 @@ def test_do_scrape_fails_job_on_high_error_rate(tmp_path, monkeypatch):
 
     assert job is not None
     assert job["status"] == "failed"
-    assert "Error rate" in job["error"]
+    assert "error rate" in job["error"].lower()
+    assert "exceeded threshold" in job["error"]
 
 
 def test_do_scrape_finishes_job_on_low_error_rate(tmp_path, monkeypatch):
@@ -226,6 +227,66 @@ def test_do_scrape_zero_links_does_not_fail(tmp_path, monkeypatch):
     # No links → no error rate calculation → job should succeed (CRITICAL logged by scraper)
     assert job is not None
     assert job["status"] == "done"
+
+
+def test_do_scrape_persists_metrics_on_failed_job(tmp_path, monkeypatch):
+    """Metrics must be stored even when fail_job is called (threshold exceeded)."""
+    import config
+    import api.routes.scrape as scrape_module
+
+    db_path = str(tmp_path / "events.db")
+    monkeypatch.setattr(config.settings, "db_path", db_path)
+    monkeypatch.setattr(config.settings, "scrape_error_threshold", 0.5)
+
+    bad_report = ScrapeReport(
+        source="tc",
+        links_seen=10,
+        events_ok=2,
+        errors=[{"url": f"url{i}", "reason": "fail"} for i in range(8)],
+    )
+
+    with patch.object(TokyoCheapo, "scrape", return_value=([_make_event()], bad_report)):
+        scrape_module._do_scrape("tc", "ar0300")
+
+    with EventStore(db_path) as store:
+        job = store.get_last_job("tc")
+
+    assert job["status"] == "failed"
+    assert job["links_seen"] == 10
+    assert job["events_ok"] == 2
+    assert job["error_count"] == 8
+
+
+def test_do_scrape_all_fails_if_one_source_broken(tmp_path, monkeypatch):
+    """source=all must fail if one source exceeds threshold, even if the other is healthy."""
+    import config
+    import api.routes.scrape as scrape_module
+
+    db_path = str(tmp_path / "events.db")
+    monkeypatch.setattr(config.settings, "db_path", db_path)
+    monkeypatch.setattr(config.settings, "scrape_error_threshold", 0.5)
+
+    # TC: 100 links, 0 errors → 0% error rate (healthy)
+    tc_report = ScrapeReport(source="tc", links_seen=100, events_ok=100)
+    # Hanabi: 10 links, 10 errors → 100% error rate (broken)
+    hanabi_report = ScrapeReport(
+        source="hanabi",
+        links_seen=10,
+        events_ok=0,
+        errors=[{"url": f"/detail/{i}/", "reason": "fail"} for i in range(10)],
+    )
+
+    with (
+        patch.object(TokyoCheapo, "scrape", return_value=([_make_event()], tc_report)),
+        patch.object(HanabiWalker, "scrape", return_value=([], hanabi_report)),
+    ):
+        scrape_module._do_scrape("all", "ar0300")
+
+    with EventStore(db_path) as store:
+        job = store.get_last_job("all")
+
+    assert job["status"] == "failed"
+    assert "hanabi" in job["error"]
 
 
 # ── GET /scrape/status returns metric columns ────────────────────────────────

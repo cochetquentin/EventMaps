@@ -59,16 +59,35 @@ def _do_scrape(source: str, region: str) -> None:
             combined_error_rate = (
                 (events_skipped + error_count) / links_seen if links_seen > 0 else 0.0
             )
+            # Also check per-source so a healthy source can't mask a broken one
+            failing_source = next(
+                (r for r in reports if r.links_seen > 0 and r.error_rate > settings.scrape_error_threshold),
+                None,
+            )
 
             store.upsert_events(events)
 
-            if links_seen > 0 and combined_error_rate > settings.scrape_error_threshold:
-                msg = (
-                    f"Error rate {combined_error_rate:.0%} exceeded threshold "
-                    f"{settings.scrape_error_threshold:.0%} "
-                    f"({error_count} errors / {links_seen} links)"
+            if failing_source is not None or (links_seen > 0 and combined_error_rate > settings.scrape_error_threshold):
+                if failing_source is not None:
+                    msg = (
+                        f"Source '{failing_source.source}' error rate {failing_source.error_rate:.0%} "
+                        f"exceeded threshold {settings.scrape_error_threshold:.0%} "
+                        f"({len(failing_source.errors)} errors / {failing_source.links_seen} links)"
+                    )
+                else:
+                    msg = (
+                        f"Combined error rate {combined_error_rate:.0%} exceeded threshold "
+                        f"{settings.scrape_error_threshold:.0%} "
+                        f"({error_count} errors / {links_seen} links)"
+                    )
+                store.fail_job(
+                    job_id,
+                    msg,
+                    links_seen=links_seen,
+                    events_ok=events_ok,
+                    events_skipped=events_skipped,
+                    error_count=error_count,
                 )
-                store.fail_job(job_id, msg)
                 logger.error("Scrape partial failure (%s): %s", source, msg)
             else:
                 store.finish_job(

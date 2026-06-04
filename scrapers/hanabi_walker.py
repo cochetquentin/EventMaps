@@ -289,16 +289,26 @@ class HanabiWalker(BaseScraper):
         paths = self.get_event_links(max_pages=max_pages)
         events = []
         errors = []
+        skipped = 0
         for path in paths:
             try:
                 event = self.scrape_event(path)
                 dates = event.pop("dates")
+                if not dates:
+                    logger.warning("SKIP %s — no parseable dates", path)
+                    skipped += 1
+                    continue
                 for date in dates:
                     events.append({**event, "date": date})
             except Exception as e:
                 logger.warning("SKIP %s — %s", path, e)
                 errors.append({"url": path, "reason": str(e)})
-        counts = {"links_seen": len(paths), "events_ok": len(events), "errors": errors}
+        counts = {
+            "links_seen": len(paths),
+            "events_ok": len(events),
+            "events_skipped": skipped,
+            "errors": errors,
+        }
         return events, counts
 
     def scrape(self, max_pages: int = 20) -> tuple[list[Event], ScrapeReport]:
@@ -309,6 +319,7 @@ class HanabiWalker(BaseScraper):
             source="hanabi",
             links_seen=counts["links_seen"],
             events_ok=counts["events_ok"],
+            events_skipped=counts.get("events_skipped", 0),
             errors=counts["errors"],
         )
         events: list[Event] = []
