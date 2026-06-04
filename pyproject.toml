@@ -5,11 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "aiofiles>=23.0",
     "beautifulsoup4>=4.14.3",
     "fastapi>=0.115",
     "icalendar>=7.1.2",
-    "pandas>=3.0.3",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
     "requests>=2.34.1",
@@ -20,7 +18,8 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28",
+    "httpx2>=0.28",
+    "pip-audit>=2.7",
     "pytest>=9.0.3",
     "pytest-cov>=4.0",
 ]

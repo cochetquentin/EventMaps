@@ -735,7 +735,7 @@ Tâches :
 
 ### Phase 1 — Qualité & sécurité
 
-1. `SEC-005` — ajouter audit dépendances/Dependabot — supply-chain — dépendances : aucune.
+1. ~~`SEC-005` — ajouter audit dépendances/Dependabot — supply-chain — dépendances : aucune.~~ **[DONE]**
 2. `SEC-003` — SRI/vendor assets CDN — réduit risque tiers — dépendances : aucune.
 3. `SEC-004` — documenter/restreindre CORS prod — hardening — dépendances : SEC-001.
 4. `TEST-003` — fixtures Tokyo Cheapo — protège parser — dépendances : aucune.
@@ -1097,7 +1097,7 @@ uv run --locked python -m pytest -q
 **Peut être fait en parallèle avec :** PR-006, PR-007.
 **Ne pas faire dans cette PR :** changer base image ou orchestration complète.
 
-### PR-009 — Supprimer dépendances inutilisées
+### PR-009 — Supprimer dépendances inutilisées ✅ DONE
 
 **Source :** CLEAN-001, SEC-005
 **Objectif :** réduire surface supply-chain et taille install.

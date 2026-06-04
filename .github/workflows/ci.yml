@@ -22,5 +22,8 @@ jobs:
       - name: Installer les dépendances
         run: uv sync --all-groups --locked
 
+      - name: Audit des dépendances
+        run: uv run --locked pip-audit
+
       - name: Lancer les tests
         run: uv run --locked python -m pytest --cov=. --cov-fail-under=80 tests/ -v
