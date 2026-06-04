@@ -21,3 +21,6 @@ docs/
 # Database & generated data files
 *.db
 *.csv
+
+# Local environment secrets
+.env
