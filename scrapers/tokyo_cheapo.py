@@ -251,7 +251,8 @@ class TokyoCheapo(BaseScraper):
         return first, second
 
     def parse_description(self, soup: BeautifulSoup) -> str:
-        return soup.find("div", class_="entry-content__text").text.strip()
+        div = soup.find("div", class_="entry-content__text")
+        return div.text.strip() if div else ""
 
     def parse_categories(self, soup: BeautifulSoup) -> list[str]:
         article = soup.find("article")

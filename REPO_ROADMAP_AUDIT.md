@@ -738,9 +738,9 @@ Tâches :
 1. ~~`SEC-005` — ajouter audit dépendances/Dependabot — supply-chain — dépendances : aucune.~~ **[DONE]**
 2. ~~`SEC-003` — SRI/vendor assets CDN — réduit risque tiers — dépendances : aucune.~~ **[DONE]**
 3. ~~`SEC-004` — documenter/restreindre CORS prod — hardening — dépendances : SEC-001.~~ **[DONE]**
-4. `TEST-003` — fixtures Tokyo Cheapo — protège parser — dépendances : aucune.
+4. ~~`TEST-003` — fixtures Tokyo Cheapo — protège parser — dépendances : aucune.~~ **[DONE]**
 5. `TEST-004` — fixtures Hanabi — protège parser — dépendances : BUG-004.
-6. `BUG-005` — fallback description Tokyo Cheapo — petite robustesse — dépendances : aucune.
+6. ~~`BUG-005` — fallback description Tokyo Cheapo — petite robustesse — dépendances : aucune.~~ **[DONE]**
 7. `CLEAN-006` — default factory attributes — hygiène modèle — dépendances : aucune.
 
 ### Phase 2 — Maintenabilité & architecture
