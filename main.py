@@ -30,7 +30,11 @@ def _write_events_csv(events: list[Event]) -> None:
 
 
 def cmd_tc(args):
-    events = TokyoCheapo().scrape()
+    events, report = TokyoCheapo().scrape()
+    logger.info(
+        "Tokyo Cheapo: %d ok, %d skipped, %d errors (of %d links)",
+        report.events_ok, report.events_skipped, len(report.errors), report.links_seen,
+    )
     if args.output == "db":
         with EventStore(args.db) as store:
             store.upsert_events(events)
@@ -40,7 +44,11 @@ def cmd_tc(args):
 
 
 def cmd_hanabi(args):
-    events = HanabiWalker(region=args.region).scrape()
+    events, report = HanabiWalker(region=args.region).scrape()
+    logger.info(
+        "Hanabi Walker: %d ok, %d skipped, %d errors (of %d links)",
+        report.events_ok, report.events_skipped, len(report.errors), report.links_seen,
+    )
     if args.output == "db":
         with EventStore(args.db) as store:
             store.upsert_events(events)
@@ -50,15 +58,21 @@ def cmd_hanabi(args):
 
 
 def cmd_all(args):
-    tc_events = TokyoCheapo().scrape()
-    hanabi_events = HanabiWalker(region=args.region).scrape()
+    tc_events, tc_report = TokyoCheapo().scrape()
+    hanabi_events, hanabi_report = HanabiWalker(region=args.region).scrape()
+    logger.info(
+        "Tokyo Cheapo: %d ok, %d skipped, %d errors (of %d links)",
+        tc_report.events_ok, tc_report.events_skipped, len(tc_report.errors), tc_report.links_seen,
+    )
+    logger.info(
+        "Hanabi Walker: %d ok, %d skipped, %d errors (of %d links)",
+        hanabi_report.events_ok, hanabi_report.events_skipped, len(hanabi_report.errors), hanabi_report.links_seen,
+    )
     if args.output == "db":
         with EventStore(args.db) as store:
             store.upsert_events(tc_events)
             store.upsert_events(hanabi_events)
-        logger.info("Tokyo Cheapo: %d rows", len(tc_events))
-        logger.info("Hanabi Walker: %d rows", len(hanabi_events))
-        logger.info("Stored in %s", args.db)
+        logger.info("Stored %d + %d rows in %s", len(tc_events), len(hanabi_events), args.db)
     else:
         _write_events_csv(tc_events + hanabi_events)
 

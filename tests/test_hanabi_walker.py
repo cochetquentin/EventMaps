@@ -348,12 +348,14 @@ def test_scrape_all_explodes_multiday(hw):
         "venue": "海浜公園",
     })
 
-    events = hw.scrape_all()
+    events, counts = hw.scrape_all()
 
     assert len(events) == 2
     assert events[0]["date"] == "2026/08/01"
     assert events[1]["date"] == "2026/08/02"
     assert "dates" not in events[0]
+    assert counts["links_seen"] == 1
+    assert counts["events_ok"] == 2  # 2 date-exploded rows
 
 
 def test_scrape_all_skips_errors(hw):
@@ -363,7 +365,10 @@ def test_scrape_all_skips_errors(hw):
         RuntimeError("timeout"),
     ])
 
-    events = hw.scrape_all()
+    events, counts = hw.scrape_all()
 
     assert len(events) == 1
     assert events[0]["title"] == "OK"
+    assert counts["links_seen"] == 2
+    assert len(counts["errors"]) == 1
+    assert counts["errors"][0]["url"] == "/detail/bad/"

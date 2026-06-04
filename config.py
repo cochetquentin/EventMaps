@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     scrape_user_agent: str = "EventMaps/1.0"
     scrape_timeout_hours: int = 2
     scrape_token: str | None = None
+    scrape_error_threshold: float = 0.5
 
     model_config = {"env_prefix": "EVENTMAPS_"}
 

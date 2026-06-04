@@ -36,17 +36,53 @@ def _is_stale(job: dict) -> bool:
 
 
 def _do_scrape(source: str, region: str) -> None:
+    from scrapers.base import ScrapeReport
+
     with EventStore(settings.db_path) as store:
         job_id = store.start_job(source)
         try:
             events = []
+            reports: list[ScrapeReport] = []
             if source in ("tc", "all"):
-                events.extend(TokyoCheapo().scrape())
+                tc_events, tc_report = TokyoCheapo().scrape()
+                events.extend(tc_events)
+                reports.append(tc_report)
             if source in ("hanabi", "all"):
-                events.extend(HanabiWalker(region=region).scrape())
+                h_events, h_report = HanabiWalker(region=region).scrape()
+                events.extend(h_events)
+                reports.append(h_report)
+
+            links_seen = sum(r.links_seen for r in reports)
+            events_ok = sum(r.events_ok for r in reports)
+            events_skipped = sum(r.events_skipped for r in reports)
+            error_count = sum(len(r.errors) for r in reports)
+            combined_error_rate = (
+                (events_skipped + error_count) / links_seen if links_seen > 0 else 0.0
+            )
+
             store.upsert_events(events)
-            store.finish_job(job_id, len(events))
-            logger.info("Scrape done (%s): %d events", source, len(events))
+
+            if links_seen > 0 and combined_error_rate > settings.scrape_error_threshold:
+                msg = (
+                    f"Error rate {combined_error_rate:.0%} exceeded threshold "
+                    f"{settings.scrape_error_threshold:.0%} "
+                    f"({error_count} errors / {links_seen} links)"
+                )
+                store.fail_job(job_id, msg)
+                logger.error("Scrape partial failure (%s): %s", source, msg)
+            else:
+                store.finish_job(
+                    job_id,
+                    len(events),
+                    links_seen=links_seen,
+                    events_ok=events_ok,
+                    events_skipped=events_skipped,
+                    error_count=error_count,
+                )
+                logger.info(
+                    "Scrape done (%s): %d events, %d links, %d errors",
+                    source, len(events), links_seen, error_count,
+                )
         except Exception as e:
             store.fail_job(job_id, str(e))
             logger.error("Scrape failed (%s): %s", source, e)

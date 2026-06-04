@@ -11,7 +11,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, before_log
 
 from db.store import _make_id
 from models.event import Event
-from scrapers.base import BaseScraper
+from scrapers.base import BaseScraper, ScrapeReport
 
 logger = logging.getLogger(__name__)
 
@@ -339,21 +339,34 @@ class TokyoCheapo(BaseScraper):
             "locations": self.parse_locations(soup),
         }
 
-    def scrape_all(self, max_pages: int = 10) -> list[dict]:
-        """Scrape tous les événements de la semaine. Ignore les erreurs par événement."""
+    def scrape_all(self, max_pages: int = 10) -> tuple[list[dict], dict]:
+        """Scrape tous les événements de la semaine. Ignore les erreurs par événement.
+
+        Returns:
+            (raw_events, counts) where counts = {"links_seen": int, "events_ok": int, "errors": list}
+        """
         urls = self.get_event_links(max_pages=max_pages)
         events = []
+        errors = []
         for url in urls:
             try:
                 events.append(self.scrape_event(url))
             except Exception as e:
                 logger.warning("SKIP %s — %s", url, e)
-        return events
+                errors.append({"url": url, "reason": str(e)})
+        counts = {"links_seen": len(urls), "events_ok": len(events), "errors": errors}
+        return events, counts
 
-    def scrape(self, max_pages: int = 10) -> list[Event]:
-        """Retourne les événements sous forme de modèles canoniques Event."""
+    def scrape(self, max_pages: int = 10) -> tuple[list[Event], ScrapeReport]:
+        """Retourne les événements sous forme de modèles canoniques Event avec un rapport."""
         now = datetime.now(timezone.utc)
-        raw_events = self.scrape_all(max_pages=max_pages)
+        raw_events, counts = self.scrape_all(max_pages=max_pages)
+        report = ScrapeReport(
+            source="tc",
+            links_seen=counts["links_seen"],
+            events_ok=counts["events_ok"],
+            errors=counts["errors"],
+        )
         events: list[Event] = []
         for e in raw_events:
             locations = e.get("locations") or [{"name": "", "lat": None, "lng": None}]
@@ -391,4 +404,4 @@ class TokyoCheapo(BaseScraper):
                 "Scraper %s returned 0 events — likely a parser failure (HTML structure changed?)",
                 self.__class__.__name__,
             )
-        return events
+        return events, report

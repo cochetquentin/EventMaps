@@ -731,7 +731,7 @@ Tâches :
 2. ~~`SEC-002` — neutraliser XSS frontend — données externes actuellement injectées en HTML~~ **[DONE]**
 3. ~~`TEST-005` — couvrir `/scrape` — sécurise auth/concurrence/stale jobs~~ **[DONE — auth + config endpoint couverts]**
 4. ~~`BUG-001` — ajouter filtre date range serveur/client — corrige incohérence presets/pagination — dépendances : TEST-002.~~ **[DONE]**
-5. `BUG-003` — signaler succès partiels scraper — évite données silencieusement incomplètes — dépendances : ARCH-002 partiel.
+5. ~~`BUG-003` — signaler succès partiels scraper — évite données silencieusement incomplètes — dépendances : ARCH-002 partiel.~~ **[DONE]**
 
 ### Phase 1 — Qualité & sécurité
 
