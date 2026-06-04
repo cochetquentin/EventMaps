@@ -59,7 +59,7 @@ def test_allowed_origins_json_array(monkeypatch):
 def test_warning_when_wildcard_and_token_set():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        Settings(allowed_origins=["*"], scrape_token="secret")
+        Settings(allowed_origins=["*"], scrape_token="secret", _env_file=None)
     assert any(
         "EVENTMAPS_ALLOWED_ORIGINS" in str(w.message) for w in caught
     ), "Expected a warning mentioning EVENTMAPS_ALLOWED_ORIGINS"
@@ -69,7 +69,7 @@ def test_no_warning_when_wildcard_no_token(monkeypatch):
     monkeypatch.delenv("EVENTMAPS_SCRAPE_TOKEN", raising=False)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        Settings(allowed_origins=["*"])
+        Settings(allowed_origins=["*"], _env_file=None)
     user_warnings = [w for w in caught if issubclass(w.category, UserWarning)]
     assert len(user_warnings) == 0
 
@@ -77,7 +77,7 @@ def test_no_warning_when_wildcard_no_token(monkeypatch):
 def test_no_warning_when_explicit_origins_with_token():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        Settings(allowed_origins=["https://a.com"], scrape_token="secret")
+        Settings(allowed_origins=["https://a.com"], scrape_token="secret", _env_file=None)
     user_warnings = [w for w in caught if issubclass(w.category, UserWarning)]
     assert len(user_warnings) == 0
 
@@ -86,7 +86,7 @@ def test_warning_when_mixed_origins_include_wildcard():
     """A list like ['*', 'https://a.com'] still triggers the warning."""
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        Settings(allowed_origins=["*", "https://a.com"], scrape_token="secret")
+        Settings(allowed_origins=["*", "https://a.com"], scrape_token="secret", _env_file=None)
     assert any("EVENTMAPS_ALLOWED_ORIGINS" in str(w.message) for w in caught)
 
 

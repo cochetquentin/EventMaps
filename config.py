@@ -45,7 +45,12 @@ class Settings(BaseSettings):
     scrape_token: str | None = None
     scrape_error_threshold: float = 0.5
 
-    model_config = SettingsConfigDict(env_prefix="EVENTMAPS_", env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_prefix="EVENTMAPS_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     @field_validator("scrape_token", mode="before")
     @classmethod
@@ -66,7 +71,12 @@ class Settings(BaseSettings):
     def settings_customise_sources(cls, settings_cls, init_settings, env_settings, dotenv_settings=None, **kwargs):
         sources: list = [init_settings, _OriginsEnvSource(settings_cls)]
         if dotenv_settings is not None:
-            sources.append(_OriginsDotEnvSource(settings_cls))
+            # Preserve runtime overrides (e.g. Settings(_env_file=None)) by forwarding
+            # the env_file already resolved by pydantic-settings on the provided source.
+            sources.append(_OriginsDotEnvSource(
+                settings_cls,
+                env_file=getattr(dotenv_settings, "env_file", None),
+            ))
         sources.extend(kwargs.values())
         return tuple(sources)
 
