@@ -82,6 +82,14 @@ def test_no_warning_when_explicit_origins_with_token():
     assert len(user_warnings) == 0
 
 
+def test_warning_when_mixed_origins_include_wildcard():
+    """A list like ['*', 'https://a.com'] still triggers the warning."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        Settings(allowed_origins=["*", "https://a.com"], scrape_token="secret")
+    assert any("EVENTMAPS_ALLOWED_ORIGINS" in str(w.message) for w in caught)
+
+
 # ---------------------------------------------------------------------------
 # scrape_token normalization — empty string → None
 # ---------------------------------------------------------------------------
