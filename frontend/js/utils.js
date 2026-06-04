@@ -1,5 +1,21 @@
 export function fmtDate(d) { return d || '—'; }
 
+export function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export function safeUrl(url) {
+  if (!url || typeof url !== 'string') return '#';
+  const u = url.trim();
+  return (u.startsWith('http://') || u.startsWith('https://')) ? u : '#';
+}
+
 export function parseTimes(ev) {
   if (!ev.times) return ['', ''];
   const idx = ev.times.indexOf('-');
