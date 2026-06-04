@@ -1,6 +1,12 @@
 import json
+from datetime import datetime, timezone
+from pathlib import Path
+from unittest.mock import MagicMock
+
 import pytest
+import requests
 from bs4 import BeautifulSoup
+
 from scrapers.tokyo_cheapo import (
     TokyoCheapo,
     _clean_whitespace,
@@ -9,6 +15,8 @@ from scrapers.tokyo_cheapo import (
     _split_time,
     _parse_date_range,
 )
+
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture
@@ -375,3 +383,173 @@ def test_parse_date_range_fuzzy_cross_month():
 def test_parse_date_range_fuzzy_late_month_end():
     # Late Feb → dernier jour de février
     assert _parse_date_range("Late Feb", year=2026) == ("2026/02/21", "2026/02/28")
+
+
+# ---------------------------------------------------------------------------
+# Cross-year date range — BUG-002 documentation
+# ---------------------------------------------------------------------------
+
+def test_parse_date_range_cross_year_documents_bug():
+    # BUG-002: "Dec 31 - Jan 2" with year=2026 produces end < start (both in 2026).
+    # This test captures the CURRENT (broken) behaviour so a regression is detected
+    # if anything changes before BUG-002 is properly fixed.
+    start, end = _parse_date_range("Dec 31 - Jan 2", year=2026)
+    assert start == "2026/12/31"
+    # Jan 2 is resolved to 2026 — end precedes start (cross-year bug)
+    assert end == "2026/01/02"
+
+
+# ---------------------------------------------------------------------------
+# Fixture-based contract tests
+# ---------------------------------------------------------------------------
+
+def _make_404_http_error() -> requests.HTTPError:
+    err = requests.HTTPError()
+    err.response = MagicMock()
+    err.response.status_code = 404
+    return err
+
+
+# --- get_event_links ---
+
+def test_get_event_links_from_fixture(tc, monkeypatch):
+    """Listing fixture contains 2 real event links; excluded links are filtered out."""
+    html_bytes = (FIXTURES_DIR / "tc_listing.html").read_bytes()
+    call_count = 0
+
+    def mock_fetch(url, session):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            resp = MagicMock()
+            resp.content = html_bytes
+            return resp
+        raise _make_404_http_error()
+
+    monkeypatch.setattr("scrapers.tokyo_cheapo._fetch", mock_fetch)
+    links = tc.get_event_links(max_pages=5)
+
+    assert len(links) == 2
+    assert all(link.startswith("https://tokyocheapo.com/events/") for link in links)
+    # Excluded patterns must not appear
+    excluded_suffixes = ["/events/", "/events/this-week/", "/events/may/", "/events/june/"]
+    full_paths = [link.replace("https://tokyocheapo.com", "") for link in links]
+    for path in full_paths:
+        assert path not in excluded_suffixes
+
+
+def test_get_event_links_stops_on_empty_page(tc, monkeypatch):
+    """Pagination stops when a page returns no event links."""
+    empty_html = b"<html><body><a href='/about/'>About</a></body></html>"
+    call_count = 0
+
+    def mock_fetch(url, session):
+        nonlocal call_count
+        call_count += 1
+        resp = MagicMock()
+        resp.content = empty_html
+        return resp
+
+    monkeypatch.setattr("scrapers.tokyo_cheapo._fetch", mock_fetch)
+    links = tc.get_event_links(max_pages=5)
+
+    assert links == []
+    assert call_count == 1  # stops after first empty page
+
+
+# --- scrape_event with full fixture ---
+
+def test_scrape_event_full_fixture(tc, monkeypatch):
+    """scrape_event returns all expected fields from a complete event page."""
+    html_bytes = (FIXTURES_DIR / "tc_event_full.html").read_bytes()
+    soup = BeautifulSoup(html_bytes, "html.parser")
+    monkeypatch.setattr(tc, "get_event_page", lambda url: soup)
+
+    result = tc.scrape_event("https://tokyocheapo.com/events/kawaii-flea-market-2026/")
+
+    assert result["title"] == "Kawaii Flea Market"
+    assert result["start_date"] == "2026/05/17"
+    assert result["end_date"] == "2026/05/17"
+    assert result["start_time"] == "10:00"
+    assert result["end_time"] == "17:00"
+    assert result["price"] == "Free"
+    assert "flea market" in result["description"].lower()
+    assert "market" in result["categories"]
+    assert "shopping" in result["categories"]
+    assert "flea-market" in result["tags"]
+    assert "vintage" in result["tags"]
+    assert result["official_link"] == "https://kawaii-market.jp/"
+    assert len(result["locations"]) == 1
+    loc = result["locations"][0]
+    assert loc["name"] == "Yoyogi Park"
+    assert abs(loc["lat"] - 35.671660) < 1e-4
+    assert abs(loc["lng"] - 139.694692) < 1e-4
+
+
+# --- scrape_event with missing description (BUG-005 regression) ---
+
+def test_scrape_event_no_description_returns_empty_string(tc, monkeypatch):
+    """parse_description returns '' when div.entry-content__text is absent (BUG-005 fix)."""
+    html_bytes = (FIXTURES_DIR / "tc_event_no_description.html").read_bytes()
+    soup = BeautifulSoup(html_bytes, "html.parser")
+    monkeypatch.setattr(tc, "get_event_page", lambda url: soup)
+
+    result = tc.scrape_event("https://tokyocheapo.com/events/pop-up-market-akihabara/")
+
+    assert result["description"] == ""
+    assert result["title"] == "Pop-up Market Akihabara"
+
+
+# --- scrape_event with multiple locations ---
+
+def test_scrape_event_multi_location_fixture(tc, monkeypatch):
+    """scrape_event returns multiple location entries when Apple Maps JSON has locations array."""
+    html_bytes = (FIXTURES_DIR / "tc_event_multi_location.html").read_bytes()
+    soup = BeautifulSoup(html_bytes, "html.parser")
+    monkeypatch.setattr(tc, "get_event_page", lambda url: soup)
+
+    result = tc.scrape_event("https://tokyocheapo.com/events/tokyo-walking-festival/")
+
+    assert len(result["locations"]) == 2
+    names = [loc["name"] for loc in result["locations"]]
+    assert "Ueno Park" in names
+    assert "Asakusa Temple" in names
+    ueno = next(loc for loc in result["locations"] if loc["name"] == "Ueno Park")
+    assert abs(ueno["lat"] - 35.714998) < 1e-4
+
+
+# --- scrape() produces one Event per location ---
+
+def test_scrape_multi_location_creates_two_events(tc, monkeypatch):
+    """scrape() yields one Event per location for a multi-location raw event."""
+    now = datetime.now(timezone.utc)
+    raw_events = [{
+        "url": "https://tokyocheapo.com/events/tokyo-walking-festival/",
+        "title": "Tokyo Walking Festival",
+        "start_date": "2026/05/23",
+        "end_date": "2026/05/24",
+        "start_time": "09:00",
+        "end_time": "16:00",
+        "price": "Free",
+        "description": "A walking festival.",
+        "categories": ["outdoor"],
+        "tags": ["walking"],
+        "official_link": None,
+        "locations": [
+            {"name": "Ueno Park", "lat": 35.714998, "lng": 139.773498},
+            {"name": "Asakusa Temple", "lat": 35.714765, "lng": 139.796655},
+        ],
+    }]
+    counts = {"links_seen": 1, "events_ok": 1, "errors": []}
+    monkeypatch.setattr(tc, "scrape_all", lambda max_pages=10: (raw_events, counts))
+
+    events, report = tc.scrape()
+
+    assert len(events) == 2
+    titles = {e.title for e in events}
+    assert titles == {"Tokyo Walking Festival"}
+    # Each location produces a distinct ID
+    ids = {e.id for e in events}
+    assert len(ids) == 2
+    locs = {e.attributes.get("location_name") for e in events}
+    assert locs == {"Ueno Park", "Asakusa Temple"}
