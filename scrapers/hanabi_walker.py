@@ -8,7 +8,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, before_log
 
 from db.store import _make_id
 from models.event import Event
-from scrapers.base import BaseScraper
+from scrapers.base import BaseScraper, ScrapeReport
 
 logger = logging.getLogger(__name__)
 
@@ -280,24 +280,48 @@ class HanabiWalker(BaseScraper):
         event["lng"] = lng
         return event
 
-    def scrape_all(self, max_pages: int = 20) -> list[dict]:
-        """Scrape tous les événements. Explose les multi-jours en une ligne par jour."""
+    def scrape_all(self, max_pages: int = 20) -> tuple[list[dict], dict]:
+        """Scrape tous les événements. Explose les multi-jours en une ligne par jour.
+
+        Returns:
+            (raw_events, counts) where counts = {"links_seen": int, "events_ok": int, "errors": list}
+        """
         paths = self.get_event_links(max_pages=max_pages)
         events = []
+        errors = []
+        skipped = 0
         for path in paths:
             try:
                 event = self.scrape_event(path)
                 dates = event.pop("dates")
+                if not dates:
+                    logger.warning("SKIP %s — no parseable dates", path)
+                    skipped += 1
+                    continue
                 for date in dates:
                     events.append({**event, "date": date})
             except Exception as e:
                 logger.warning("SKIP %s — %s", path, e)
-        return events
+                errors.append({"url": path, "reason": str(e)})
+        counts = {
+            "links_seen": len(paths),
+            "events_ok": len(events),
+            "events_skipped": skipped,
+            "errors": errors,
+        }
+        return events, counts
 
-    def scrape(self, max_pages: int = 20) -> list[Event]:
-        """Retourne les événements sous forme de modèles canoniques Event."""
+    def scrape(self, max_pages: int = 20) -> tuple[list[Event], ScrapeReport]:
+        """Retourne les événements sous forme de modèles canoniques Event avec un rapport."""
         now = datetime.now(timezone.utc)
-        raw_events = self.scrape_all(max_pages=max_pages)
+        raw_events, counts = self.scrape_all(max_pages=max_pages)
+        report = ScrapeReport(
+            source="hanabi",
+            links_seen=counts["links_seen"],
+            events_ok=counts["events_ok"],
+            events_skipped=counts.get("events_skipped", 0),
+            errors=counts["errors"],
+        )
         events: list[Event] = []
         for e in raw_events:
             date_val = e.get("date", "")  # YYYY/MM/DD brut — préserve la stabilité des IDs
@@ -343,4 +367,4 @@ class HanabiWalker(BaseScraper):
                 "Scraper %s returned 0 events — likely a parser failure (HTML structure changed?)",
                 self.__class__.__name__,
             )
-        return events
+        return events, report

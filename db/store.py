@@ -46,9 +46,20 @@ CREATE TABLE IF NOT EXISTS scrape_jobs (
     started_at     TEXT,
     finished_at    TEXT,
     events_scraped INTEGER,
-    error          TEXT
+    error          TEXT,
+    links_seen     INTEGER,
+    events_ok      INTEGER,
+    events_skipped INTEGER,
+    error_count    INTEGER
 )
 """
+
+_SCRAPE_JOBS_MIGRATIONS = [
+    "ALTER TABLE scrape_jobs ADD COLUMN links_seen INTEGER",
+    "ALTER TABLE scrape_jobs ADD COLUMN events_ok INTEGER",
+    "ALTER TABLE scrape_jobs ADD COLUMN events_skipped INTEGER",
+    "ALTER TABLE scrape_jobs ADD COLUMN error_count INTEGER",
+]
 
 _EVENTS_HEADERS = [
     "id", "source", "title", "url", "start_date", "end_date",
@@ -66,6 +77,17 @@ def _safe_iso_date(raw: str | None) -> str | None:
         return normalized
     except ValueError:
         return None
+
+
+def _migrate_scrape_jobs(conn: sqlite3.Connection) -> None:
+    """Add new metric columns to scrape_jobs if they don't exist yet (existing DBs)."""
+    for sql in _SCRAPE_JOBS_MIGRATIONS:
+        try:
+            conn.execute(sql)
+            conn.commit()
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" not in str(exc).lower():
+                raise
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
@@ -207,6 +229,7 @@ class EventStore:
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_events_start_date ON events(start_date)")
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_events_coords ON events(latitude, longitude)")
         self._conn.commit()
+        _migrate_scrape_jobs(self._conn)
         _migrate(self._conn)
 
     def __enter__(self):
@@ -298,19 +321,57 @@ class EventStore:
         self._conn.commit()
         return cur.lastrowid
 
-    def finish_job(self, job_id: int, count: int) -> None:
+    def finish_job(
+        self,
+        job_id: int,
+        count: int,
+        *,
+        links_seen: int | None = None,
+        events_ok: int | None = None,
+        events_skipped: int | None = None,
+        error_count: int | None = None,
+    ) -> None:
         self._conn.execute(
-            """UPDATE scrape_jobs SET status='done', finished_at=?, events_scraped=?
+            """UPDATE scrape_jobs
+               SET status='done', finished_at=?, events_scraped=?,
+                   links_seen=?, events_ok=?, events_skipped=?, error_count=?
                WHERE id=?""",
-            (datetime.now(timezone.utc).isoformat(), count, job_id),
+            (
+                datetime.now(timezone.utc).isoformat(),
+                count,
+                links_seen,
+                events_ok,
+                events_skipped,
+                error_count,
+                job_id,
+            ),
         )
         self._conn.commit()
 
-    def fail_job(self, job_id: int, error: str) -> None:
+    def fail_job(
+        self,
+        job_id: int,
+        error: str,
+        *,
+        links_seen: int | None = None,
+        events_ok: int | None = None,
+        events_skipped: int | None = None,
+        error_count: int | None = None,
+    ) -> None:
         self._conn.execute(
-            """UPDATE scrape_jobs SET status='failed', finished_at=?, error=?
+            """UPDATE scrape_jobs
+               SET status='failed', finished_at=?, error=?,
+                   links_seen=?, events_ok=?, events_skipped=?, error_count=?
                WHERE id=?""",
-            (datetime.now(timezone.utc).isoformat(), error, job_id),
+            (
+                datetime.now(timezone.utc).isoformat(),
+                error,
+                links_seen,
+                events_ok,
+                events_skipped,
+                error_count,
+                job_id,
+            ),
         )
         self._conn.commit()
 
@@ -326,7 +387,10 @@ class EventStore:
             ).fetchone()
         if row is None:
             return None
-        keys = ["id", "source", "status", "started_at", "finished_at", "events_scraped", "error"]
+        keys = [
+            "id", "source", "status", "started_at", "finished_at", "events_scraped", "error",
+            "links_seen", "events_ok", "events_skipped", "error_count",
+        ]
         return dict(zip(keys, row))
 
     # --- Internal helpers ---
