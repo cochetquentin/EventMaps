@@ -736,7 +736,7 @@ Tâches :
 ### Phase 1 — Qualité & sécurité
 
 1. ~~`SEC-005` — ajouter audit dépendances/Dependabot — supply-chain — dépendances : aucune.~~ **[DONE]**
-2. `SEC-003` — SRI/vendor assets CDN — réduit risque tiers — dépendances : aucune.
+2. ~~`SEC-003` — SRI/vendor assets CDN — réduit risque tiers — dépendances : aucune.~~ **[DONE]**
 3. `SEC-004` — documenter/restreindre CORS prod — hardening — dépendances : SEC-001.
 4. `TEST-003` — fixtures Tokyo Cheapo — protège parser — dépendances : aucune.
 5. `TEST-004` — fixtures Hanabi — protège parser — dépendances : BUG-004.
