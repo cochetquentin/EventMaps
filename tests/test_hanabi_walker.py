@@ -153,7 +153,16 @@ def test_extract_dates_holiday_marker():
 
 
 def test_extract_dates_no_date_fallback():
-    assert _extract_dates("未定") == ["未定"]
+    assert _extract_dates("未定") == []
+
+
+def test_extract_dates_natural_language_unparseable():
+    assert _extract_dates("春頃開催予定") == []
+
+
+def test_extract_dates_slash_iso_passthrough():
+    # Date déjà en format YYYY/MM/DD sans kanji : doit être préservée
+    assert _extract_dates("2026/08/01") == ["2026/08/01"]
 
 
 # ---------------------------------------------------------------------------
@@ -372,3 +381,87 @@ def test_scrape_all_skips_errors(hw):
     assert counts["links_seen"] == 2
     assert len(counts["errors"]) == 1
     assert counts["errors"][0]["url"] == "/detail/bad/"
+
+
+def test_scrape_all_skips_unparseable_dates(hw):
+    hw.get_event_links = MagicMock(return_value=["/detail/ar0300e001/"])
+    hw.scrape_event = MagicMock(return_value={
+        "title": "花火大会",
+        "dates": [],  # _extract_dates retourne [] pour "未定" après le fix BUG-004
+        "venue": "海浜公園",
+    })
+
+    events, counts = hw.scrape_all()
+
+    assert len(events) == 0
+    assert counts["events_skipped"] == 1
+    assert counts["links_seen"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Tests basés sur fixtures HTML (TEST-004)
+# ---------------------------------------------------------------------------
+
+import os
+
+FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
+
+
+def _load_fixture(name: str) -> BeautifulSoup:
+    with open(os.path.join(FIXTURES_DIR, name), encoding="utf-8") as f:
+        return BeautifulSoup(f.read(), "html.parser")
+
+
+def test_get_event_links_from_fixture(hw):
+    soup = _load_fixture("hanabi_listing.html")
+    # Simuler la réponse HTTP avec le contenu de la fixture
+    with open(os.path.join(FIXTURES_DIR, "hanabi_listing.html"), "rb") as f:
+        content = f.read()
+
+    page1 = MagicMock()
+    page1.content = content
+    page1.raise_for_status = MagicMock()
+    page1.status_code = 200
+
+    page2 = MagicMock()
+    page2.raise_for_status.side_effect = Exception("404")
+    page2.status_code = 404
+
+    from requests import HTTPError
+    http_err = HTTPError(response=MagicMock(status_code=404))
+    page2.raise_for_status.side_effect = http_err
+
+    hw.session.get = MagicMock(side_effect=[page1, http_err])
+
+    with patch("scrapers.hanabi_walker._fetch", side_effect=[page1, http_err]):
+        links = hw.get_event_links()
+
+    assert "/detail/ar0300e001/" in links
+    assert "/detail/ar0300e002/" in links
+    assert "/detail/ar0300e003/" in links
+    assert len(links) == 3
+
+
+def test_parse_event_table_from_fixture(hw):
+    soup = _load_fixture("hanabi_event_data.html")
+    result = hw.parse_event_table(soup)
+
+    assert result["title"] == "第54回 真岡市夏祭大花火大会"
+    assert result["dates"] == ["2026/08/01"]
+    assert result["start_time"] == "19:30"
+    assert result["end_time"] == "21:00"
+    assert result["fireworks_count"] == "約1万5000発"
+    assert result["venue"] == "真岡市役所東側五行川沿い"
+    assert result["paid_seating"] == "あり"
+    assert result["paid_seating_details"] == "自由席4400円、VIP席1万円"
+    assert result["official_site"] == "https://www.moka-kanko.jp/"
+    assert "MAP" not in result["access"]
+    assert "徒歩15分" in result["access"]
+
+
+def test_parse_coordinates_from_fixture(hw):
+    soup = _load_fixture("hanabi_event_map.html")
+    lat, lng = hw.parse_coordinates(soup)
+
+    assert lat == pytest.approx(36.439054)
+    assert lng == pytest.approx(140.012547)

@@ -144,10 +144,17 @@ def _extract_dates(raw: str) -> list[str]:
 
     first = _FULL_DATE_RE.search(text)
     if re.search(r"\d{4}/\d{1,2}[・～]", text):
-        return [f"{first.group(1)}/{int(first.group(2)):02d}/{int(first.group(3)):02d}"] if first else [raw]
+        if first:
+            return [f"{first.group(1)}/{int(first.group(2)):02d}/{int(first.group(3)):02d}"]
+        if _parse_iso_date(raw):
+            return [raw]
+        return []
 
     if not first:
-        return [raw]
+        if _parse_iso_date(raw):
+            return [raw]
+        logger.warning("Hanabi date not parseable: %r", raw)
+        return []
 
     year = int(first.group(1))
     collected: set[_date] = set()
