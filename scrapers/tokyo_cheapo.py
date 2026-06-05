@@ -231,6 +231,11 @@ def _parse_date_range(
                     start = start.replace(year=start.year - 1)
                 else:
                     end = end.replace(year=end.year + 1)
+            elif reference_explicit and (reference - start).days > 182:
+                # Plage dans le passé lointain (ex: "Jan 2 - Jan 5" en décembre)
+                # → les deux dates appartiennent à l'année suivante
+                start = start.replace(year=start.year + 1)
+                end = end.replace(year=end.year + 1)
             return start.strftime("%Y/%m/%d"), end.strftime("%Y/%m/%d")
         return date_str, ""
 
