@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class TokyoCheapoAttributes(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     categories: list[str] = []
     tags: list[str] = []
     official_link: str | None = None
@@ -11,6 +13,8 @@ class TokyoCheapoAttributes(BaseModel):
 
 
 class HanabiWalkerAttributes(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     fireworks_count: str | None = None
     fireworks_duration: str | None = None
     expected_crowd: str | None = None
