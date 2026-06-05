@@ -15,9 +15,8 @@ data/
 # Local docs
 docs/
 
-# Claude Code — settings restent locaux, commands partagées
+# Claude Code — settings.local.json reste local, le reste est partagé
 .claude/settings.local.json
-.claude/settings.json
 
 # Database & generated data files
 *.db

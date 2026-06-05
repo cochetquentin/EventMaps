@@ -23,8 +23,8 @@ Mémoriser ces variables pour toutes les étapes suivantes.
 ## Phase 2 — Protection anti-boucle
 
 ```bash
-gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments"
-gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews"
+gh api --paginate --slurp "repos/${REPO}/issues/${PR_NUMBER}/comments"
+gh api --paginate --slurp "repos/${REPO}/pulls/${PR_NUMBER}/reviews"
 git log -1 --format="%cI"
 ```
 
@@ -40,9 +40,9 @@ Logique :
 ## Phase 3 — Récupérer les remarques Codex
 
 ```bash
-gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/reviews"
-gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/comments"
-gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments"
+gh api --paginate --slurp "repos/${REPO}/pulls/${PR_NUMBER}/reviews"
+gh api --paginate --slurp "repos/${REPO}/pulls/${PR_NUMBER}/comments"
+gh api --paginate --slurp "repos/${REPO}/issues/${PR_NUMBER}/comments"
 ```
 
 Filtrer uniquement les objets dont `user.login` est exactement `chatgpt-codex-connector[bot]`
@@ -110,7 +110,7 @@ Re-vérifier l'anti-boucle (précaution post-push) :
 
 ```bash
 git log -1 --format="%cI"
-gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments"
+gh api --paginate --slurp "repos/${REPO}/issues/${PR_NUMBER}/comments"
 ```
 
 Confirmer que `T_commit > T_comment` (ou pas de commentaire `@Codex review`), puis :
