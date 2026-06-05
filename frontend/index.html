@@ -144,6 +144,7 @@
     }
 
     #scrape-btn:hover, #locate-btn:hover { border-color: var(--accent); color: var(--accent); }
+    #locate-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
     #locate-btn {
       flex-shrink: 0;
@@ -465,6 +466,17 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+    .dist-badge {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 6px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 600;
+      vertical-align: middle;
     }
 
     /* ── Markers ── */

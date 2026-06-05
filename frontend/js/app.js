@@ -1,5 +1,5 @@
 /* global L */
-import { setMap, setClusterGroup, deactivatedPills, setShowOnlyFavorites, showOnlyFavorites, markerMap, allEvents } from './state.js';
+import { setMap, setClusterGroup, deactivatedPills, setShowOnlyFavorites, showOnlyFavorites, markerMap, allEvents, setUserPosition, setProximityMode } from './state.js';
 import { isoDate, todayJST, computePresets } from './utils.js';
 import { toggleFavorite, isFavorite, getIcon, updateFavPill } from './favorites.js';
 import { buildPopup } from './popups.js';
@@ -111,6 +111,9 @@ document.getElementById('reset-filters').addEventListener('click', () => {
   document.getElementById('search-input').value     = '';
   deactivatedPills.clear();
   setShowOnlyFavorites(false);
+  setProximityMode(false);
+  setUserPosition(null);
+  document.getElementById('locate-btn').classList.remove('active');
   document.querySelectorAll('.pill').forEach(p => {
     if (p.classList.contains('fav-pill')) p.classList.remove('active');
     else p.classList.add('active');

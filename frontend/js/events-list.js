@@ -1,6 +1,6 @@
 /* global L */
-import { allEvents, map, markerMap, showOnlyFavorites } from './state.js';
-import { fmtDate, escapeHtml } from './utils.js';
+import { allEvents, map, markerMap, showOnlyFavorites, userPosition, proximityMode } from './state.js';
+import { fmtDate, escapeHtml, haversineKm, fmtDistance } from './utils.js';
 import { TC_EXCLUDED_CATS, CAT_EMOJI } from './config.js';
 import { isFavorite, toggleFavorite, getIcon, updateFavPill } from './favorites.js';
 import { renderMarkers } from './markers.js';
@@ -13,6 +13,20 @@ export function buildEventList(events) {
   if (!events.length) {
     list.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:12px 16px">Aucun événement</div>';
     return;
+  }
+
+  // En mode proximité, on pré-trie tous les événements par distance croissante
+  const inProximity = proximityMode && userPosition;
+  if (inProximity) {
+    events = [...events].sort((a, b) => {
+      const da = (a.latitude != null && a.longitude != null)
+        ? haversineKm(userPosition.lat, userPosition.lng, a.latitude, a.longitude)
+        : Infinity;
+      const db = (b.latitude != null && b.longitude != null)
+        ? haversineKm(userPosition.lat, userPosition.lng, b.latitude, b.longitude)
+        : Infinity;
+      return da - db;
+    });
   }
 
   const groups = new Map();
@@ -41,7 +55,20 @@ export function buildEventList(events) {
   });
 
   sorted.forEach(([, group]) => {
-    group.events.sort((a, b) => (a.start_date || a.date || '').localeCompare(b.start_date || b.date || ''));
+    // Tri intra-groupe : par distance si mode proximité, sinon par date
+    if (inProximity) {
+      group.events.sort((a, b) => {
+        const da = (a.latitude != null && a.longitude != null)
+          ? haversineKm(userPosition.lat, userPosition.lng, a.latitude, a.longitude)
+          : Infinity;
+        const db = (b.latitude != null && b.longitude != null)
+          ? haversineKm(userPosition.lat, userPosition.lng, b.latitude, b.longitude)
+          : Infinity;
+        return da - db;
+      });
+    } else {
+      group.events.sort((a, b) => (a.start_date || a.date || '').localeCompare(b.start_date || b.date || ''));
+    }
 
     const groupEl = document.createElement('div');
     groupEl.className = 'cat-group';
@@ -66,13 +93,17 @@ export function buildEventList(events) {
         ? [escapeHtml(attrs.location_name), escapeHtml(ev.price)].filter(Boolean).join(' · ')
         : [escapeHtml(ev.venue), escapeHtml(attrs.fireworks_count)].filter(Boolean).join(' · ');
 
+      const distBadge = (inProximity && ev.latitude != null && ev.longitude != null)
+        ? `<span class="dist-badge">📍 ${fmtDistance(haversineKm(userPosition.lat, userPosition.lng, ev.latitude, ev.longitude))}</span>`
+        : '';
+
       card.innerHTML = `
         <div class="card-header">
           <div class="card-dot ${ev.source}"></div>
           <div class="card-title">${escapeHtml(ev.title)}</div>
           <button class="fav-btn ${isFavorite(ev.id) ? 'active' : ''}" title="Favoris">${isFavorite(ev.id) ? '★' : '☆'}</button>
         </div>
-        <div class="card-meta">${date}${sub ? ' · ' + sub : ''}</div>`;
+        <div class="card-meta">${date}${sub ? ' · ' + sub : ''}${distBadge}</div>`;
 
       card.querySelector('.fav-btn').addEventListener('click', (e) => {
         e.stopPropagation();
