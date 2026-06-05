@@ -70,7 +70,7 @@ Les retries HTTP sont gérés via **tenacity** (3 tentatives, backoff 2–10 s c
 | `events.py` | `EventRepository` — CRUD événements |
 | `jobs.py` | `JobRepository` — suivi des jobs de scrape |
 | `schema.py` | DDL des tables + migrations |
-| `migrations.py` | Migration depuis le schéma legacy (table unique `events`) |
+| `migrations.py` | Migration depuis le schéma legacy (tables `tokyo_cheapo` + `hanabi` → `events`) |
 
 SQLite en mode WAL. La DB est créée automatiquement à la première connexion.
 
@@ -224,7 +224,7 @@ L'algorithme est stable et ne doit **jamais être modifié** : les IDs persisté
 | `GET` | `/events` | - | Liste des événements (filtres, pagination) |
 | `GET` | `/events/{id}` | - | Détail d'un événement |
 | `GET` | `/events/{id}.ics` | - | Export iCal d'un événement |
-| `POST` | `/scrape` | Bearer token | Déclenche un job de scraping (async) |
+| `POST` | `/scrape` | Bearer token (si `SCRAPE_TOKEN` configuré, sinon public) | Déclenche un job de scraping (async) |
 | `GET` | `/scrape/status` | - | Dernier job de scraping |
 | `GET` | `/scrape/config` | - | Indique si `/scrape` est public |
 | `GET` | `/health` | - | Healthcheck DB (`SELECT 1`) |

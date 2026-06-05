@@ -93,7 +93,7 @@ GET  /docs                          → Swagger UI
 | `source` | `tc` \| `hanabi` | Filtre par source |
 | `date` | `YYYY-MM-DD` | Filtre par chevauchement de date |
 | `bbox` | `min_lon,min_lat,max_lon,max_lat` | Filtre géographique |
-| `start_from` | `YYYY-MM-DD` | Borne basse sur `start_date` |
+| `start_from` | `YYYY-MM-DD` | Borne inférieure de chevauchement : inclut les événements dont `COALESCE(end_date, start_date) >= start_from` |
 | `start_to` | `YYYY-MM-DD` | Borne haute sur `start_date` |
 | `limit` | `int` 1–500 (défaut 100) | Pagination |
 | `offset` | `int` (défaut 0) | Pagination |
