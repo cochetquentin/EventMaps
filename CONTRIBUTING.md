@@ -15,6 +15,9 @@ cd EventMaps
 # Installer les dépendances Python
 uv sync
 
+# Installer les dépendances Node (Vitest)
+npm ci
+
 # Copier et adapter la configuration locale
 cp .env.example .env
 ```
@@ -90,7 +93,7 @@ test(store): couvrir upsert avec conflit de clé
 
 Les tests ne font **jamais** de vraies requêtes HTTP vers les sources tierces. Utiliser :
 - Des fixtures HTML statiques dans `tests/fixtures/` (HTML sauvegardé manuellement)
-- La librairie `responses` ou `unittest.mock` pour mocker les appels `requests`
+- `unittest.mock` (stdlib) pour mocker les appels `requests`
 
 Ajouter une fixture :
 1. Sauvegarder le HTML de la page dans `tests/fixtures/<source>_<description>.html`
@@ -116,9 +119,10 @@ npx vitest run
 
 Les scrapers doivent :
 - Déclarer un `User-Agent` explicite (`EventMaps/1.0`, configurable via `EVENTMAPS_SCRAPE_USER_AGENT`)
-- Respecter un délai entre les requêtes (tenacity backoff configuré)
 - Ne jamais être exécutés de façon automatique non contrôlée (le rate limit de `POST /scrape` est 2 req/h)
 - Ne pas contourner les robots.txt des sites ciblés
+
+Note : tenacity est configuré pour les **retries** uniquement (backoff entre tentatives échouées), pas comme mécanisme de throttling entre requêtes.
 
 ## Structure du projet
 

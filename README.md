@@ -142,7 +142,8 @@ Les événements sont stockés dans `data/events.db` (SQLite) avec un hash SHA-2
 
 | Table | Source | Clé de déduplication |
 |---|---|---|
-| `events` | toutes | `source` + `title` + `start_date` (+ `location_name` pour TC) |
+| `events` (TC) | tokyocheapo.com | `url` + `location_name` |
+| `events` (Hanabi) | hanabi.walkerplus.com | `url` + `date` |
 | `scrape_jobs` | — | suivi des jobs de scraping |
 
 ## Modèles de données
