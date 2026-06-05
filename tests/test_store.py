@@ -4,6 +4,7 @@ import pytest
 
 from db.store import EventStore, _make_id
 from models.event import Event
+from models.identity import make_event_id
 
 
 # --- Fixtures ---
@@ -81,10 +82,13 @@ def make_hanabi(**kwargs) -> Event:
 # --- _make_id ---
 
 def test_make_id_stable():
-    assert _make_id(["https://example.com", "Yoyogi Park"]) == _make_id(["https://example.com", "Yoyogi Park"])
-    result = _make_id(["https://example.com", "loc"])
+    # Test de la fonction canonique dans models.identity
+    assert make_event_id(["https://example.com", "Yoyogi Park"]) == make_event_id(["https://example.com", "Yoyogi Park"])
+    result = make_event_id(["https://example.com", "loc"])
     assert len(result) == 16
     assert result.isalnum()
+    # L'alias db.store doit produire des résultats identiques
+    assert _make_id(["https://example.com", "loc"]) == result
 
 
 # --- upsert_events (TC) ---
