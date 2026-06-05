@@ -16,7 +16,7 @@ export function updateURL() {
   const q    = document.getElementById('search-input').value.trim();
 
   const today = isoDate(todayJST());
-  if (from && from !== today) params.set('from', from);
+  if (from && (from !== today || to)) params.set('from', from);
   if (to)   params.set('to', to);
   if (q)    params.set('q', q);
 
@@ -59,7 +59,14 @@ export function restoreFromURL() {
   if (q)    document.getElementById('search-input').value     = q;
   if (off)  off.split(',').filter(Boolean).forEach(t => deactivatedPills.add(t));
   if (favs === '1') setShowOnlyFavorites(true);
-  if (lat && lng && z && map) map.setView([parseFloat(lat), parseFloat(lng)], parseInt(z, 10));
+  const latN = parseFloat(lat);
+  const lngN = parseFloat(lng);
+  const zN   = parseInt(z, 10);
+  if (map && Number.isFinite(latN) && Number.isFinite(lngN) && Number.isFinite(zN)
+      && latN >= -90 && latN <= 90 && lngN >= -180 && lngN <= 180
+      && zN >= 0 && zN <= 20) {
+    map.setView([latN, lngN], zN);
+  }
 
   return true;
 }

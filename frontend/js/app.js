@@ -190,8 +190,14 @@ document.getElementById('copy-link-btn').addEventListener('click', () => {
     btn.classList.add('copied');
     setTimeout(() => { btn.textContent = '🔗'; btn.classList.remove('copied'); }, 1500);
   };
+  const onFailure = () => {
+    btn.textContent = '✗';
+    setTimeout(() => { btn.textContent = '🔗'; }, 1500);
+  };
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(location.href).then(onSuccess).catch(() => {});
+    navigator.clipboard.writeText(location.href).then(onSuccess).catch(onFailure);
+  } else {
+    onFailure();
   }
 });
 
