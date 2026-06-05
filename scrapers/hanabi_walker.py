@@ -5,7 +5,13 @@ from datetime import date as _date
 
 import requests
 from bs4 import BeautifulSoup
-from tenacity import before_log, retry, stop_after_attempt, wait_exponential
+from tenacity import (
+    Retrying,
+    before_log,
+    retry_if_not_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from models.attributes import HanabiWalkerAttributes
 from models.event import Event
@@ -14,11 +20,6 @@ from scrapers.base import BaseScraper, ScrapeReport
 
 logger = logging.getLogger(__name__)
 
-_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-}
 
 # Pour ces champs, on extrait le href de l'<a> plutôt que le texte
 _LINK_FIELDS = {"official_site", "official_x"}
@@ -53,13 +54,8 @@ _TIME_RANGE_RE = re.compile(r"\d{1,2}:\d{2}[～〜]\d{1,2}:\d{2}")
 _TIME_START_RE = re.compile(r"\d{1,2}:\d{2}[～〜]")
 
 
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(min=2, max=10),
-    before=before_log(logger, logging.WARNING),
-)
-def _fetch(url: str, session: requests.Session) -> requests.Response:
-    response = session.get(url, timeout=10)
+def _fetch(url: str, session: requests.Session, timeout: int = 10) -> requests.Response:
+    response = session.get(url, timeout=timeout)
     response.raise_for_status()
     return response
 
@@ -198,17 +194,36 @@ class HanabiWalker(BaseScraper):
         from config import settings
 
         self.region = region
+        self._timeout = settings.scrape_request_timeout_seconds
+        self._max_pages = settings.scrape_max_pages_hanabi
+        self._retrying = Retrying(
+            stop=stop_after_attempt(settings.scrape_retry_attempts),
+            wait=wait_exponential(
+                min=settings.scrape_retry_wait_min,
+                max=settings.scrape_retry_wait_max,
+            ),
+            retry=retry_if_not_exception_type(requests.HTTPError),
+            before=before_log(logger, logging.WARNING),
+            reraise=True,
+        )
         self.session = requests.Session()
-        self.session.headers.update(_HEADERS)
-        self.session.headers["User-Agent"] = settings.scrape_user_agent
+        self.session.headers.update(
+            {
+                "User-Agent": settings.scrape_user_agent,
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            }
+        )
 
-    def get_event_links(self, max_pages: int = 20) -> list[str]:
+    def get_event_links(self, max_pages: int | None = None) -> list[str]:
         """Retourne les paths /detail/... de tous les événements paginés (sans doublons)."""
+        if max_pages is None:
+            max_pages = self._max_pages
         links = []
         for i in range(1, max_pages + 1):
             url = f"{BASE_URL}/list/{self.region}/scheduled/{i}.html"
             try:
-                response = _fetch(url, self.session)
+                response = self._retrying(_fetch, url, self.session, self._timeout)
             except requests.HTTPError as e:
                 if e.response is not None and e.response.status_code == 404:
                     break
@@ -229,11 +244,11 @@ class HanabiWalker(BaseScraper):
         return list(dict.fromkeys(links))
 
     def get_data_page(self, path: str) -> BeautifulSoup:
-        response = _fetch(f"{BASE_URL}{path}data.html", self.session)
+        response = self._retrying(_fetch, f"{BASE_URL}{path}data.html", self.session, self._timeout)
         return BeautifulSoup(response.content, "html.parser")
 
     def get_map_page(self, path: str) -> BeautifulSoup:
-        response = _fetch(f"{BASE_URL}{path}map.html", self.session)
+        response = self._retrying(_fetch, f"{BASE_URL}{path}map.html", self.session, self._timeout)
         return BeautifulSoup(response.content, "html.parser")
 
     def parse_event_table(self, soup: BeautifulSoup) -> dict:
@@ -291,7 +306,7 @@ class HanabiWalker(BaseScraper):
         event["lng"] = lng
         return event
 
-    def scrape_all(self, max_pages: int = 20) -> tuple[list[dict], dict]:
+    def scrape_all(self, max_pages: int | None = None) -> tuple[list[dict], dict]:
         """Scrape tous les événements. Explose les multi-jours en une ligne par jour.
 
         Returns:
@@ -322,7 +337,7 @@ class HanabiWalker(BaseScraper):
         }
         return events, counts
 
-    def scrape(self, max_pages: int = 20) -> tuple[list[Event], ScrapeReport]:
+    def scrape(self, max_pages: int | None = None) -> tuple[list[Event], ScrapeReport]:
         """Retourne les événements sous forme de modèles canoniques Event avec un rapport."""
         now = datetime.now(UTC)
         raw_events, counts = self.scrape_all(max_pages=max_pages)

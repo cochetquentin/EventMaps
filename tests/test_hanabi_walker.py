@@ -496,3 +496,33 @@ def test_parse_coordinates_from_fixture(hw):
 
     assert lat == pytest.approx(36.439054)
     assert lng == pytest.approx(140.012547)
+
+
+# --- ARCH-006 : injection des settings ---
+
+
+def test_scraper_timeout_matches_settings():
+    """_timeout est bien la valeur configurée par settings."""
+    hw = HanabiWalker()
+    from config import settings
+
+    assert hw._timeout == settings.scrape_request_timeout_seconds
+
+
+def test_scraper_max_pages_matches_settings():
+    """_max_pages est bien la valeur configurée par settings."""
+    hw = HanabiWalker()
+    from config import settings
+
+    assert hw._max_pages == settings.scrape_max_pages_hanabi
+
+
+def test_scraper_user_agent_from_settings(monkeypatch):
+    """Le User-Agent de la session reflète scrape_user_agent."""
+    import config
+    from config import Settings
+
+    fake = Settings(scrape_user_agent="HanabiBot/2.0", _env_file=None)
+    monkeypatch.setattr(config, "settings", fake)
+    hw2 = HanabiWalker()
+    assert hw2.session.headers["User-Agent"] == "HanabiBot/2.0"
