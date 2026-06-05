@@ -14,6 +14,7 @@ from scrapers.tokyo_cheapo import (
     _parse_12h_time,
     _parse_date_range,
     _split_time,
+    _today_jst,
 )
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -409,16 +410,26 @@ def test_parse_date_range_fuzzy_late_month_end():
 # ---------------------------------------------------------------------------
 
 
-def test_parse_date_range_cross_year():
-    # BUG-002 fix: "Dec 31 - Jan 2" with year=2026 → end bumped to 2027
-    start, end = _parse_date_range("Dec 31 - Jan 2", year=2026)
+def test_parse_date_range_cross_year_dec_scraping():
+    # Scraping en décembre : "Dec 31 - Jan 2" → end passe à l'année suivante
+    ref = _date_cls(2026, 12, 5)
+    start, end = _parse_date_range("Dec 31 - Jan 2", year=2026, reference=ref)
+    assert start == "2026/12/31"
+    assert end == "2027/01/02"
+
+
+def test_parse_date_range_cross_year_jan_scraping():
+    # Scraping en janvier : "Dec 31 - Jan 2" → start revient à l'année précédente
+    ref = _date_cls(2027, 1, 5)
+    start, end = _parse_date_range("Dec 31 - Jan 2", year=2027, reference=ref)
     assert start == "2026/12/31"
     assert end == "2027/01/02"
 
 
 def test_parse_date_range_cross_year_normal_unaffected():
     # Plage same-year ne doit pas bumper l'année de end
-    start, end = _parse_date_range("May 15 - Jun 2", year=2026)
+    ref = _date_cls(2026, 5, 1)
+    start, end = _parse_date_range("May 15 - Jun 2", year=2026, reference=ref)
     assert start == "2026/05/15"
     assert end == "2026/06/02"
 
@@ -494,7 +505,7 @@ def test_scrape_event_full_fixture(tc, monkeypatch):
 
     result = tc.scrape_event("https://tokyocheapo.com/events/kawaii-flea-market-2026/")
 
-    year = _date_cls.today().year
+    year = _today_jst().year
     assert result["title"] == "Kawaii Flea Market"
     assert result["start_date"] == f"{year}/05/17"
     assert result["end_date"] == f"{year}/05/17"

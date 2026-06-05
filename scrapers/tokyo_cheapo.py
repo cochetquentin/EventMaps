@@ -194,15 +194,26 @@ def _parse_fuzzy_date_range(date_str: str, year: int) -> tuple[str, str] | None:
     return None
 
 
-def _parse_date_range(date_str: str, year: int | None = None) -> tuple[str, str]:
+def _parse_date_range(
+    date_str: str,
+    year: int | None = None,
+    reference: _date | None = None,
+) -> tuple[str, str]:
     """
     Retourne (start_date, end_date) en format YYYY/MM/DD.
     - Date unique → (date, "")
     - Plage → (start, end) normalisés
     - Dates fuzzy ('Mid May') → (date_str, "")
+
+    reference sert à résoudre les plages cross-year : si start est à plus de
+    182 jours dans le futur par rapport à reference, c'est start qui appartient
+    à l'année précédente (cas scraping en janvier pour "Dec 31 - Jan 2") ;
+    sinon c'est end qui passe à l'année suivante (cas scraping en décembre).
     """
+    if reference is None:
+        reference = _today_jst()
     if year is None:
-        year = _date.today().year
+        year = reference.year
 
     range_m = re.match(r"^(.+?)\s+-\s+(.+)$", date_str.strip())
     if range_m:
@@ -210,7 +221,11 @@ def _parse_date_range(date_str: str, year: int | None = None) -> tuple[str, str]
         end = _parse_date_part(range_m.group(2).strip(), year)
         if start and end:
             if end < start:  # plage cross-year, ex: "Dec 31 - Jan 2"
-                end = end.replace(year=end.year + 1)
+                if (start - reference).days > 182:
+                    # start est trop loin dans le futur : il appartient à l'année précédente
+                    start = start.replace(year=start.year - 1)
+                else:
+                    end = end.replace(year=end.year + 1)
             return start.strftime("%Y/%m/%d"), end.strftime("%Y/%m/%d")
         return date_str, ""
 
@@ -366,7 +381,8 @@ class TokyoCheapo(BaseScraper):
         time_raw, price = self.parse_time_and_price(soup)
         start_time, end_time = _split_time(time_raw) if time_raw else ("", "")
         date_raw = self.parse_date(soup)
-        start_date, end_date = _parse_date_range(date_raw, year=_today_jst().year)
+        today_jst = _today_jst()
+        start_date, end_date = _parse_date_range(date_raw, year=today_jst.year, reference=today_jst)
         return {
             "url": url,
             "title": self.parse_title(soup),
