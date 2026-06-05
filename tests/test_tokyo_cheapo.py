@@ -1,6 +1,5 @@
 import json
 from datetime import date as _date_cls
-from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -13,8 +12,8 @@ from scrapers.tokyo_cheapo import (
     _clean_whitespace,
     _is_price_text,
     _parse_12h_time,
-    _split_time,
     _parse_date_range,
+    _split_time,
 )
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -31,12 +30,14 @@ def make_soup(html: str) -> BeautifulSoup:
 
 # --- parse_title ---
 
+
 def test_parse_title(tc):
     soup = make_soup("<header><h1>Kawaii Flea Market</h1></header>")
     assert tc.parse_title(soup) == "Kawaii Flea Market"
 
 
 # --- parse_date ---
+
 
 def test_parse_date_single(tc):
     soup = make_soup("""
@@ -83,6 +84,7 @@ def test_parse_date_no_date(tc):
 
 
 # --- parse_time_and_price ---
+
 
 def test_parse_time_and_price(tc):
     soup = make_soup("""
@@ -151,6 +153,7 @@ def test_parse_time_and_price_empty(tc):
 
 # --- parse_categories ---
 
+
 def test_parse_categories(tc):
     soup = make_soup('<article class="event-category-market event-category-food"></article>')
     assert tc.parse_categories(soup) == ["market", "food"]
@@ -168,8 +171,11 @@ def test_parse_categories_no_article(tc):
 
 # --- parse_tags ---
 
+
 def test_parse_tags(tc):
-    soup = make_soup('<article class="event-tag-flea-market-3 event-tag-shopping-4 event-tag-recycling"></article>')
+    soup = make_soup(
+        '<article class="event-tag-flea-market-3 event-tag-shopping-4 event-tag-recycling"></article>'
+    )
     assert tc.parse_tags(soup) == ["flea-market", "shopping", "recycling"]
 
 
@@ -179,6 +185,7 @@ def test_parse_tags_no_tags(tc):
 
 
 # --- parse_official_link ---
+
 
 def test_parse_official_link(tc):
     soup = make_soup("""
@@ -216,6 +223,7 @@ def test_parse_official_link_no_infobox(tc):
 
 # --- parse_locations ---
 
+
 def test_parse_locations_multiple(tc):
     data = {
         "lat": "35.7",
@@ -238,7 +246,12 @@ def test_parse_locations_multiple(tc):
 
 
 def test_parse_locations_single_fallback(tc):
-    data = {"lat": "35.729032", "lng": "139.719566", "title": "Sunshine City", "addr": "3 Chome-1 Higashiikebukuro"}
+    data = {
+        "lat": "35.729032",
+        "lng": "139.719566",
+        "title": "Sunshine City",
+        "addr": "3 Chome-1 Higashiikebukuro",
+    }
     soup = make_soup(f"""
     <div async-component="1" component-name="apple-maps">
         <script type="application/json">{json.dumps(data)}</script>
@@ -269,6 +282,7 @@ def test_parse_locations_html_entity(tc):
 
 # --- _clean_whitespace ---
 
+
 def test_clean_whitespace_tabs():
     assert _clean_whitespace("¥3,800\t\t\t\t – ¥40,000") == "¥3,800 – ¥40,000"
 
@@ -282,6 +296,7 @@ def test_clean_whitespace_already_clean():
 
 
 # --- _is_price_text ---
+
 
 def test_is_price_free():
     assert _is_price_text("Free") is True
@@ -309,6 +324,7 @@ def test_is_price_empty():
 
 # --- _parse_12h_time ---
 
+
 def test_parse_12h_time_pm():
     assert _parse_12h_time("7:30pm") == "19:30"
 
@@ -331,6 +347,7 @@ def test_parse_12h_time_uppercase():
 
 # --- _split_time ---
 
+
 def test_split_time_range():
     assert _split_time("7:30pm – 10:00pm") == ("19:30", "22:00")
 
@@ -348,6 +365,7 @@ def test_split_time_empty():
 
 
 # --- _parse_date_range ---
+
 
 def test_parse_date_range_single_with_weekday():
     assert _parse_date_range("Fri, May 15", year=2026) == ("2026/05/15", "2026/05/15")
@@ -390,6 +408,7 @@ def test_parse_date_range_fuzzy_late_month_end():
 # Cross-year date range — BUG-002 documentation
 # ---------------------------------------------------------------------------
 
+
 def test_parse_date_range_cross_year_documents_bug():
     # BUG-002: "Dec 31 - Jan 2" with year=2026 produces end < start (both in 2026).
     # This test captures the CURRENT (broken) behaviour so a regression is detected
@@ -404,6 +423,7 @@ def test_parse_date_range_cross_year_documents_bug():
 # Fixture-based contract tests
 # ---------------------------------------------------------------------------
 
+
 def _make_404_http_error() -> requests.HTTPError:
     err = requests.HTTPError()
     err.response = MagicMock()
@@ -412,6 +432,7 @@ def _make_404_http_error() -> requests.HTTPError:
 
 
 # --- get_event_links ---
+
 
 def test_get_event_links_from_fixture(tc, monkeypatch):
     """Listing fixture contains 2 real event links; excluded links are filtered out."""
@@ -460,6 +481,7 @@ def test_get_event_links_stops_on_empty_page(tc, monkeypatch):
 
 # --- scrape_event with full fixture ---
 
+
 def test_scrape_event_full_fixture(tc, monkeypatch):
     """scrape_event returns all expected fields from a complete event page."""
     html_bytes = (FIXTURES_DIR / "tc_event_full.html").read_bytes()
@@ -490,6 +512,7 @@ def test_scrape_event_full_fixture(tc, monkeypatch):
 
 # --- scrape_event with missing description (BUG-005 regression) ---
 
+
 def test_scrape_event_no_description_returns_empty_string(tc, monkeypatch):
     """parse_description returns '' when div.entry-content__text is absent (BUG-005 fix)."""
     html_bytes = (FIXTURES_DIR / "tc_event_no_description.html").read_bytes()
@@ -503,6 +526,7 @@ def test_scrape_event_no_description_returns_empty_string(tc, monkeypatch):
 
 
 # --- scrape_event with multiple locations ---
+
 
 def test_scrape_event_multi_location_fixture(tc, monkeypatch):
     """scrape_event returns multiple location entries when Apple Maps JSON has locations array."""
@@ -522,26 +546,28 @@ def test_scrape_event_multi_location_fixture(tc, monkeypatch):
 
 # --- scrape() produces one Event per location ---
 
+
 def test_scrape_multi_location_creates_two_events(tc, monkeypatch):
     """scrape() yields one Event per location for a multi-location raw event."""
-    now = datetime.now(timezone.utc)
-    raw_events = [{
-        "url": "https://tokyocheapo.com/events/tokyo-walking-festival/",
-        "title": "Tokyo Walking Festival",
-        "start_date": "2026/05/23",
-        "end_date": "2026/05/24",
-        "start_time": "09:00",
-        "end_time": "16:00",
-        "price": "Free",
-        "description": "A walking festival.",
-        "categories": ["outdoor"],
-        "tags": ["walking"],
-        "official_link": None,
-        "locations": [
-            {"name": "Ueno Park", "lat": 35.714998, "lng": 139.773498},
-            {"name": "Asakusa Temple", "lat": 35.714765, "lng": 139.796655},
-        ],
-    }]
+    raw_events = [
+        {
+            "url": "https://tokyocheapo.com/events/tokyo-walking-festival/",
+            "title": "Tokyo Walking Festival",
+            "start_date": "2026/05/23",
+            "end_date": "2026/05/24",
+            "start_time": "09:00",
+            "end_time": "16:00",
+            "price": "Free",
+            "description": "A walking festival.",
+            "categories": ["outdoor"],
+            "tags": ["walking"],
+            "official_link": None,
+            "locations": [
+                {"name": "Ueno Park", "lat": 35.714998, "lng": 139.773498},
+                {"name": "Asakusa Temple", "lat": 35.714765, "lng": 139.796655},
+            ],
+        }
+    ]
     counts = {"links_seen": 1, "events_ok": 1, "errors": []}
     monkeypatch.setattr(tc, "scrape_all", lambda max_pages=10: (raw_events, counts))
 

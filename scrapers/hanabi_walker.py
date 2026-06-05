@@ -1,13 +1,14 @@
 import logging
 import re
-from datetime import date as _date, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from datetime import date as _date
+
 import requests
 from bs4 import BeautifulSoup
+from tenacity import before_log, retry, stop_after_attempt, wait_exponential
 
-from tenacity import retry, stop_after_attempt, wait_exponential, before_log
-
-from models.identity import make_event_id as _make_id
 from models.event import Event
+from models.identity import make_event_id as _make_id
 from scrapers.base import BaseScraper, ScrapeReport
 
 logger = logging.getLogger(__name__)
@@ -86,9 +87,9 @@ def _extract_time(text: str) -> tuple[str | None, str | None]:
 
 # Tokens pour le format 年M/D : année, M/D, fin-range ～D, jour additionnel ・D
 _SLASH_TOKEN_RE = re.compile(
-    r"(\d{4})年"                    # groupe 1 : année
-    r"|(\d{1,2})/(\d{1,2})"        # groupes 2,3 : mois/jour
-    r"|～(\d{1,2})"                 # groupe 4 : fin de range
+    r"(\d{4})年"  # groupe 1 : année
+    r"|(\d{1,2})/(\d{1,2})"  # groupes 2,3 : mois/jour
+    r"|～(\d{1,2})"  # groupe 4 : fin de range
     r"|[・、,](\d{1,2})(?![/\d])"  # groupe 5 : jour additionnel (pas suivi de / ou chiffre)
 )
 
@@ -99,10 +100,10 @@ def _parse_slash_dates(text: str) -> list[str]:
     year = ctx_month = prev_day = None
 
     for m in _SLASH_TOKEN_RE.finditer(text):
-        if m.group(1):                          # nouvelle année
+        if m.group(1):  # nouvelle année
             year = int(m.group(1))
             ctx_month = prev_day = None
-        elif m.group(2) and m.group(3):         # M/D
+        elif m.group(2) and m.group(3):  # M/D
             if year is None:
                 continue
             ctx_month, day = int(m.group(2)), int(m.group(3))
@@ -186,7 +187,7 @@ def _split_paid_seating(text: str) -> tuple[str, str | None]:
     """Sépare 'ありXXX' en ('あり', 'XXX') et 'なし' en ('なし', None)."""
     for flag in ("あり", "なし"):
         if text.startswith(flag):
-            details = text[len(flag):].strip() or None
+            details = text[len(flag) :].strip() or None
             return flag, details
     return text, None
 
@@ -194,6 +195,7 @@ def _split_paid_seating(text: str) -> tuple[str, str | None]:
 class HanabiWalker(BaseScraper):
     def __init__(self, region: str = "ar0300"):
         from config import settings
+
         self.region = region
         self.session = requests.Session()
         self.session.headers.update(_HEADERS)
@@ -213,7 +215,8 @@ class HanabiWalker(BaseScraper):
 
             soup = BeautifulSoup(response.content, "html.parser")
             page_links = [
-                a.get("href") for a in soup.find_all("a")
+                a.get("href")
+                for a in soup.find_all("a")
                 if a.get("href", "").startswith("/detail/")
             ]
 
@@ -320,7 +323,7 @@ class HanabiWalker(BaseScraper):
 
     def scrape(self, max_pages: int = 20) -> tuple[list[Event], ScrapeReport]:
         """Retourne les événements sous forme de modèles canoniques Event avec un rapport."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         raw_events, counts = self.scrape_all(max_pages=max_pages)
         report = ScrapeReport(
             source="hanabi",
@@ -339,36 +342,38 @@ class HanabiWalker(BaseScraper):
                 times = f"{start_time}-{end_time}"
             elif start_time:
                 times = start_time
-            events.append(Event(
-                id=_make_id([e["url"], date_val]),
-                source="hanabi",
-                title=e.get("title", ""),
-                url=e["url"],
-                start_date=_parse_iso_date(date_val),
-                end_date=None,
-                times=times,
-                venue=e.get("venue") or None,
-                latitude=e.get("lat"),
-                longitude=e.get("lng"),
-                price=None,
-                attributes={
-                    "fireworks_count": e.get("fireworks_count") or None,
-                    "fireworks_duration": e.get("fireworks_duration") or None,
-                    "expected_crowd": e.get("expected_crowd") or None,
-                    "rain_policy": e.get("rain_policy") or None,
-                    "paid_seating": e.get("paid_seating") or None,
-                    "paid_seating_details": e.get("paid_seating_details") or None,
-                    "food_stalls": e.get("food_stalls") or None,
-                    "notes": e.get("notes") or None,
-                    "access": e.get("access") or None,
-                    "parking": e.get("parking") or None,
-                    "official_site": e.get("official_site") or None,
-                    "official_x": e.get("official_x") or None,
-                    "contact": e.get("contact") or None,
-                    "contact2": e.get("contact2") or None,
-                },
-                created_at=now,
-            ))
+            events.append(
+                Event(
+                    id=_make_id([e["url"], date_val]),
+                    source="hanabi",
+                    title=e.get("title", ""),
+                    url=e["url"],
+                    start_date=_parse_iso_date(date_val),
+                    end_date=None,
+                    times=times,
+                    venue=e.get("venue") or None,
+                    latitude=e.get("lat"),
+                    longitude=e.get("lng"),
+                    price=None,
+                    attributes={
+                        "fireworks_count": e.get("fireworks_count") or None,
+                        "fireworks_duration": e.get("fireworks_duration") or None,
+                        "expected_crowd": e.get("expected_crowd") or None,
+                        "rain_policy": e.get("rain_policy") or None,
+                        "paid_seating": e.get("paid_seating") or None,
+                        "paid_seating_details": e.get("paid_seating_details") or None,
+                        "food_stalls": e.get("food_stalls") or None,
+                        "notes": e.get("notes") or None,
+                        "access": e.get("access") or None,
+                        "parking": e.get("parking") or None,
+                        "official_site": e.get("official_site") or None,
+                        "official_x": e.get("official_x") or None,
+                        "contact": e.get("contact") or None,
+                        "contact2": e.get("contact2") or None,
+                    },
+                    created_at=now,
+                )
+            )
         if not events:
             logger.critical(
                 "Scraper %s returned 0 events — likely a parser failure (HTML structure changed?)",

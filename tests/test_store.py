@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -6,10 +6,9 @@ from db.store import EventStore, _make_id
 from models.event import Event
 from models.identity import make_event_id
 
-
 # --- Fixtures ---
 
-_NOW = datetime(2026, 5, 16, 12, 0, 0, tzinfo=timezone.utc)
+_NOW = datetime(2026, 5, 16, 12, 0, 0, tzinfo=UTC)
 _TC_URL = "https://tokyocheapo.com/event/foo"
 _HW_URL = "https://hanabi.walkerplus.com/detail/ar0300e001/"
 
@@ -81,9 +80,12 @@ def make_hanabi(**kwargs) -> Event:
 
 # --- _make_id ---
 
+
 def test_make_id_stable():
     # Test de la fonction canonique dans models.identity
-    assert make_event_id(["https://example.com", "Yoyogi Park"]) == make_event_id(["https://example.com", "Yoyogi Park"])
+    assert make_event_id(["https://example.com", "Yoyogi Park"]) == make_event_id(
+        ["https://example.com", "Yoyogi Park"]
+    )
     result = make_event_id(["https://example.com", "loc"])
     assert len(result) == 16
     assert result.isalnum()
@@ -93,11 +95,14 @@ def test_make_id_stable():
 
 # --- upsert_events (TC) ---
 
+
 def test_upsert_tc_inserts_row(tmp_path):
     db = str(tmp_path / "events.db")
     with EventStore(db) as store:
         store.upsert_events([make_tc()])
-        rows = store._conn.execute("SELECT id, title, latitude FROM events WHERE source='tc'").fetchall()
+        rows = store._conn.execute(
+            "SELECT id, title, latitude FROM events WHERE source='tc'"
+        ).fetchall()
     assert len(rows) == 1
     assert rows[0][1] == "Foo Festival"
     assert rows[0][2] == pytest.approx(35.671)
@@ -115,10 +120,23 @@ def test_upsert_tc_updates_on_rerun(tmp_path):
 
 def test_upsert_tc_multi_location(tmp_path):
     db = str(tmp_path / "events.db")
-    e1 = make_tc(attributes={"categories": [], "tags": [], "official_link": None, "location_name": "Yoyogi Park"})
+    e1 = make_tc(
+        attributes={
+            "categories": [],
+            "tags": [],
+            "official_link": None,
+            "location_name": "Yoyogi Park",
+        }
+    )
     e2 = make_tc(
-        latitude=35.685, longitude=139.710,
-        attributes={"categories": [], "tags": [], "official_link": None, "location_name": "Shinjuku Gyoen"},
+        latitude=35.685,
+        longitude=139.710,
+        attributes={
+            "categories": [],
+            "tags": [],
+            "official_link": None,
+            "location_name": "Shinjuku Gyoen",
+        },
     )
     with EventStore(db) as store:
         store.upsert_events([e1, e2])
@@ -128,17 +146,21 @@ def test_upsert_tc_multi_location(tmp_path):
     assert len(rows) == 2
     assert rows[0][0] != rows[1][0]
     import json
+
     loc_names = {json.loads(r[1]).get("location_name") for r in rows}
     assert loc_names == {"Yoyogi Park", "Shinjuku Gyoen"}
 
 
 # --- upsert_events (Hanabi) ---
 
+
 def test_upsert_hanabi_inserts_row(tmp_path):
     db = str(tmp_path / "events.db")
     with EventStore(db) as store:
         store.upsert_events([make_hanabi()])
-        rows = store._conn.execute("SELECT title, start_date FROM events WHERE source='hanabi'").fetchall()
+        rows = store._conn.execute(
+            "SELECT title, start_date FROM events WHERE source='hanabi'"
+        ).fetchall()
     assert len(rows) == 1
     assert rows[0][0] == "Sumida River Fireworks"
     assert rows[0][1] == "2026-07-25"
@@ -147,10 +169,12 @@ def test_upsert_hanabi_inserts_row(tmp_path):
 def test_upsert_hanabi_multiday(tmp_path):
     db = str(tmp_path / "events.db")
     with EventStore(db) as store:
-        store.upsert_events([
-            make_hanabi(start_date=date(2026, 7, 25)),
-            make_hanabi(start_date=date(2026, 7, 26)),
-        ])
+        store.upsert_events(
+            [
+                make_hanabi(start_date=date(2026, 7, 25)),
+                make_hanabi(start_date=date(2026, 7, 26)),
+            ]
+        )
         rows = store._conn.execute(
             "SELECT id, start_date FROM events WHERE source='hanabi' ORDER BY start_date"
         ).fetchall()
@@ -172,6 +196,7 @@ def test_upsert_hanabi_updates_on_rerun(tmp_path):
 
 
 # --- Query ---
+
 
 def test_get_events_all(tmp_path):
     db = str(tmp_path / "events.db")
@@ -212,6 +237,7 @@ def test_get_event_not_found(tmp_path):
 
 
 # --- Scrape jobs ---
+
 
 def test_start_finish_job(tmp_path):
     db = str(tmp_path / "events.db")
@@ -256,6 +282,7 @@ def test_get_last_job_by_source(tmp_path):
 
 # --- Context manager ---
 
+
 def test_context_manager(tmp_path):
     db = str(tmp_path / "events.db")
     with EventStore(db) as store:
@@ -266,9 +293,9 @@ def test_context_manager(tmp_path):
 
 # --- Migration ---
 
+
 def test_migration_from_old_schema(tmp_path):
     """Vérifie que les vieilles tables tokyo_cheapo et hanabi sont migrées automatiquement."""
-    import json
     import sqlite3
 
     db = str(tmp_path / "events.db")
@@ -339,17 +366,22 @@ def test_migration_from_old_schema(tmp_path):
 
     # Vérifier que les vieilles tables ont été supprimées
     with EventStore(db) as store:
-        tables = {r[0] for r in store._conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall()}
+        tables = {
+            r[0]
+            for r in store._conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
     assert "tokyo_cheapo" not in tables
     assert "hanabi" not in tables
 
 
 # --- Upcoming filter ---
 
+
 def test_upcoming_excludes_past(tmp_path):
     from datetime import timedelta
+
     db = str(tmp_path / "events.db")
     today = date.today()
     past = make_tc(start_date=today - timedelta(days=10), end_date=today - timedelta(days=5))
@@ -363,6 +395,7 @@ def test_upcoming_excludes_past(tmp_path):
 
 def test_upcoming_keeps_ongoing(tmp_path):
     from datetime import timedelta
+
     db = str(tmp_path / "events.db")
     today = date.today()
     ongoing = make_tc(start_date=today - timedelta(days=2), end_date=today + timedelta(days=2))
@@ -374,6 +407,7 @@ def test_upcoming_keeps_ongoing(tmp_path):
 
 def test_upcoming_false_returns_all(tmp_path):
     from datetime import timedelta
+
     db = str(tmp_path / "events.db")
     today = date.today()
     past = make_tc(start_date=today - timedelta(days=30), end_date=today - timedelta(days=25))
@@ -385,6 +419,7 @@ def test_upcoming_false_returns_all(tmp_path):
 
 def test_date_param_overrides_upcoming(tmp_path):
     from datetime import timedelta
+
     db = str(tmp_path / "events.db")
     today = date.today()
     past = make_tc(start_date=today - timedelta(days=10), end_date=today - timedelta(days=10))
@@ -397,6 +432,7 @@ def test_date_param_overrides_upcoming(tmp_path):
 
 def test_start_from_returns_past_events(tmp_path):
     from datetime import timedelta
+
     db = str(tmp_path / "events.db")
     today = date.today()
     past = make_tc(start_date=today - timedelta(days=10), end_date=today - timedelta(days=5))
@@ -411,6 +447,7 @@ def test_start_from_returns_past_events(tmp_path):
 def test_start_from_overrides_upcoming(tmp_path):
     """start_from disables the JST-today default when provided."""
     from datetime import timedelta
+
     db = str(tmp_path / "events.db")
     today = date.today()
     past = make_tc(start_date=today - timedelta(days=10), end_date=today - timedelta(days=5))
@@ -426,6 +463,7 @@ def test_start_from_overrides_upcoming(tmp_path):
 def test_start_to_alone_upper_bound(tmp_path):
     """start_to alone applies upper bound and disables the upcoming default."""
     from datetime import timedelta
+
     db = str(tmp_path / "events.db")
     today = date.today()
     near = make_tc(start_date=today + timedelta(days=3), end_date=None)
@@ -440,6 +478,7 @@ def test_start_to_alone_upper_bound(tmp_path):
 def test_start_from_and_start_to_range(tmp_path):
     """Both bounds together return only events within the window."""
     from datetime import timedelta
+
     db = str(tmp_path / "events.db")
     today = date.today()
     inside = make_tc(start_date=today + timedelta(days=5), end_date=None)
@@ -464,6 +503,7 @@ def test_start_from_and_start_to_range(tmp_path):
 def test_start_to_includes_multiday_spanning_range(tmp_path):
     """Multi-day event starting before start_from but ending after is included."""
     from datetime import timedelta
+
     db = str(tmp_path / "events.db")
     today = date.today()
     spanning = make_tc(
@@ -482,6 +522,7 @@ def test_start_to_includes_multiday_spanning_range(tmp_path):
 def test_start_to_suppresses_upcoming(tmp_path):
     """start_to alone disables the default upcoming filter."""
     from datetime import timedelta
+
     db = str(tmp_path / "events.db")
     today = date.today()
     soon = make_tc(start_date=today + timedelta(days=2), end_date=None)
@@ -494,6 +535,7 @@ def test_start_to_suppresses_upcoming(tmp_path):
 
 
 # --- Bbox filter ---
+
 
 def test_bbox_filters_by_coords(tmp_path):
     db = str(tmp_path / "events.db")

@@ -1,3 +1,4 @@
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -25,6 +26,7 @@ def hw():
 # _extract_time
 # ---------------------------------------------------------------------------
 
+
 def test_extract_time_range():
     assert _extract_time("19:30～21:00(予定)開場 16:00") == ("19:30", "21:00")
 
@@ -48,6 +50,7 @@ def test_extract_time_prefix_text():
 # ---------------------------------------------------------------------------
 # _split_paid_seating
 # ---------------------------------------------------------------------------
+
 
 def test_split_paid_seating_ari_with_details():
     flag, details = _split_paid_seating("あり自由席4400円、VIP席1万円")
@@ -77,11 +80,16 @@ def test_split_paid_seating_unknown():
 # _parse_slash_dates
 # ---------------------------------------------------------------------------
 
+
 def test_parse_slash_dates_simple_list():
     result = _parse_slash_dates("2026年4/4・5・11・27、5/16・30、6/13")
     assert result == [
-        "2026/04/04", "2026/04/05", "2026/04/11", "2026/04/27",
-        "2026/05/16", "2026/05/30",
+        "2026/04/04",
+        "2026/04/05",
+        "2026/04/11",
+        "2026/04/27",
+        "2026/05/16",
+        "2026/05/30",
         "2026/06/13",
     ]
 
@@ -121,13 +129,15 @@ def test_parse_slash_dates_no_false_capture_on_two_digit_month():
 # _extract_dates
 # ---------------------------------------------------------------------------
 
+
 def test_extract_dates_single():
     assert _extract_dates("2026年5月23日(土)") == ["2026/05/23"]
 
 
 def test_extract_dates_with_trailing_text():
     assert _extract_dates("2026年5月17日(日)横田基地フェスティバルは16日(土)、17日(日)") == [
-        "2026/05/16", "2026/05/17"
+        "2026/05/16",
+        "2026/05/17",
     ]
 
 
@@ -169,6 +179,7 @@ def test_extract_dates_slash_iso_passthrough():
 # HanabiWalker.parse_coordinates
 # ---------------------------------------------------------------------------
 
+
 def test_parse_coordinates(hw):
     soup = make_soup("""
     <div class="map_canvas">
@@ -203,20 +214,23 @@ def test_parse_coordinates_no_q_param(hw):
 # HanabiWalker.parse_event_table
 # ---------------------------------------------------------------------------
 
+
 def _make_table_html(rows: dict) -> str:
     """Construit une <table class='s_table'> à partir d'un dict {th: td_html}."""
-    rows_html = "".join(
-        f"<tr><th>{th}</th><td>{td}</td></tr>" for th, td in rows.items()
-    )
+    rows_html = "".join(f"<tr><th>{th}</th><td>{td}</td></tr>" for th, td in rows.items())
     return f"<table class='s_table'>{rows_html}</table>"
 
 
 def test_parse_event_table_basic_fields(hw):
-    soup = make_soup(_make_table_html({
-        "大会名": "第54回 真岡市夏祭大花火大会",
-        "打ち上げ数": "約1万5000発",
-        "会場": "真岡市役所東側五行川沿い",
-    }))
+    soup = make_soup(
+        _make_table_html(
+            {
+                "大会名": "第54回 真岡市夏祭大花火大会",
+                "打ち上げ数": "約1万5000発",
+                "会場": "真岡市役所東側五行川沿い",
+            }
+        )
+    )
     result = hw.parse_event_table(soup)
     assert result["title"] == "第54回 真岡市夏祭大花火大会"
     assert result["fireworks_count"] == "約1万5000発"
@@ -244,10 +258,14 @@ def test_parse_event_table_paid_seating_split(hw):
 
 
 def test_parse_event_table_link_fields(hw):
-    soup = make_soup(_make_table_html({
-        "公式サイト": '<a href="https://example.com/">公式サイトはこちら</a>',
-        "公式X": '<a href="https://x.com/example">公式Xはこちら</a>',
-    }))
+    soup = make_soup(
+        _make_table_html(
+            {
+                "公式サイト": '<a href="https://example.com/">公式サイトはこちら</a>',
+                "公式X": '<a href="https://x.com/example">公式Xはこちら</a>',
+            }
+        )
+    )
     result = hw.parse_event_table(soup)
     assert result["official_site"] == "https://example.com/"
     assert result["official_x"] == "https://x.com/example"
@@ -260,9 +278,13 @@ def test_parse_event_table_link_field_absent(hw):
 
 
 def test_parse_event_table_access_strips_map_link(hw):
-    soup = make_soup(_make_table_html({
-        "会場アクセス": '【電車】最寄り駅から徒歩10分<a href="/map">MAP</a>',
-    }))
+    soup = make_soup(
+        _make_table_html(
+            {
+                "会場アクセス": '【電車】最寄り駅から徒歩10分<a href="/map">MAP</a>',
+            }
+        )
+    )
     result = hw.parse_event_table(soup)
     assert "MAP" not in result["access"]
     assert "徒歩10分" in result["access"]
@@ -277,6 +299,7 @@ def test_parse_event_table_ignores_unknown_keys(hw):
 # ---------------------------------------------------------------------------
 # HanabiWalker.get_event_links
 # ---------------------------------------------------------------------------
+
 
 def _mock_response(html: str, status: int = 200) -> MagicMock:
     r = MagicMock()
@@ -317,14 +340,17 @@ def test_get_event_links_stops_on_404(hw):
 # HanabiWalker.scrape_event
 # ---------------------------------------------------------------------------
 
+
 def test_scrape_event(hw):
-    data_html = _make_table_html({
-        "大会名": "花火大会",
-        "開催期間": "2026年8月1日(土)",
-        "開催時間": "19:30～20:30",
-        "会場": "海浜公園",
-        "有料席": "なし",
-    })
+    data_html = _make_table_html(
+        {
+            "大会名": "花火大会",
+            "開催期間": "2026年8月1日(土)",
+            "開催時間": "19:30～20:30",
+            "会場": "海浜公園",
+            "有料席": "なし",
+        }
+    )
     map_html = """
     <div class="map_canvas">
         <iframe src="https://www.google.com/maps/embed/v1/place?key=X&q=35.6,139.7"></iframe>
@@ -349,13 +375,16 @@ def test_scrape_event(hw):
 # HanabiWalker.scrape_all
 # ---------------------------------------------------------------------------
 
+
 def test_scrape_all_explodes_multiday(hw):
     hw.get_event_links = MagicMock(return_value=["/detail/ar0300e001/"])
-    hw.scrape_event = MagicMock(return_value={
-        "title": "花火大会",
-        "dates": ["2026/08/01", "2026/08/02"],
-        "venue": "海浜公園",
-    })
+    hw.scrape_event = MagicMock(
+        return_value={
+            "title": "花火大会",
+            "dates": ["2026/08/01", "2026/08/02"],
+            "venue": "海浜公園",
+        }
+    )
 
     events, counts = hw.scrape_all()
 
@@ -369,10 +398,12 @@ def test_scrape_all_explodes_multiday(hw):
 
 def test_scrape_all_skips_errors(hw):
     hw.get_event_links = MagicMock(return_value=["/detail/ok/", "/detail/bad/"])
-    hw.scrape_event = MagicMock(side_effect=[
-        {"title": "OK", "dates": ["2026/08/01"]},
-        RuntimeError("timeout"),
-    ])
+    hw.scrape_event = MagicMock(
+        side_effect=[
+            {"title": "OK", "dates": ["2026/08/01"]},
+            RuntimeError("timeout"),
+        ]
+    )
 
     events, counts = hw.scrape_all()
 
@@ -385,11 +416,13 @@ def test_scrape_all_skips_errors(hw):
 
 def test_scrape_all_skips_unparseable_dates(hw):
     hw.get_event_links = MagicMock(return_value=["/detail/ar0300e001/"])
-    hw.scrape_event = MagicMock(return_value={
-        "title": "花火大会",
-        "dates": [],  # _extract_dates retourne [] pour "未定" après le fix BUG-004
-        "venue": "海浜公園",
-    })
+    hw.scrape_event = MagicMock(
+        return_value={
+            "title": "花火大会",
+            "dates": [],  # _extract_dates retourne [] pour "未定" après le fix BUG-004
+            "venue": "海浜公園",
+        }
+    )
 
     events, counts = hw.scrape_all()
 
@@ -402,8 +435,6 @@ def test_scrape_all_skips_unparseable_dates(hw):
 # Tests basés sur fixtures HTML (TEST-004)
 # ---------------------------------------------------------------------------
 
-import os
-
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 
 
@@ -413,7 +444,6 @@ def _load_fixture(name: str) -> BeautifulSoup:
 
 
 def test_get_event_links_from_fixture(hw):
-    soup = _load_fixture("hanabi_listing.html")
     # Simuler la réponse HTTP avec le contenu de la fixture
     with open(os.path.join(FIXTURES_DIR, "hanabi_listing.html"), "rb") as f:
         content = f.read()
@@ -428,6 +458,7 @@ def test_get_event_links_from_fixture(hw):
     page2.status_code = 404
 
     from requests import HTTPError
+
     http_err = HTTPError(response=MagicMock(status_code=404))
     page2.raise_for_status.side_effect = http_err
 

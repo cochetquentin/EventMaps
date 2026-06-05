@@ -13,7 +13,7 @@ class Event(BaseModel):
     url: str
     start_date: date | None = None
     end_date: date | None = None
-    times: str | None = None        # "HH:MM-HH:MM" ou "HH:MM"
+    times: str | None = None  # "HH:MM-HH:MM" ou "HH:MM"
     venue: str | None = None
     latitude: float | None = None
     longitude: float | None = None

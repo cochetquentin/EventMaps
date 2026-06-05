@@ -998,7 +998,7 @@ uv run --locked python -m pytest -q
 **Peut être fait en parallèle avec :** PR-001, PR-002, PR-006.
 **Ne pas faire dans cette PR :** refactor complet dates Hanabi.
 
-### PR-006 — Ajouter Ruff format/check en CI
+### ~~PR-006 — Ajouter Ruff format/check en CI~~ ✅ DONE
 
 **Source :** Technology & Tooling, DOC-004
 **Objectif :** standardiser lint/format sans gros refactor.

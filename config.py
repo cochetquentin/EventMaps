@@ -2,7 +2,12 @@ import json
 import warnings
 
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, DotEnvSettingsSource, EnvSettingsSource, SettingsConfigDict
+from pydantic_settings import (
+    BaseSettings,
+    DotEnvSettingsSource,
+    EnvSettingsSource,
+    SettingsConfigDict,
+)
 
 
 def _normalize_origins_value(field_name: str, value: object) -> object:
@@ -68,15 +73,19 @@ class Settings(BaseSettings):
             )
 
     @classmethod
-    def settings_customise_sources(cls, settings_cls, init_settings, env_settings, dotenv_settings=None, **kwargs):
+    def settings_customise_sources(
+        cls, settings_cls, init_settings, env_settings, dotenv_settings=None, **kwargs
+    ):
         sources: list = [init_settings, _OriginsEnvSource(settings_cls)]
         if dotenv_settings is not None:
             # Preserve runtime overrides (e.g. Settings(_env_file=None)) by forwarding
             # the env_file already resolved by pydantic-settings on the provided source.
-            sources.append(_OriginsDotEnvSource(
-                settings_cls,
-                env_file=getattr(dotenv_settings, "env_file", None),
-            ))
+            sources.append(
+                _OriginsDotEnvSource(
+                    settings_cls,
+                    env_file=getattr(dotenv_settings, "env_file", None),
+                )
+            )
         sources.extend(kwargs.values())
         return tuple(sources)
 

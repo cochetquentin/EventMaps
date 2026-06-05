@@ -2,10 +2,7 @@
 
 import warnings
 
-import pytest
-
 from config import Settings
-
 
 # ---------------------------------------------------------------------------
 # Parsing EVENTMAPS_ALLOWED_ORIGINS
@@ -44,9 +41,7 @@ def test_allowed_origins_csv_ignores_empty_segments(monkeypatch):
 
 
 def test_allowed_origins_json_array(monkeypatch):
-    monkeypatch.setenv(
-        "EVENTMAPS_ALLOWED_ORIGINS", '["https://a.com","https://b.com"]'
-    )
+    monkeypatch.setenv("EVENTMAPS_ALLOWED_ORIGINS", '["https://a.com","https://b.com"]')
     s = Settings()
     assert s.allowed_origins == ["https://a.com", "https://b.com"]
 
@@ -60,9 +55,9 @@ def test_warning_when_wildcard_and_token_set():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         Settings(allowed_origins=["*"], scrape_token="secret", _env_file=None)
-    assert any(
-        "EVENTMAPS_ALLOWED_ORIGINS" in str(w.message) for w in caught
-    ), "Expected a warning mentioning EVENTMAPS_ALLOWED_ORIGINS"
+    assert any("EVENTMAPS_ALLOWED_ORIGINS" in str(w.message) for w in caught), (
+        "Expected a warning mentioning EVENTMAPS_ALLOWED_ORIGINS"
+    )
 
 
 def test_no_warning_when_wildcard_no_token(monkeypatch):
