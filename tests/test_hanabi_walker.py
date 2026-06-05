@@ -160,6 +160,11 @@ def test_extract_dates_natural_language_unparseable():
     assert _extract_dates("春頃開催予定") == []
 
 
+def test_extract_dates_slash_iso_passthrough():
+    # Date déjà en format YYYY/MM/DD sans kanji : doit être préservée
+    assert _extract_dates("2026/08/01") == ["2026/08/01"]
+
+
 # ---------------------------------------------------------------------------
 # HanabiWalker.parse_coordinates
 # ---------------------------------------------------------------------------
