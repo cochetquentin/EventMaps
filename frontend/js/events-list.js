@@ -5,6 +5,7 @@ import { TC_EXCLUDED_CATS, CAT_EMOJI } from './config.js';
 import { isFavorite, toggleFavorite, getIcon, updateFavPill } from './favorites.js';
 import { renderMarkers } from './markers.js';
 import { buildPopup } from './popups.js';
+import { openDrawer } from './drawer.js';
 
 function makeCard(ev, inProximity, cardsRow) {
   const card = document.createElement('div');
@@ -57,6 +58,7 @@ function makeCard(ev, inProximity, cardsRow) {
       cardsRow.previousElementSibling.classList.remove('collapsed');
     }
     card.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+    openDrawer(ev);
   });
 
   return card;

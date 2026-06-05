@@ -14,3 +14,6 @@ export function setMap(v) { map = v; }
 export function setClusterGroup(v) { clusterGroup = v; }
 export function setUserPosition(v) { userPosition = v; }
 export function setProximityMode(v) { proximityMode = v; }
+
+export let selectedEventId = null;
+export function setSelectedEventId(v) { selectedEventId = v; }
