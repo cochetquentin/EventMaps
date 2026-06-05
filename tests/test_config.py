@@ -109,3 +109,56 @@ def test_scrape_token_env_empty_string_is_none(monkeypatch):
 def test_valid_scrape_token_preserved():
     s = Settings(scrape_token="mysecret")
     assert s.scrape_token == "mysecret"
+
+
+# ---------------------------------------------------------------------------
+# ARCH-006 — Scraping config settings
+# ---------------------------------------------------------------------------
+
+
+def test_scrape_request_timeout_seconds_default():
+    s = Settings(_env_file=None)
+    assert s.scrape_request_timeout_seconds == 10
+
+
+def test_scrape_max_pages_tc_default():
+    s = Settings(_env_file=None)
+    assert s.scrape_max_pages_tc == 10
+
+
+def test_scrape_max_pages_hanabi_default():
+    s = Settings(_env_file=None)
+    assert s.scrape_max_pages_hanabi == 20
+
+
+def test_scrape_retry_attempts_default():
+    s = Settings(_env_file=None)
+    assert s.scrape_retry_attempts == 3
+
+
+def test_scrape_retry_wait_min_default():
+    s = Settings(_env_file=None)
+    assert s.scrape_retry_wait_min == 2
+
+
+def test_scrape_retry_wait_max_default():
+    s = Settings(_env_file=None)
+    assert s.scrape_retry_wait_max == 10
+
+
+def test_scrape_request_timeout_env_override(monkeypatch):
+    monkeypatch.setenv("EVENTMAPS_SCRAPE_REQUEST_TIMEOUT_SECONDS", "30")
+    s = Settings()
+    assert s.scrape_request_timeout_seconds == 30
+
+
+def test_scrape_max_pages_tc_env_override(monkeypatch):
+    monkeypatch.setenv("EVENTMAPS_SCRAPE_MAX_PAGES_TC", "5")
+    s = Settings()
+    assert s.scrape_max_pages_tc == 5
+
+
+def test_scrape_retry_attempts_env_override(monkeypatch):
+    monkeypatch.setenv("EVENTMAPS_SCRAPE_RETRY_ATTEMPTS", "5")
+    s = Settings()
+    assert s.scrape_retry_attempts == 5

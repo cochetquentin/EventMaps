@@ -8,7 +8,13 @@ from datetime import date as _date
 
 import requests
 from bs4 import BeautifulSoup
-from tenacity import before_log, retry, stop_after_attempt, wait_exponential
+from tenacity import (
+    Retrying,
+    before_log,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from models.attributes import TokyoCheapoAttributes
 from models.event import Event
@@ -17,18 +23,21 @@ from scrapers.base import BaseScraper, ScrapeReport
 
 logger = logging.getLogger(__name__)
 
+
+def _is_retryable(exc: BaseException) -> bool:
+    """Retente les erreurs transitoires (5xx, 429) mais pas les erreurs client définitives (4xx)."""
+    if isinstance(exc, requests.HTTPError) and exc.response is not None:
+        status = exc.response.status_code
+        return status == 429 or status >= 500
+    return True
+
+
 _JST = timezone(timedelta(hours=9))
 
 
 def _today_jst() -> _date:
     return datetime.now(_JST).date()
 
-
-_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-}
 
 _MONTHS = [
     "january",
@@ -74,13 +83,8 @@ _MONTH_ABBREVS = {
 }
 
 
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(min=2, max=10),
-    before=before_log(logger, logging.WARNING),
-)
-def _fetch(url: str, session: requests.Session) -> requests.Response:
-    response = session.get(url, timeout=10)
+def _fetch(url: str, session: requests.Session, timeout: int = 10) -> requests.Response:
+    response = session.get(url, timeout=timeout)
     response.raise_for_status()
     return response
 
@@ -288,17 +292,36 @@ class TokyoCheapo(BaseScraper):
     def __init__(self):
         from config import settings
 
+        self._timeout = settings.scrape_request_timeout_seconds
+        self._max_pages = settings.scrape_max_pages_tc
+        self._retrying = Retrying(
+            stop=stop_after_attempt(settings.scrape_retry_attempts),
+            wait=wait_exponential(
+                min=settings.scrape_retry_wait_min,
+                max=settings.scrape_retry_wait_max,
+            ),
+            retry=retry_if_exception(_is_retryable),
+            before=before_log(logger, logging.WARNING),
+            reraise=True,
+        )
         self.session = requests.Session()
-        self.session.headers.update(_HEADERS)
-        self.session.headers["User-Agent"] = settings.scrape_user_agent
+        self.session.headers.update(
+            {
+                "User-Agent": settings.scrape_user_agent,
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            }
+        )
 
-    def get_event_links(self, max_pages: int = 10) -> list[str]:
+    def get_event_links(self, max_pages: int | None = None) -> list[str]:
         """Retourne les URLs de tous les événements de la semaine."""
+        if max_pages is None:
+            max_pages = self._max_pages
         links = []
         for i in range(1, max_pages + 1):
             url = f"{BASE_URL}/events/this-week/page/{i}/"
             try:
-                response = _fetch(url, self.session)
+                response = self._retrying(_fetch, url, self.session, self._timeout)
             except requests.HTTPError as e:
                 if e.response is not None and e.response.status_code == 404:
                     break
@@ -323,7 +346,7 @@ class TokyoCheapo(BaseScraper):
 
     def get_event_page(self, url: str) -> BeautifulSoup:
         """Télécharge et parse une page événement."""
-        response = _fetch(url, self.session)
+        response = self._retrying(_fetch, url, self.session, self._timeout)
         return BeautifulSoup(response.content, "html.parser")
 
     def parse_title(self, soup: BeautifulSoup) -> str:
@@ -442,7 +465,7 @@ class TokyoCheapo(BaseScraper):
             "locations": self.parse_locations(soup),
         }
 
-    def scrape_all(self, max_pages: int = 10) -> tuple[list[dict], dict]:
+    def scrape_all(self, max_pages: int | None = None) -> tuple[list[dict], dict]:
         """Scrape tous les événements de la semaine. Ignore les erreurs par événement.
 
         Returns:
@@ -460,7 +483,7 @@ class TokyoCheapo(BaseScraper):
         counts = {"links_seen": len(urls), "events_ok": len(events), "errors": errors}
         return events, counts
 
-    def scrape(self, max_pages: int = 10) -> tuple[list[Event], ScrapeReport]:
+    def scrape(self, max_pages: int | None = None) -> tuple[list[Event], ScrapeReport]:
         """Retourne les événements sous forme de modèles canoniques Event avec un rapport."""
         now = datetime.now(UTC)
         raw_events, counts = self.scrape_all(max_pages=max_pages)

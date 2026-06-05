@@ -525,7 +525,7 @@ def test_get_event_links_from_fixture(tc, monkeypatch):
     html_bytes = (FIXTURES_DIR / "tc_listing.html").read_bytes()
     call_count = 0
 
-    def mock_fetch(url, session):
+    def mock_fetch(url, session, timeout=10):
         nonlocal call_count
         call_count += 1
         if call_count == 1:
@@ -551,7 +551,7 @@ def test_get_event_links_stops_on_empty_page(tc, monkeypatch):
     empty_html = b"<html><body><a href='/about/'>About</a></body></html>"
     call_count = 0
 
-    def mock_fetch(url, session):
+    def mock_fetch(url, session, timeout=10):
         nonlocal call_count
         call_count += 1
         resp = MagicMock()
@@ -670,3 +670,33 @@ def test_scrape_multi_location_creates_two_events(tc, monkeypatch):
     assert len(ids) == 2
     locs = {e.attributes.location_name for e in events}
     assert locs == {"Ueno Park", "Asakusa Temple"}
+
+
+# --- ARCH-006 : injection des settings ---
+
+
+def test_scraper_timeout_matches_settings():
+    """_timeout est bien la valeur configurée par settings."""
+    tc = TokyoCheapo()
+    from config import settings
+
+    assert tc._timeout == settings.scrape_request_timeout_seconds
+
+
+def test_scraper_max_pages_matches_settings():
+    """_max_pages est bien la valeur configurée par settings."""
+    tc = TokyoCheapo()
+    from config import settings
+
+    assert tc._max_pages == settings.scrape_max_pages_tc
+
+
+def test_scraper_user_agent_from_settings(monkeypatch):
+    """Le User-Agent de la session reflète scrape_user_agent."""
+    import config
+    from config import Settings
+
+    fake = Settings(scrape_user_agent="TestBot/9.9", _env_file=None)
+    monkeypatch.setattr(config, "settings", fake)
+    tc2 = TokyoCheapo()
+    assert tc2.session.headers["User-Agent"] == "TestBot/9.9"

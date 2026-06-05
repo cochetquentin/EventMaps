@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     scrape_timeout_hours: int = 2
     scrape_token: str | None = None
     scrape_error_threshold: float = 0.5
+    scrape_request_timeout_seconds: int = 10
+    scrape_max_pages_tc: int = 10
+    scrape_max_pages_hanabi: int = 20
+    scrape_retry_attempts: int = 3
+    scrape_retry_wait_min: int = 2
+    scrape_retry_wait_max: int = 10
 
     model_config = SettingsConfigDict(
         env_prefix="EVENTMAPS_",
