@@ -23,15 +23,18 @@ Mémoriser ces variables pour toutes les étapes suivantes.
 ## Phase 2 — Protection anti-boucle
 
 ```bash
-gh api --paginate --slurp "repos/${REPO}/issues/${PR_NUMBER}/comments"
-gh api --paginate --slurp "repos/${REPO}/pulls/${PR_NUMBER}/reviews"
-git log -1 --format="%cI"
+# --slurp est incompatible avec --jq ; utiliser --paginate --jq pour filtrer page par page
+T_TRIGGER=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+  --jq '.[] | select(.body | test("@Codex review"; "i")) | .created_at' | tail -1)
+T_CODEX=$(gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
+  --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .submitted_at' | tail -1)
+T_COMMIT=$(git log -1 --format="%cI")
 ```
 
 Logique :
-1. Dans les issue comments (paginés), trouver le **dernier** dont le `body` contient `@Codex review` (insensible à la casse) → `T_trigger`.
-2. Dans les reviews formelles, trouver le `submitted_at` de la **dernière** review de l'identité Codex exacte (`chatgpt-codex-connector[bot]`) → `T_codex_review`.
-3. Si `T_trigger` existe ET `T_trigger > T_commit` ET (`T_codex_review` est absent ou `T_codex_review < T_trigger`) → **STOP** :
+1. `T_TRIGGER` = `created_at` du dernier commentaire contenant `@Codex review`.
+2. `T_CODEX` = `submitted_at` de la dernière review formelle de `chatgpt-codex-connector[bot]`.
+3. Si `T_TRIGGER` existe ET `T_TRIGGER > T_COMMIT` ET (`T_CODEX` absent ou `T_CODEX < T_TRIGGER`) → **STOP** :
    "Anti-boucle : `@Codex review` déjà posté après le dernier commit et Codex n'a pas encore répondu."
 4. Sinon → continuer.
 
@@ -40,9 +43,13 @@ Logique :
 ## Phase 3 — Récupérer les remarques Codex
 
 ```bash
-gh api --paginate --slurp "repos/${REPO}/pulls/${PR_NUMBER}/reviews"
-gh api --paginate --slurp "repos/${REPO}/pulls/${PR_NUMBER}/comments"
-gh api --paginate --slurp "repos/${REPO}/issues/${PR_NUMBER}/comments"
+# --paginate --jq applique le filtre à chaque page et concatène les résultats
+gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
+  --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]")'
+gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/comments" \
+  --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]")'
+gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+  --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]")'
 ```
 
 Filtrer uniquement les objets dont `user.login` est exactement `chatgpt-codex-connector[bot]`
@@ -109,11 +116,12 @@ Si **aucune modification** → ne pas commiter. Passer en Phase 7 avec note expl
 Re-vérifier l'anti-boucle (précaution post-push) :
 
 ```bash
-git log -1 --format="%cI"
-gh api --paginate --slurp "repos/${REPO}/issues/${PR_NUMBER}/comments"
+T_COMMIT=$(git log -1 --format="%cI")
+T_TRIGGER=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+  --jq '.[] | select(.body | test("@Codex review"; "i")) | .created_at' | tail -1)
 ```
 
-Confirmer que `T_commit > T_comment` (ou pas de commentaire `@Codex review`), puis :
+Confirmer que `T_COMMIT > T_TRIGGER` (ou `T_TRIGGER` absent), puis :
 
 ```bash
 gh pr comment "${PR_NUMBER}" --body "@Codex review"
