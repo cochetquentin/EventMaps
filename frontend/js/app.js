@@ -14,6 +14,7 @@ import {
 } from './api.js';
 import { setupGeolocation, cancelGeolocation } from './geolocation.js';
 import { initDrawer } from './drawer.js';
+import { updateURL, restoreFromURL } from './share.js';
 
 // ── Map init ──────────────────────────────────────────────────────────────
 const map = L.map('map').setView([35.68, 139.69], 11);
@@ -126,6 +127,7 @@ document.getElementById('reset-filters').addEventListener('click', () => {
   });
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('date-dropdown').classList.add('hidden');
+  updateURL();
   clearTimeout(fetchDebounceTimer);
   setFetchDebounceTimer(setTimeout(fetchEventsByBbox, 300));
 });
@@ -179,9 +181,32 @@ initScrapeButton();
 // ── Geolocation ───────────────────────────────────────────────────────────
 setupGeolocation();
 
+// ── Copy-link button ──────────────────────────────────────────────────────
+document.getElementById('copy-link-btn').addEventListener('click', () => {
+  updateURL();
+  const btn = document.getElementById('copy-link-btn');
+  const onSuccess = () => {
+    btn.textContent = '✓';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '🔗'; btn.classList.remove('copied'); }, 1500);
+  };
+  const onFailure = () => {
+    btn.textContent = '✗';
+    setTimeout(() => { btn.textContent = '🔗'; }, 1500);
+  };
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(location.href).then(onSuccess).catch(onFailure);
+  } else {
+    onFailure();
+  }
+});
+
 // ── Init ──────────────────────────────────────────────────────────────────
 async function loadEvents() {
-  document.getElementById('filter-date-from').value = isoDate(todayJST());
+  const hadParams = restoreFromURL();
+  if (!hadParams) {
+    document.getElementById('filter-date-from').value = isoDate(todayJST());
+  }
   try {
     await fetchEventsByBbox();
     setBboxFetchEnabled(true);
