@@ -530,3 +530,10 @@ def test_bbox_combined_with_source(tmp_path):
         results = store.get_events(source="tc", bbox=bbox, upcoming=False)
     assert len(results) == 1
     assert results[0].source == "tc"
+
+
+def test_event_attributes_not_shared():
+    e1 = make_tc(attributes={})
+    e2 = make_tc(attributes={})
+    e1.attributes["foo"] = "bar"
+    assert "foo" not in e2.attributes
