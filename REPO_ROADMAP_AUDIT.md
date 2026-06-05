@@ -433,7 +433,7 @@ EventMaps est une application Python/FastAPI + frontend statique Leaflet qui scr
 * Pas de test Docker build, pas de test CLI, pas de test de sécurité headers/CORS/auth.
 * Pas de fixtures HTML complètes versionnées pour détecter un changement de DOM tiers.
 
-### TEST-001 — Couvrir CLI `main.py`
+### ~~TEST-001 — Couvrir CLI `main.py`~~ **[DONE]**
 
 **Priorité :** P1
 **Zone concernée :** `main.py`, `tests/`
@@ -754,7 +754,7 @@ Tâches :
 
 ### Phase 3 — Tests & documentation
 
-1. `TEST-001` — couvrir CLI — ferme trou coverage 0% — dépendances : aucune.
+1. ~~`TEST-001` — couvrir CLI — ferme trou coverage 0% — dépendances : aucune.~~ **[DONE]**
 2. `TEST-006` — tests frontend — protège XSS/filtres — dépendances : SEC-002.
 3. `TEST-007` — Docker smoke CI — production readiness — dépendances : CLEAN-002.
 4. `TEST-008` — tests config env — évite régressions ops — dépendances : SEC-001/SEC-004.
@@ -1032,7 +1032,7 @@ uv run --locked python -m pytest -q
 **Peut être fait en parallèle avec :** PR-001, PR-003.
 **Ne pas faire dans cette PR :** ajouter mypy strict.
 
-### PR-007 — Couvrir le CLI `main.py`
+### ~~PR-007 — Couvrir le CLI `main.py`~~ ✅ DONE
 
 **Source :** TEST-001
 **Objectif :** réduire trou coverage et sécuriser commandes utilisateurs.
