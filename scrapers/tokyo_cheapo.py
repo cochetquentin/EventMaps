@@ -225,43 +225,61 @@ def _parse_date_range(
         start = _parse_date_part(range_m.group(1).strip(), year)
         end = _parse_date_part(range_m.group(2).strip(), year)
         if start and end:
-            if end < start:  # plage cross-year, ex: "Dec 31 - Jan 2"
+            if end < start:  # plage cross-year (mois différents), ex: "Dec 31 - Jan 2"
                 if reference_explicit and (start - reference).days > 182:
-                    # start est trop loin dans le futur : il appartient à l'année précédente
+                    # Scraping en janvier : start (déc) trop loin dans le futur
                     start = start.replace(year=start.year - 1)
                 else:
+                    # Scraping en décembre : end (jan) passe à l'année suivante
                     end = end.replace(year=end.year + 1)
             elif reference_explicit and (reference - end).days > 182:
                 # Toute la plage est dans le passé lointain (ex: "Jan 2 - Jan 5" en décembre)
-                # → les deux dates appartiennent à l'année suivante.
-                # On teste end (pas start) pour ne pas bumper les plages encore en cours
-                # (ex: "Mar 27 - Sep 30" scrapée le 30 sep aurait start > 182 jours).
+                # On teste end pour ne pas bumper les plages encore en cours.
                 start = start.replace(year=start.year + 1)
                 end = end.replace(year=end.year + 1)
+            elif reference_explicit and (start - reference).days > 182:
+                # Toute la plage est dans le futur lointain (ex: "Dec 30 - Dec 31" en janvier)
+                start = start.replace(year=start.year - 1)
+                end = end.replace(year=end.year - 1)
             return start.strftime("%Y/%m/%d"), end.strftime("%Y/%m/%d")
         return date_str, ""
 
     single = _parse_date_part(date_str.strip(), year)
     if single:
-        # Date unique cross-year : ex. scraping en décembre, "Jan 2" → année suivante.
-        # Le heuristique ne s'applique que si reference est fourni explicitement,
-        # pour ne pas altérer un year passé explicitement sans reference.
-        if reference_explicit and (reference - single).days > 182:
-            single = single.replace(year=single.year + 1)
+        # Inférence cross-year pour dates uniques (uniquement si reference est explicite).
+        if reference_explicit:
+            if (reference - single).days > 182:
+                # Scraping en décembre : "Jan 2" → année suivante
+                single = single.replace(year=single.year + 1)
+            elif (single - reference).days > 182:
+                # Scraping en janvier : "Dec 31" → année précédente
+                single = single.replace(year=single.year - 1)
         d = single.strftime("%Y/%m/%d")
         return d, d
 
     fuzzy = _parse_fuzzy_date_range(date_str.strip(), year)
     if fuzzy:
         if reference_explicit:
-            # Appliquer la même inférence cross-year que pour les dates exactes.
+            fuzzy_start = _date.fromisoformat(fuzzy[0].replace("/", "-"))
             fuzzy_end = _date.fromisoformat(fuzzy[1].replace("/", "-"))
-            if (reference - fuzzy_end).days > 182:
-                fuzzy_start = _date.fromisoformat(fuzzy[0].replace("/", "-"))
-                fuzzy = (
-                    fuzzy_start.replace(year=fuzzy_start.year + 1).strftime("%Y/%m/%d"),
-                    fuzzy_end.replace(year=fuzzy_end.year + 1).strftime("%Y/%m/%d"),
-                )
+            if fuzzy_end < fuzzy_start:
+                # Fuzzy cross-year : "Late Dec ~ Early Jan"
+                if (fuzzy_start - reference).days > 182:
+                    fuzzy_start = fuzzy_start.replace(year=fuzzy_start.year - 1)
+                else:
+                    fuzzy_end = fuzzy_end.replace(year=fuzzy_end.year + 1)
+            elif (reference - fuzzy_end).days > 182:
+                # Toute la plage dans le passé lointain
+                fuzzy_start = fuzzy_start.replace(year=fuzzy_start.year + 1)
+                fuzzy_end = fuzzy_end.replace(year=fuzzy_end.year + 1)
+            elif (fuzzy_start - reference).days > 182:
+                # Toute la plage dans le futur lointain
+                fuzzy_start = fuzzy_start.replace(year=fuzzy_start.year - 1)
+                fuzzy_end = fuzzy_end.replace(year=fuzzy_end.year - 1)
+            fuzzy = (
+                fuzzy_start.strftime("%Y/%m/%d"),
+                fuzzy_end.strftime("%Y/%m/%d"),
+            )
         return fuzzy
     return date_str, ""
 

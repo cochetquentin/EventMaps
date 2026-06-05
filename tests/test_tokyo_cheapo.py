@@ -457,6 +457,38 @@ def test_parse_date_range_fuzzy_cross_year_dec_scraping():
     assert end == "2027/01/10"
 
 
+def test_parse_date_range_fuzzy_cross_month_cross_year_dec_scraping():
+    # "Late Dec ~ Early Jan" scraping en décembre → start 2026, end 2027
+    ref = _date_cls(2026, 12, 5)
+    start, end = _parse_date_range("Late Dec ~ Early Jan", year=2026, reference=ref)
+    assert start == "2026/12/21"
+    assert end == "2027/01/10"
+
+
+def test_parse_date_range_fuzzy_cross_month_cross_year_jan_scraping():
+    # "Late Dec ~ Early Jan" scraping en janvier → start 2026, end 2027
+    ref = _date_cls(2027, 1, 5)
+    start, end = _parse_date_range("Late Dec ~ Early Jan", year=2027, reference=ref)
+    assert start == "2026/12/21"
+    assert end == "2027/01/10"
+
+
+def test_parse_date_range_range_same_month_dec_jan_scraping():
+    # "Dec 30 - Dec 31" scraping en janvier → revient à l'année précédente
+    ref = _date_cls(2027, 1, 5)
+    start, end = _parse_date_range("Dec 30 - Dec 31", year=2027, reference=ref)
+    assert start == "2026/12/30"
+    assert end == "2026/12/31"
+
+
+def test_parse_date_range_single_dec_jan_scraping():
+    # "Dec 31" scraping en janvier → revient à l'année précédente
+    ref = _date_cls(2027, 1, 5)
+    start, end = _parse_date_range("Dec 31", year=2027, reference=ref)
+    assert start == "2026/12/31"
+    assert end == "2026/12/31"
+
+
 def test_parse_date_range_single_cross_year_dec_scraping():
     # Date unique en janvier scrapée en décembre → année suivante
     ref = _date_cls(2026, 12, 5)
