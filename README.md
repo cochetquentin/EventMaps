@@ -36,8 +36,8 @@ uv run python main.py hanabi --region ar0300
 # Scraper les deux sources
 uv run python main.py all
 
-# Exporter en CSV au lieu de SQLite
-uv run python main.py tc --output csv > output.csv
+# Exporter en CSV au lieu de SQLite (--output est un flag global, avant le sous-commande)
+uv run python main.py --output csv tc > output.csv
 ```
 
 **Codes région Hanabi Walker :**
@@ -192,7 +192,7 @@ Variables d'environnement préfixées `EVENTMAPS_` (fichier `.env` ou variables 
 | `EVENTMAPS_LOG_LEVEL` | `INFO` | Niveau de log (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `EVENTMAPS_REQUEST_LOGGING` | `false` | Activer le log des requêtes HTTP (timings) |
 | `EVENTMAPS_ALLOWED_ORIGINS` | `*` | Origines CORS — CSV ou JSON array |
-| `EVENTMAPS_SCRAPE_TOKEN` | _(vide)_ | Token Bearer requis pour `POST /scrape` |
+| `EVENTMAPS_SCRAPE_TOKEN` | _(vide)_ | Token Bearer pour `POST /scrape` — si vide, l'endpoint est **public** (rate limité à 2 req/h) |
 | `EVENTMAPS_SCRAPE_USER_AGENT` | `EventMaps/1.0` | User-Agent HTTP des scrapers |
 | `EVENTMAPS_SCRAPE_TIMEOUT_HOURS` | `2` | Durée max d'un job avant marquage stale |
 | `EVENTMAPS_SCRAPE_ERROR_THRESHOLD` | `0.5` | Taux d'erreur max avant échec du job (0.0–1.0) |
