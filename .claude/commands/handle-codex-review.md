@@ -74,14 +74,11 @@ Logique :
 # Filtrer sur le cycle courant uniquement (depuis T_TRIGGER) pour éviter de retraiter
 # des remarques déjà corrigées dans des cycles précédents.
 gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
-  --jq --arg since "${T_TRIGGER}" \
-  '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | select(.submitted_at > $since)'
+  --jq ".[] | select(.user.login == \"chatgpt-codex-connector[bot]\") | select(.submitted_at > \"${T_TRIGGER}\")"
 gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/comments" \
-  --jq --arg since "${T_TRIGGER}" \
-  '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | select(.created_at > $since)'
+  --jq ".[] | select(.user.login == \"chatgpt-codex-connector[bot]\") | select(.created_at > \"${T_TRIGGER}\")"
 gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
-  --jq --arg since "${T_TRIGGER}" \
-  '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | select(.created_at > $since)'
+  --jq ".[] | select(.user.login == \"chatgpt-codex-connector[bot]\") | select(.created_at > \"${T_TRIGGER}\")"
 ```
 
 Filtrer uniquement les objets dont `user.login` est exactement `chatgpt-codex-connector[bot]`
@@ -105,12 +102,15 @@ Sinon, **afficher un résumé des points à traiter** avant toute modification.
 **Avant toute modification**, enregistrer l'état du working tree :
 
 ```bash
-DIRTY_FILES=$(git status --porcelain | awk '{print $2}')
+DIRTY_FILES=$(git status --porcelain | awk '{print substr($0,4)}')
+NEW_FILES=$(git status --porcelain | awk '/^\?\?/{print substr($0,4)}')
 ```
 
-Ces fichiers (`DIRTY_FILES`) étaient déjà modifiés avant ce workflow. Si Phase 5 échoue,
-le rollback **ne touchera jamais** ces fichiers — uniquement les fichiers propres que ce
-workflow a modifiés.
+Ces fichiers (`DIRTY_FILES`) étaient déjà modifiés avant ce workflow. `NEW_FILES` liste
+les fichiers non-trackés préexistants. Si Phase 5 échoue, le rollback :
+- **ne touche jamais** `DIRTY_FILES` ni `NEW_FILES`
+- supprime les nouveaux fichiers créés par ce workflow (`rm` sur les untracked post-workflow)
+- restaure les fichiers trackés modifiés par ce workflow (`git checkout -- <fichiers>`)
 
 Pour chaque remarque (dans l'ordre de priorité) :
 
@@ -131,9 +131,9 @@ uv run pytest --cov=. --cov-fail-under=80 tests/ -v
 
 - **Succès** → continuer.
 - **Échec** → diagnostiquer, corriger, relancer (max 2 tentatives).
-  Si toujours KO après 2 tentatives : annuler uniquement les fichiers modifiés par ce
-  workflow ET absents de `DIRTY_FILES` (enregistré en Phase 4) :
-  `git checkout -- <fichiers modifiés dans ce cycle sauf DIRTY_FILES>`,
+  Si toujours KO après 2 tentatives : annuler les changements de ce cycle :
+  - `git checkout -- <fichiers trackés modifiés dans ce cycle sauf DIRTY_FILES>`
+  - `rm <fichiers non-trackés créés dans ce cycle sauf NEW_FILES>`
   noter les corrections non appliquées, continuer sans elles.
 - **Coverage < 80%** → ajouter des tests pour le code modifié.
 
