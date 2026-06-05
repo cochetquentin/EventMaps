@@ -4,15 +4,15 @@ import { iconUser } from './config.js';
 import { renderMarkers } from './markers.js';
 
 let activeRequestId = 0;
+let userMarker = null; // module-level pour être accessible par cancelGeolocation()
 
-// Appelé par le Reset pour invalider toute requête GPS en cours
+// Appelé par le Reset pour invalider toute requête GPS en cours et retirer le marker
 export function cancelGeolocation() {
   activeRequestId++;
+  if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
 }
 
 export function setupGeolocation() {
-  let userMarker = null;
-
   document.getElementById('locate-btn').addEventListener('click', () => {
     const btn = document.getElementById('locate-btn');
 
@@ -37,10 +37,11 @@ export function setupGeolocation() {
     btn.disabled = true;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        // Vérifier la fraîcheur AVANT de toucher le bouton — si Reset a invalidé la
+        // requête entre-temps, la prochaine requête en cours doit garder son état ⏳
+        if (myRequestId !== activeRequestId) return;
         btn.textContent = '📍';
         btn.disabled = false;
-        // Callback obsolète si Reset a été cliqué pendant la requête
-        if (myRequestId !== activeRequestId) return;
         const lat = pos.coords.latitude, lng = pos.coords.longitude;
         setUserPosition({ lat, lng });
         setProximityMode(true);
@@ -52,9 +53,9 @@ export function setupGeolocation() {
         renderMarkers();
       },
       (err) => {
+        if (myRequestId !== activeRequestId) return;
         btn.textContent = '📍';
         btn.disabled = false;
-        if (myRequestId !== activeRequestId) return;
         alert("Impossible d'obtenir votre position : " + err.message);
       },
       { timeout: 10000, maximumAge: 60000 },
