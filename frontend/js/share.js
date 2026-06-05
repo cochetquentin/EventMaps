@@ -3,6 +3,11 @@ import { isoDate, todayJST } from './utils.js';
 
 const KNOWN_PARAMS = ['from', 'to', 'q', 'off', 'favs', 'lat', 'lng', 'z'];
 
+// Vue par défaut initiale de la carte (doit correspondre à L.map().setView() dans app.js)
+const DEFAULT_LAT  = 35.68;
+const DEFAULT_LNG  = 139.69;
+const DEFAULT_ZOOM = 11;
+
 /**
  * Encode l'état courant des filtres dans les query params de l'URL.
  * Utilise replaceState pour ne pas polluer l'historique à chaque frappe.
@@ -26,10 +31,15 @@ export function updateURL() {
   if (showOnlyFavorites) params.set('favs', '1');
 
   if (map) {
-    const c = map.getCenter();
-    params.set('lat', c.lat.toFixed(4));
-    params.set('lng', c.lng.toFixed(4));
-    params.set('z', String(map.getZoom()));
+    const c    = map.getCenter();
+    const latN = parseFloat(c.lat.toFixed(4));
+    const lngN = parseFloat(c.lng.toFixed(4));
+    const zN   = map.getZoom();
+    if (latN !== DEFAULT_LAT || lngN !== DEFAULT_LNG || zN !== DEFAULT_ZOOM) {
+      params.set('lat', c.lat.toFixed(4));
+      params.set('lng', c.lng.toFixed(4));
+      params.set('z', String(zN));
+    }
   }
 
   const qs = params.toString();
