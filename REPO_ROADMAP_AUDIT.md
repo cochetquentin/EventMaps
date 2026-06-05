@@ -488,7 +488,7 @@ EventMaps est une application Python/FastAPI + frontend statique Leaflet qui scr
 **Taille estimée :** M
 **Candidat PR indépendante :** Oui
 
-### TEST-006 — Ajouter tests frontend minimaux
+### ~~TEST-006 — Ajouter tests frontend minimaux~~ [DONE]
 
 **Priorité :** P1
 **Zone concernée :** `frontend/js/*.js`, `pyproject.toml` ou package JS si choisi
@@ -755,7 +755,7 @@ Tâches :
 ### Phase 3 — Tests & documentation
 
 1. ~~`TEST-001` — couvrir CLI — ferme trou coverage 0% — dépendances : aucune.~~ **[DONE]**
-2. `TEST-006` — tests frontend — protège XSS/filtres — dépendances : SEC-002.
+2. ~~`TEST-006` — tests frontend — protège XSS/filtres — dépendances : SEC-002.~~ **[DONE]**
 3. `TEST-007` — Docker smoke CI — production readiness — dépendances : CLEAN-002.
 4. ~~`TEST-008` — tests config env — évite régressions ops — dépendances : SEC-001/SEC-004.~~ **[DONE]**
 5. `DOC-001` — README actuel — onboarding — dépendances : SEC-001.
