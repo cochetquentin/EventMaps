@@ -405,18 +405,22 @@ def test_parse_date_range_fuzzy_late_month_end():
 
 
 # ---------------------------------------------------------------------------
-# Cross-year date range — BUG-002 documentation
+# Cross-year date range — BUG-002
 # ---------------------------------------------------------------------------
 
 
-def test_parse_date_range_cross_year_documents_bug():
-    # BUG-002: "Dec 31 - Jan 2" with year=2026 produces end < start (both in 2026).
-    # This test captures the CURRENT (broken) behaviour so a regression is detected
-    # if anything changes before BUG-002 is properly fixed.
+def test_parse_date_range_cross_year():
+    # BUG-002 fix: "Dec 31 - Jan 2" with year=2026 → end bumped to 2027
     start, end = _parse_date_range("Dec 31 - Jan 2", year=2026)
     assert start == "2026/12/31"
-    # Jan 2 is resolved to 2026 — end precedes start (cross-year bug)
-    assert end == "2026/01/02"
+    assert end == "2027/01/02"
+
+
+def test_parse_date_range_cross_year_normal_unaffected():
+    # Plage same-year ne doit pas bumper l'année de end
+    start, end = _parse_date_range("May 15 - Jun 2", year=2026)
+    assert start == "2026/05/15"
+    assert end == "2026/06/02"
 
 
 # ---------------------------------------------------------------------------

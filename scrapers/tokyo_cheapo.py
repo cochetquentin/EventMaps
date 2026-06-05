@@ -3,7 +3,7 @@ import html as _html
 import json
 import logging
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from datetime import date as _date
 
 import requests
@@ -16,6 +16,13 @@ from models.identity import make_event_id as _make_id
 from scrapers.base import BaseScraper, ScrapeReport
 
 logger = logging.getLogger(__name__)
+
+_JST = timezone(timedelta(hours=9))
+
+
+def _today_jst() -> _date:
+    return datetime.now(_JST).date()
+
 
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -202,6 +209,8 @@ def _parse_date_range(date_str: str, year: int | None = None) -> tuple[str, str]
         start = _parse_date_part(range_m.group(1).strip(), year)
         end = _parse_date_part(range_m.group(2).strip(), year)
         if start and end:
+            if end < start:  # plage cross-year, ex: "Dec 31 - Jan 2"
+                end = end.replace(year=end.year + 1)
             return start.strftime("%Y/%m/%d"), end.strftime("%Y/%m/%d")
         return date_str, ""
 
@@ -357,7 +366,7 @@ class TokyoCheapo(BaseScraper):
         time_raw, price = self.parse_time_and_price(soup)
         start_time, end_time = _split_time(time_raw) if time_raw else ("", "")
         date_raw = self.parse_date(soup)
-        start_date, end_date = _parse_date_range(date_raw)
+        start_date, end_date = _parse_date_range(date_raw, year=_today_jst().year)
         return {
             "url": url,
             "title": self.parse_title(soup),
