@@ -51,3 +51,20 @@ jobs:
 
       - name: Lancer les tests JS
         run: npm test
+
+  docker-build:
+    name: Docker Build & Smoke Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build Docker image
+        run: docker build -t eventmaps:test .
+
+      - name: Smoke test /health
+        run: |
+          docker run --rm -d -p 8000:8000 --name eventmaps_test eventmaps:test
+          sleep 8
+          curl --fail http://localhost:8000/health
+          docker stop eventmaps_test

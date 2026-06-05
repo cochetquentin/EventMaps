@@ -1,7 +1,38 @@
+# Python
 __pycache__/
 *.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# Environnement virtuel (uv sync installe dans le container)
 .venv/
-data/
+
+# Git
 .git/
+.gitignore
+.gitattributes
+
+# CI/CD et tooling
+.github/
+.claude/
+
+# Frontend tooling (non requis à l'exécution)
+node_modules/
+package.json
+package-lock.json
+vitest.config.js
+
+# Données runtime (montées via volume en prod)
+data/
+
+# Tests (non requis à l'exécution)
 tests/
+
+# Documentation
+docs/
 *.md
+
+# Secrets (ne jamais inclure)
+.env
