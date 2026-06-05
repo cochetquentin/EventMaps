@@ -23,9 +23,10 @@ Mémoriser ces variables pour toutes les étapes suivantes.
 ## Phase 2 — Protection anti-boucle
 
 ```bash
-# T_TRIGGER : dernier @Codex review dans les issue comments (toutes pages)
+# T_TRIGGER : dernier commentaire dont le body est EXACTEMENT "@Codex review" (trim)
+# Évite que des mentions incidentes (ex: "j'ai posté @Codex review hier") deviennent le trigger
 T_TRIGGER=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
-  --jq '.[] | select(.body | test("@Codex review"; "i")) | .created_at' | tail -1)
+  --jq '.[] | select(.body | ltrimstr("\n") | rtrimstr("\n") | ascii_downcase | test("^@codex review\\s*$")) | .created_at' | tail -1)
 
 # T_CODEX : dernière réponse Codex parmi les 3 endpoints (reviews formelles, inline, issue comments)
 T_CODEX_R=$(gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
@@ -117,8 +118,10 @@ Pour chaque remarque (dans l'ordre de priorité) :
 
 1. Lire le fichier concerné pour comprendre le contexte actuel.
 2. **Évaluer** : la remarque est-elle valide ? Déjà corrigée par un commit précédent ?
-3. Si **valide** → appliquer la correction, noter : `[APPLIQUÉ] fichier:ligne — description`.
-4. Si **invalide / non applicable** → ignorer avec justification courte.
+3. Si le fichier à modifier est dans `DIRTY_FILES` → **ignorer** la correction (évite de
+   mélanger les changements du workflow avec des modifications locales préexistantes).
+4. Si **valide** → appliquer la correction, noter : `[APPLIQUÉ] fichier:ligne — description`.
+5. Si **invalide / non applicable** → ignorer avec justification courte.
 
 Ne pas modifier les tests pour faire passer une règle de coverage — corriger le code de production.
 
@@ -151,7 +154,8 @@ git commit -m "fix: appliquer corrections Codex — {résumé 1 ligne}"
 git push
 ```
 
-Si **aucune modification** → ne pas commiter. Passer en Phase 7 avec note explicative.
+Si **aucune modification** → ne pas commiter, **ne pas relancer Codex** (même SHA = review
+inutile). Afficher le résumé final avec `@Codex review relancé : NON (aucun changement)` et s'arrêter.
 
 ---
 
@@ -164,7 +168,7 @@ HEAD_SHA=$(gh pr view --json headRefOid -q .headRefOid)
 T_COMMIT=$(gh api "repos/${REPO}/commits/${HEAD_SHA}" --jq '.commit.committer.date' 2>/dev/null \
   || git log -1 --format="%cI")
 T_TRIGGER=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
-  --jq '.[] | select(.body | test("@Codex review"; "i")) | .created_at' | tail -1)
+  --jq '.[] | select(.body | ltrimstr("\n") | rtrimstr("\n") | ascii_downcase | test("^@codex review\\s*$")) | .created_at' | tail -1)
 T_COMMIT_E=$(uv run python -c "from datetime import datetime,timezone; s='$T_COMMIT'; print(int(datetime.fromisoformat(s.replace('Z','+00:00')).timestamp()))")
 T_TRIGGER_E=$(uv run python -c "from datetime import datetime,timezone; s='$T_TRIGGER'; print(int(datetime.fromisoformat(s.replace('Z','+00:00')).timestamp()) if s else 0)")
 ```
