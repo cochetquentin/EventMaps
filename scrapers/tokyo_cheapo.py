@@ -226,7 +226,7 @@ def _parse_date_range(
         end = _parse_date_part(range_m.group(2).strip(), year)
         if start and end:
             if end < start:  # plage cross-year, ex: "Dec 31 - Jan 2"
-                if (start - reference).days > 182:
+                if reference_explicit and (start - reference).days > 182:
                     # start est trop loin dans le futur : il appartient à l'année précédente
                     start = start.replace(year=start.year - 1)
                 else:

@@ -14,7 +14,6 @@ from scrapers.tokyo_cheapo import (
     _parse_12h_time,
     _parse_date_range,
     _split_time,
-    _today_jst,
 )
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -518,13 +517,16 @@ def test_scrape_event_full_fixture(tc, monkeypatch):
     html_bytes = (FIXTURES_DIR / "tc_event_full.html").read_bytes()
     soup = BeautifulSoup(html_bytes, "html.parser")
     monkeypatch.setattr(tc, "get_event_page", lambda url: soup)
+    # Figer l'horloge JST pour que l'assertion de date soit déterministe quelle
+    # que soit la période de l'année où le test tourne.
+    fixed_jst = _date_cls(2026, 6, 5)
+    monkeypatch.setattr("scrapers.tokyo_cheapo._today_jst", lambda: fixed_jst)
 
     result = tc.scrape_event("https://tokyocheapo.com/events/kawaii-flea-market-2026/")
 
-    year = _today_jst().year
     assert result["title"] == "Kawaii Flea Market"
-    assert result["start_date"] == f"{year}/05/17"
-    assert result["end_date"] == f"{year}/05/17"
+    assert result["start_date"] == "2026/05/17"
+    assert result["end_date"] == "2026/05/17"
     assert result["start_time"] == "10:00"
     assert result["end_time"] == "17:00"
     assert result["price"] == "Free"
