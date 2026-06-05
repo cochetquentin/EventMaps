@@ -591,12 +591,17 @@
 
     /* ── Event Drawer ── */
     #event-drawer {
-      display: none;
+      display: block;
       position: fixed;
       inset: 0;
       z-index: 2000;
+      visibility: hidden;
+      pointer-events: none;
     }
-    #event-drawer.open { display: block; }
+    #event-drawer.open {
+      visibility: visible;
+      pointer-events: auto;
+    }
     .drawer-backdrop {
       position: absolute;
       inset: 0;

@@ -10,6 +10,7 @@ class TokyoCheapoAttributes(BaseModel):
     tags: list[str] = []
     official_link: str | None = None
     location_name: str | None = None
+    description: str | None = None
 
 
 class HanabiWalkerAttributes(BaseModel):

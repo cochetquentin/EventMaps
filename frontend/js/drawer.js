@@ -2,7 +2,7 @@ import { setSelectedEventId } from './state.js';
 import { fmtDate } from './utils.js';
 
 const SAFE_PROTOCOLS = /^https?:\/\//i;
-function safeUrl(url) { return (url && SAFE_PROTOCOLS.test(url)) ? url : '#'; }
+function safeUrl(url) { return (url && SAFE_PROTOCOLS.test(url)) ? url : null; }
 
 function _appendMetaLine(container, emoji, text) {
   const row = document.createElement('div');
@@ -70,12 +70,12 @@ export function openDrawer(ev) {
     attrEl.appendChild(sec);
   });
 
-  // Liens actions — safeUrl filtre les protocoles non-http(s)
+  // Liens actions — chaque candidat validé indépendamment pour permettre le fallback
   // TC stocke attrs.official_link, Hanabi stocke attrs.official_site
-  const eventUrl = safeUrl(attrs.official_link || attrs.official_site || ev.url);
+  const eventUrl = safeUrl(attrs.official_link) || safeUrl(attrs.official_site) || safeUrl(ev.url);
   const linkEvent = panel.querySelector('.drawer-link-event');
-  linkEvent.href = eventUrl;
-  linkEvent.style.display = eventUrl === '#' ? 'none' : '';
+  linkEvent.href = eventUrl || '#';
+  linkEvent.style.display = eventUrl ? '' : 'none';
 
   if (ev.latitude && ev.longitude) {
     const coords = `${ev.latitude},${ev.longitude}`;
