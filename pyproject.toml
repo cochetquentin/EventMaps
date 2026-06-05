@@ -32,6 +32,9 @@ scrape = "main:main"
 target-version = "py313"
 line-length = 100
 
+[tool.ruff.format]
+line-ending = "lf"
+
 [tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
