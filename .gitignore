@@ -25,3 +25,10 @@ CLAUDE.local.md
 
 # Local environment secrets
 .env
+
+# Node.js
+node_modules/
+
+# Coverage reports
+.coverage
+htmlcov/
