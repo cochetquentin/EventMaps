@@ -13,6 +13,7 @@ class ScrapeReport:
     events_ok: int = 0
     events_skipped: int = 0
     errors: list[dict] = field(default_factory=list)  # [{"url": ..., "reason": ...}]
+    duration_s: float | None = None  # wall-clock seconds for the scrape() call
 
     @property
     def error_rate(self) -> float:

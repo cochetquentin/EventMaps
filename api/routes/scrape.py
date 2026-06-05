@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import UTC, datetime
 from typing import Literal
 
@@ -43,15 +44,38 @@ def _do_scrape(source: str, region: str) -> None:
         try:
             events = []
             reports: list[ScrapeReport] = []
+            job_start = time.monotonic()
+
             if source in ("tc", "all"):
+                t0 = time.monotonic()
                 tc_events, tc_report = TokyoCheapo().scrape()
+                tc_report.duration_s = time.monotonic() - t0
                 events.extend(tc_events)
                 reports.append(tc_report)
+                logger.info(
+                    "scraper source=tc job_id=%d events=%d links=%d errors=%d duration=%.2fs",
+                    job_id,
+                    tc_report.events_ok,
+                    tc_report.links_seen,
+                    len(tc_report.errors),
+                    tc_report.duration_s,
+                )
             if source in ("hanabi", "all"):
+                t0 = time.monotonic()
                 h_events, h_report = HanabiWalker(region=region).scrape()
+                h_report.duration_s = time.monotonic() - t0
                 events.extend(h_events)
                 reports.append(h_report)
+                logger.info(
+                    "scraper source=hanabi job_id=%d events=%d links=%d errors=%d duration=%.2fs",
+                    job_id,
+                    h_report.events_ok,
+                    h_report.links_seen,
+                    len(h_report.errors),
+                    h_report.duration_s,
+                )
 
+            job_duration = time.monotonic() - job_start
             links_seen = sum(r.links_seen for r in reports)
             events_ok = sum(r.events_ok for r in reports)
             events_skipped = sum(r.events_skipped for r in reports)
@@ -94,7 +118,12 @@ def _do_scrape(source: str, region: str) -> None:
                     events_skipped=events_skipped,
                     error_count=error_count,
                 )
-                logger.error("Scrape partial failure (%s): %s", source, msg)
+                logger.error(
+                    "scrape_fail source=%s job_id=%d %s",
+                    source,
+                    job_id,
+                    msg,
+                )
             else:
                 store.finish_job(
                     job_id,
@@ -105,15 +134,17 @@ def _do_scrape(source: str, region: str) -> None:
                     error_count=error_count,
                 )
                 logger.info(
-                    "Scrape done (%s): %d events, %d links, %d errors",
+                    "scrape_done source=%s job_id=%d events=%d links=%d errors=%d duration=%.2fs",
                     source,
+                    job_id,
                     len(events),
                     links_seen,
                     error_count,
+                    job_duration,
                 )
         except Exception as e:
             store.fail_job(job_id, str(e))
-            logger.error("Scrape failed (%s): %s", source, e)
+            logger.error("scrape_error source=%s job_id=%d error=%r", source, job_id, str(e))
             raise
 
 

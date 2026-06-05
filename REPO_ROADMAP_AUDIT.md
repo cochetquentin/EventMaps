@@ -749,15 +749,15 @@ Tâches :
 2. ~~`ARCH-001` — typer attributes par source — contrat plus stable — dépendances : TEST-001.~~ **[DONE]**
 3. ~~`ARCH-005` — déplacer génération ID hors DB — découplage métier — dépendances : aucune.~~ **[DONE]**
 4. ~~`ARCH-004` — scinder `db.store` — maintenabilité — dépendances : TEST-001.~~ **[DONE]**
-5. `ARCH-006` — centraliser config scraping — ops — dépendances : BUG-003.
-6. `ARCH-007` — logs structurés scrape/job — diagnostic — dépendances : ARCH-002.
+5. ~~`ARCH-006` — centraliser config scraping — ops — dépendances : BUG-003.~~ **[DONE]**
+6. ~~`ARCH-007` — logs structurés scrape/job — diagnostic — dépendances : ARCH-002.~~ **[DONE]**
 
 ### Phase 3 — Tests & documentation
 
 1. ~~`TEST-001` — couvrir CLI — ferme trou coverage 0% — dépendances : aucune.~~ **[DONE]**
 2. `TEST-006` — tests frontend — protège XSS/filtres — dépendances : SEC-002.
 3. `TEST-007` — Docker smoke CI — production readiness — dépendances : CLEAN-002.
-4. `TEST-008` — tests config env — évite régressions ops — dépendances : SEC-001/SEC-004.
+4. ~~`TEST-008` — tests config env — évite régressions ops — dépendances : SEC-001/SEC-004.~~ **[DONE]**
 5. `DOC-001` — README actuel — onboarding — dépendances : SEC-001.
 6. `DOC-003` — architecture/contrat data — facilite LLM/devs — dépendances : ARCH-001.
 7. `DOC-004` — CONTRIBUTING — DX — dépendances : tooling.
