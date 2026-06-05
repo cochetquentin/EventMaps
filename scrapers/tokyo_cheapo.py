@@ -205,13 +205,16 @@ def _parse_date_range(
     - Plage → (start, end) normalisés
     - Dates fuzzy ('Mid May') → (date_str, "")
 
-    reference sert à résoudre les ambiguïtés cross-year :
+    reference sert à résoudre les ambiguïtés cross-year et n'est utilisé que
+    lorsqu'il est fourni explicitement par l'appelant (pour ne pas réécrire une
+    année passée explicitement) :
     - Plage : si start est à plus de 182 jours dans le futur, start appartient
       à l'année précédente (scraping en janvier pour "Dec 31 - Jan 2") ; sinon
       end passe à l'année suivante (scraping en décembre).
     - Date unique : si la date est à plus de 182 jours dans le passé, elle
       appartient à l'année suivante (scraping en décembre pour "Jan 2").
     """
+    reference_explicit = reference is not None
     if reference is None:
         reference = _today_jst()
     if year is None:
@@ -233,8 +236,10 @@ def _parse_date_range(
 
     single = _parse_date_part(date_str.strip(), year)
     if single:
-        # Date unique cross-year : ex. scraping en décembre, "Jan 2" → année suivante
-        if (reference - single).days > 182:
+        # Date unique cross-year : ex. scraping en décembre, "Jan 2" → année suivante.
+        # Le heuristique ne s'applique que si reference est fourni explicitement,
+        # pour ne pas altérer un year passé explicitement sans reference.
+        if reference_explicit and (reference - single).days > 182:
             single = single.replace(year=single.year + 1)
         d = single.strftime("%Y/%m/%d")
         return d, d
