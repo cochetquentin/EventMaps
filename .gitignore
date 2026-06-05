@@ -12,8 +12,10 @@ wheels/
 # Data output
 data/
 
-# Local docs
-docs/
+# Local docs (AI-generated improvement suggestions, not tracked)
+docs/*improvement*.md
+docs/IMPROVEMENTS.md
+docs/PROJECT_OVERVIEW_PROMPT.md
 
 # Claude Code — settings.local.json reste local, le reste est partagé
 .claude/settings.local.json

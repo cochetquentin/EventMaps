@@ -6,6 +6,7 @@ Scrapers d'événements géolocalisés pour alimenter une carte interactive.
 
 ```bash
 uv sync
+cp .env.example .env   # configurer les variables si besoin
 ```
 
 ## Structure
@@ -13,11 +14,12 @@ uv sync
 ```
 EventMaps/
 ├── scrapers/          # Scrapers Tokyo Cheapo et Hanabi Walker
-├── models/            # Modèles Pydantic (TokyoCheapoEvent, HanabiEvent)
-├── db/                # Persistance SQLite (EventStore)
-├── api/               # API FastAPI
-├── frontend/          # UI carte interactive (Leaflet.js)
-├── tests/             # Tests unitaires et API
+├── models/            # Modèles Pydantic (Event, attributes, identity)
+├── db/                # Persistance SQLite (EventStore, migrations)
+├── api/               # API FastAPI (routes events, scrape, health)
+├── frontend/          # UI carte interactive (Leaflet.js, ES modules)
+├── tests/             # 247 tests Python + tests frontend Vitest
+├── docs/              # Documentation technique
 ├── data/              # Base de données et exports CSV (gitignored)
 └── main.py            # CLI de scraping
 ```
@@ -34,8 +36,8 @@ uv run python main.py hanabi --region ar0300
 # Scraper les deux sources
 uv run python main.py all
 
-# Exporter en CSV au lieu de SQLite
-uv run python main.py tc --output csv > output.csv
+# Exporter en CSV au lieu de SQLite (--output est un flag global, avant le sous-commande)
+uv run python main.py --output csv tc > output.csv
 ```
 
 **Codes région Hanabi Walker :**
@@ -73,14 +75,39 @@ uv run uvicorn api.app:app --reload
 ### Endpoints
 
 ```
-GET /                                → UI carte (Leaflet.js)
-GET /events                          → liste tous les événements
-GET /events?source=tc                → filtre par source (tc | hanabi)
-GET /events?date=2026/07/25          → filtre par date
-GET /events?limit=50&offset=0        → pagination
-GET /events/{id}                     → détail d'un événement
-GET /docs                            → Swagger UI
+GET  /                              → UI carte (Leaflet.js)
+GET  /events                        → liste des événements (filtres, pagination)
+GET  /events/{id}                   → détail d'un événement
+GET  /events/{id}.ics               → export iCal d'un événement
+POST /scrape                        → déclenche un job de scraping (async)
+GET  /scrape/status                 → état du dernier job de scraping
+GET  /scrape/config                 → indique si /scrape est public (sans token)
+GET  /health                        → healthcheck DB
+GET  /docs                          → Swagger UI
 ```
+
+**Paramètres `GET /events` :**
+
+| Paramètre | Type | Description |
+|---|---|---|
+| `source` | `tc` \| `hanabi` | Filtre par source |
+| `date` | `YYYY-MM-DD` | Filtre par chevauchement de date |
+| `bbox` | `min_lon,min_lat,max_lon,max_lat` | Filtre géographique |
+| `start_from` | `YYYY-MM-DD` | Borne inférieure de chevauchement : inclut les événements dont `COALESCE(end_date, start_date) >= start_from` |
+| `start_to` | `YYYY-MM-DD` | Borne haute sur `start_date` |
+| `limit` | `int` 1–500 (défaut 100) | Pagination |
+| `offset` | `int` (défaut 0) | Pagination |
+
+Sans filtre de date, seuls les événements à venir sont retournés.
+
+**`POST /scrape` :**
+
+```
+POST /scrape?source=all&region=ar0300
+Authorization: Bearer <EVENTMAPS_SCRAPE_TOKEN>
+```
+
+Paramètres : `source` (`tc` | `hanabi` | `all`), `region` (code Hanabi Walker). Répond immédiatement `{"status": "started"}` et exécute le scraping en arrière-plan. Rate limité à 2 req/h.
 
 ### Exemple de réponse
 
@@ -91,17 +118,20 @@ GET /docs                            → Swagger UI
     "source": "tc",
     "title": "Dry Noodle Grand Prix",
     "url": "https://tokyocheapo.com/events/dry-noodle-grand-prix/",
-    "start_date": "2026/05/11",
-    "end_date": "2026/05/20",
-    "start_time": "10:00",
-    "end_time": "18:00",
+    "start_date": "2026-05-11",
+    "end_date": "2026-05-20",
+    "times": "10:00-18:00",
+    "venue": null,
+    "latitude": 35.627198,
+    "longitude": 139.661894,
     "price": "Free",
-    "categories": ["food"],
-    "tags": ["food", "noodles"],
-    "location_name": "Komazawa Olympic Park",
-    "lat": 35.627198,
-    "lng": 139.661894,
-    "scraped_at": "2026-05-16T12:51:25+00:00"
+    "attributes": {
+      "categories": ["food"],
+      "tags": ["food", "noodles"],
+      "official_link": null,
+      "location_name": "Komazawa Olympic Park"
+    },
+    "created_at": "2026-05-16T12:51:25+00:00"
   }
 ]
 ```
@@ -112,8 +142,9 @@ Les événements sont stockés dans `data/events.db` (SQLite) avec un hash SHA-2
 
 | Table | Source | Clé de déduplication |
 |---|---|---|
-| `tokyo_cheapo` | tokyocheapo.com | `url` + `location_name` |
-| `hanabi` | hanabi.walkerplus.com | `url` + `date` |
+| `events` (TC) | tokyocheapo.com | `url` + `location_name` |
+| `events` (Hanabi) | hanabi.walkerplus.com | `url` + `date` |
+| `scrape_jobs` | — | suivi des jobs de scraping |
 
 ## Modèles de données
 
@@ -122,24 +153,23 @@ Les événements sont stockés dans `data/events.db` (SQLite) avec un hash SHA-2
 | Champ | Description |
 |---|---|
 | `title` | Nom de l'événement |
-| `start_date` / `end_date` | Dates au format `YYYY/MM/DD` |
-| `start_time` / `end_time` | Heures (`HH:MM`, 24h) |
+| `start_date` / `end_date` | Dates au format `YYYY-MM-DD` |
+| `times` | Horaires (`HH:MM–HH:MM`) |
 | `price` | Prix (`Free`, `¥1,000`, etc.) |
 | `categories` / `tags` | Listes de strings |
 | `official_link` | URL du site officiel |
 | `location_name` / `lat` / `lng` | Lieu et coordonnées GPS |
 
-Les dates floues (`Mid May`, `Early Apr ~ Late Jun`) sont converties : Early=1-10, Mid=11-20, Late=21-fin du mois.
-Les événements multi-lieux génèrent une ligne par lieu.
+Les dates floues (`Mid May`, `Early Apr ~ Late Jun`) sont converties : Early=1–10, Mid=11–20, Late=21–fin du mois. Les événements multi-lieux génèrent une ligne par lieu.
 
 ### HanabiEvent
 
 | Champ | Description |
 |---|---|
 | `title` | Nom du festival |
-| `start_date` | Date au format `YYYY/MM/DD` |
-| `start_time` / `end_time` | Heures (`HH:MM`) |
-| `fireworks_count` | Nombre de feux |
+| `start_date` | Date au format `YYYY-MM-DD` |
+| `times` | Horaires (`HH:MM–HH:MM`) |
+| `fireworks_count` | Nombre de feux (ex. `"10000発"`) |
 | `fireworks_duration` | Durée du spectacle |
 | `expected_crowd` | Affluence estimée |
 | `rain_policy` | Politique en cas de pluie |
@@ -153,33 +183,67 @@ Les événements multi-jours génèrent une ligne par jour.
 
 ## Configuration
 
-Variables d'environnement préfixées `EVENTMAPS_` :
+Variables d'environnement préfixées `EVENTMAPS_` (fichier `.env` ou variables système) :
 
 | Variable | Défaut | Description |
 |---|---|---|
 | `EVENTMAPS_DB_PATH` | `data/events.db` | Chemin vers la base SQLite |
 | `EVENTMAPS_PORT` | `8000` | Port d'écoute uvicorn |
 | `EVENTMAPS_LOG_LEVEL` | `INFO` | Niveau de log (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
-| `EVENTMAPS_ALLOWED_ORIGINS` | `*` | Origines CORS autorisées — CSV (`https://a.com,https://b.com`) ou JSON (`["https://a.com"]`) |
-| `EVENTMAPS_SCRAPE_TOKEN` | _(vide)_ | Token Bearer requis pour `POST /scrape` — laisser vide pour un endpoint public |
+| `EVENTMAPS_REQUEST_LOGGING` | `false` | Activer le log des requêtes HTTP (timings) |
+| `EVENTMAPS_ALLOWED_ORIGINS` | `*` | Origines CORS — CSV ou JSON array |
+| `EVENTMAPS_SCRAPE_TOKEN` | _(vide)_ | Token Bearer pour `POST /scrape` — si vide, l'endpoint est **public** (rate limité à 2 req/h) |
 | `EVENTMAPS_SCRAPE_USER_AGENT` | `EventMaps/1.0` | User-Agent HTTP des scrapers |
-| `EVENTMAPS_SCRAPE_TIMEOUT_HOURS` | `2` | Durée max d'un job de scrape avant de le marquer stale (heures) |
+| `EVENTMAPS_SCRAPE_TIMEOUT_HOURS` | `2` | Durée max d'un job avant marquage stale |
 | `EVENTMAPS_SCRAPE_ERROR_THRESHOLD` | `0.5` | Taux d'erreur max avant échec du job (0.0–1.0) |
+| `EVENTMAPS_SCRAPE_REQUEST_TIMEOUT_SECONDS` | `10` | Timeout HTTP par requête (secondes) |
+| `EVENTMAPS_SCRAPE_MAX_PAGES_TC` | `10` | Pages max scraper Tokyo Cheapo |
+| `EVENTMAPS_SCRAPE_MAX_PAGES_HANABI` | `20` | Pages max scraper Hanabi Walker |
+| `EVENTMAPS_SCRAPE_RETRY_ATTEMPTS` | `3` | Nombre de tentatives tenacity |
+| `EVENTMAPS_SCRAPE_RETRY_WAIT_MIN` | `2` | Backoff min entre tentatives (secondes) |
+| `EVENTMAPS_SCRAPE_RETRY_WAIT_MAX` | `10` | Backoff max entre tentatives (secondes) |
 
 **Dev local :** copier `.env.example` en `.env` à la racine (chargé automatiquement).
-**Production :** exporter les variables via le process manager (Docker `-e`, systemd `EnvironmentFile`, Kubernetes secrets, etc.).
 
-**Note de production :** restreindre `EVENTMAPS_ALLOWED_ORIGINS` à l'origine réelle du frontend :
+**Production :** restreindre `EVENTMAPS_ALLOWED_ORIGINS` à l'origine réelle du frontend :
 ```
 EVENTMAPS_ALLOWED_ORIGINS=https://monapp.example.com
+EVENTMAPS_SCRAPE_TOKEN=un-token-secret-fort
 ```
-Si `EVENTMAPS_SCRAPE_TOKEN` est défini mais que `EVENTMAPS_ALLOWED_ORIGINS` reste à `*`, l'application émet un avertissement au démarrage.
+Si `EVENTMAPS_SCRAPE_TOKEN` est défini mais `EVENTMAPS_ALLOWED_ORIGINS` reste `*`, l'application émet un avertissement au démarrage.
+
+## Docker
+
+```bash
+# Build
+docker build -t eventmaps .
+
+# Run (avec token de scraping)
+docker run -p 8000:8000 \
+  -e EVENTMAPS_SCRAPE_TOKEN=mon-token \
+  -e EVENTMAPS_ALLOWED_ORIGINS=https://monapp.example.com \
+  -v $(pwd)/data:/app/data \
+  eventmaps
+
+# → http://localhost:8000
+```
+
+L'image utilise un utilisateur non-root (`appuser`) et inclut un healthcheck sur `/health`.
 
 ## Tests
 
 ```bash
-uv run pytest          # tous les tests
-uv run pytest tests/test_store.py   # store SQLite
-uv run pytest tests/test_api.py     # API FastAPI
-uv run pytest --cov=. --cov-fail-under=80 tests/  # avec coverage
+# Tous les tests Python
+uv run python -m pytest tests/ -q
+
+# Avec coverage (gate CI à 80 %)
+uv run python -m pytest --cov=. --cov-fail-under=80 tests/ -q
+
+# Tests frontend (Vitest)
+npx vitest run
 ```
+
+## Documentation
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture, flux de données, contrat `attributes` par source, schéma DB
+- [CONTRIBUTING.md](CONTRIBUTING.md) — setup, conventions, workflow PR, politique fixtures
