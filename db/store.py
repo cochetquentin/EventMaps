@@ -455,7 +455,7 @@ class EventStore:
             e.latitude,
             e.longitude,
             e.price,
-            json.dumps(e.attributes),
+            json.dumps(e.attributes.model_dump()),
             e.created_at.isoformat(),
         )
 

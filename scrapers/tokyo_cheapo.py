@@ -10,6 +10,7 @@ import requests
 from bs4 import BeautifulSoup
 from tenacity import before_log, retry, stop_after_attempt, wait_exponential
 
+from models.attributes import TokyoCheapoAttributes
 from models.event import Event
 from models.identity import make_event_id as _make_id
 from scrapers.base import BaseScraper, ScrapeReport
@@ -425,12 +426,12 @@ class TokyoCheapo(BaseScraper):
                         latitude=loc.get("lat"),
                         longitude=loc.get("lng"),
                         price=e.get("price") or None,
-                        attributes={
-                            "categories": e.get("categories") or [],
-                            "tags": e.get("tags") or [],
-                            "official_link": e.get("official_link") or None,
-                            "location_name": location_name or None,
-                        },
+                        attributes=TokyoCheapoAttributes(
+                            categories=e.get("categories") or [],
+                            tags=e.get("tags") or [],
+                            official_link=e.get("official_link") or None,
+                            location_name=location_name or None,
+                        ),
                         created_at=now,
                     )
                 )
