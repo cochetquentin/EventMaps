@@ -1,6 +1,7 @@
 import { map, setAllEvents } from './state.js';
 import { buildPills } from './filters.js';
 import { renderMarkers } from './markers.js';
+import { updateURL } from './share.js';
 
 export let bboxFetchEnabled = false;
 export let fetchDebounceTimer = null;
@@ -46,6 +47,7 @@ export async function fetchEventsByBbox({ category = null } = {}) {
     setAllEvents(events);
     buildPills();
     renderMarkers();
+    updateURL();
   } catch (e) {
     if (e.name === 'AbortError') return;
     document.getElementById('stats').textContent = 'Erreur de chargement.';

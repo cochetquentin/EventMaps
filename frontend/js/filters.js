@@ -2,6 +2,7 @@ import { allEvents, deactivatedPills, showOnlyFavorites, setShowOnlyFavorites } 
 import { TC_EXCLUDED_CATS, CAT_EMOJI } from './config.js';
 import { getFavorites } from './favorites.js';
 import { renderMarkers } from './markers.js';
+import { updateURL } from './share.js';
 
 export function getActivePills() {
   const s = new Set();
@@ -22,6 +23,7 @@ export function buildPills() {
     setShowOnlyFavorites(!showOnlyFavorites);
     favPill.classList.toggle('active', showOnlyFavorites);
     renderMarkers();
+    updateURL();
   });
   container.appendChild(favPill);
 
@@ -54,6 +56,7 @@ export function addPill(container, type, label, isHanabi = false) {
     if (btn.classList.contains('active')) deactivatedPills.delete(type);
     else deactivatedPills.add(type);
     renderMarkers();
+    updateURL();
   });
   container.appendChild(btn);
 }
