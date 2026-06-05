@@ -1,5 +1,12 @@
-import { fmtDate, parseTimes, escapeHtml, safeUrl } from './utils.js';
+import { fmtDate, parseTimes, escapeHtml, safeUrl, haversineKm, fmtDistance } from './utils.js';
 import { isFavorite } from './favorites.js';
+import { userPosition, proximityMode } from './state.js';
+
+function distBadge(ev) {
+  if (!proximityMode || !userPosition || ev.latitude == null || ev.longitude == null) return '';
+  const km = haversineKm(userPosition.lat, userPosition.lng, ev.latitude, ev.longitude);
+  return `<span class="pop-badge">📍 ${fmtDistance(km)}</span>`;
+}
 
 export function buildPopup(ev) {
   const attrs = ev.attributes || {};
@@ -11,7 +18,10 @@ export function buildPopup(ev) {
     const time  = st ? `🕐 ${escapeHtml(st)}${et ? ' – ' + escapeHtml(et) : ''}` : '';
     const loc   = attrs.location_name ? `📍 ${escapeHtml(attrs.location_name)}` : '';
     const meta  = [date, time, loc].filter(Boolean).join('<br>');
-    const badge = ev.price ? `<div class="pop-badges"><span class="pop-badge">${escapeHtml(ev.price)}</span></div>` : '';
+    const dist  = distBadge(ev);
+    const badge = (ev.price || dist)
+      ? `<div class="pop-badges">${ev.price ? `<span class="pop-badge">${escapeHtml(ev.price)}</span>` : ''}${dist}</div>`
+      : '';
     const directions = ev.latitude && ev.longitude
       ? `<div style="display:flex;gap:6px;">
           <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.latitude},${ev.longitude}" target="_blank">🗺 Google</a>
@@ -42,6 +52,7 @@ export function buildPopup(ev) {
       attrs.expected_crowd  ? `👥 ${escapeHtml(attrs.expected_crowd)}`  : null,
       attrs.food_stalls  === 'あり' ? '🍢 Food stalls'  : null,
       attrs.paid_seating === 'あり' ? '🎫 Paid seating' : null,
+      distBadge(ev) || null,
     ].filter(Boolean);
     const badges = bs.length
       ? `<div class="pop-badges">${bs.map(b => `<span class="pop-badge">${b}</span>`).join('')}</div>`
