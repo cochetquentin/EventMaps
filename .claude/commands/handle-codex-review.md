@@ -35,22 +35,23 @@ T_CODEX_C=$(gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/comments" \
 T_CODEX_I=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
   --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .created_at' | tail -1)
 
-# T_COMMIT : HEAD remote du PR (évite décalage si checkout local en retard)
-T_COMMIT=$(gh pr view --json commits --jq '.commits[-1].committedDate' 2>/dev/null \
+# T_COMMIT : via l'API commits sur le headRefOid (pas de limite 100 commits)
+HEAD_SHA=$(gh pr view --json headRefOid -q .headRefOid)
+T_COMMIT=$(gh api "repos/${REPO}/commits/${HEAD_SHA}" --jq '.commit.committer.date' 2>/dev/null \
   || git log -1 --format="%cI")
 
 # Normaliser en epoch UTC pour comparaison cross-timezone (GitHub = UTC Z, git = offset local)
-T_TRIGGER_E=$(python3 -c "
+T_TRIGGER_E=$(uv run python -c "
 from datetime import datetime,timezone
 s='$T_TRIGGER'
 print(int(datetime.fromisoformat(s.replace('Z','+00:00')).timestamp()) if s else 0)
 ")
-T_CODEX_E=$(python3 -c "
+T_CODEX_E=$(uv run python -c "
 from datetime import datetime,timezone
 def e(s): return int(datetime.fromisoformat(s.strip().replace('Z','+00:00')).timestamp()) if s.strip() else 0
 print(max(e('$T_CODEX_R'), e('$T_CODEX_C'), e('$T_CODEX_I')))
 ")
-T_COMMIT_E=$(python3 -c "
+T_COMMIT_E=$(uv run python -c "
 from datetime import datetime,timezone
 s='$T_COMMIT'
 print(int(datetime.fromisoformat(s.replace('Z','+00:00')).timestamp()))
@@ -126,7 +127,7 @@ Ne pas modifier les tests pour faire passer une règle de coverage — corriger 
 ## Phase 5 — Tests
 
 ```bash
-uv run pytest --cov=. --cov-fail-under=80 tests/ -v
+uv run --locked python -m pytest --cov=. --cov-fail-under=80 tests/ -v
 ```
 
 - **Succès** → continuer.
@@ -159,12 +160,13 @@ Si **aucune modification** → ne pas commiter. Passer en Phase 7 avec note expl
 Re-vérifier l'anti-boucle (précaution post-push) :
 
 ```bash
-T_COMMIT=$(gh pr view --json commits --jq '.commits[-1].committedDate' 2>/dev/null \
+HEAD_SHA=$(gh pr view --json headRefOid -q .headRefOid)
+T_COMMIT=$(gh api "repos/${REPO}/commits/${HEAD_SHA}" --jq '.commit.committer.date' 2>/dev/null \
   || git log -1 --format="%cI")
 T_TRIGGER=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
   --jq '.[] | select(.body | test("@Codex review"; "i")) | .created_at' | tail -1)
-T_COMMIT_E=$(python3 -c "from datetime import datetime,timezone; s='$T_COMMIT'; print(int(datetime.fromisoformat(s.replace('Z','+00:00')).timestamp()))")
-T_TRIGGER_E=$(python3 -c "from datetime import datetime,timezone; s='$T_TRIGGER'; print(int(datetime.fromisoformat(s.replace('Z','+00:00')).timestamp()) if s else 0)")
+T_COMMIT_E=$(uv run python -c "from datetime import datetime,timezone; s='$T_COMMIT'; print(int(datetime.fromisoformat(s.replace('Z','+00:00')).timestamp()))")
+T_TRIGGER_E=$(uv run python -c "from datetime import datetime,timezone; s='$T_TRIGGER'; print(int(datetime.fromisoformat(s.replace('Z','+00:00')).timestamp()) if s else 0)")
 ```
 
 Confirmer que `T_COMMIT_E > T_TRIGGER_E` (ou `T_TRIGGER_E == 0`), puis :
