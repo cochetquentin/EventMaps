@@ -739,7 +739,7 @@ Tâches :
 2. ~~`SEC-003` — SRI/vendor assets CDN — réduit risque tiers — dépendances : aucune.~~ **[DONE]**
 3. ~~`SEC-004` — documenter/restreindre CORS prod — hardening — dépendances : SEC-001.~~ **[DONE]**
 4. ~~`TEST-003` — fixtures Tokyo Cheapo — protège parser — dépendances : aucune.~~ **[DONE]**
-5. `TEST-004` — fixtures Hanabi — protège parser — dépendances : BUG-004.
+5. ~~`TEST-004` — fixtures Hanabi — protège parser — dépendances : BUG-004.~~ **[DONE]**
 6. ~~`BUG-005` — fallback description Tokyo Cheapo — petite robustesse — dépendances : aucune.~~ **[DONE]**
 7. `CLEAN-006` — default factory attributes — hygiène modèle — dépendances : aucune.
 
@@ -1162,7 +1162,7 @@ uv run --locked python -m pytest -q
 **Peut être fait en parallèle avec :** PR-001, PR-002.
 **Ne pas faire dans cette PR :** changer clés de déduplication.
 
-### PR-011 — Ajouter fixtures HTML Hanabi et gérer dates non parseables
+### PR-011 — Ajouter fixtures HTML Hanabi et gérer dates non parseables ✅ DONE
 
 **Source :** BUG-004, TEST-004
 **Objectif :** éviter événements Hanabi invisibles à cause de `start_date=None`.
