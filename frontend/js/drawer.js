@@ -71,7 +71,8 @@ export function openDrawer(ev) {
   });
 
   // Liens actions — safeUrl filtre les protocoles non-http(s)
-  const eventUrl = safeUrl(attrs.official_url || ev.url);
+  // TC stocke attrs.official_link, Hanabi stocke attrs.official_site
+  const eventUrl = safeUrl(attrs.official_link || attrs.official_site || ev.url);
   const linkEvent = panel.querySelector('.drawer-link-event');
   linkEvent.href = eventUrl;
   linkEvent.style.display = eventUrl === '#' ? 'none' : '';
