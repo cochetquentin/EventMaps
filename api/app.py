@@ -26,7 +26,17 @@ _req_logger = logging.getLogger("api.requests")
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         t0 = time.monotonic()
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            duration = time.monotonic() - t0
+            _req_logger.info(
+                "request method=%s path=%s status=500 duration=%.3fs",
+                request.method,
+                request.url.path,
+                duration,
+            )
+            raise
         duration = time.monotonic() - t0
         _req_logger.info(
             "request method=%s path=%s status=%d duration=%.3fs",

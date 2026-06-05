@@ -53,10 +53,11 @@ def _do_scrape(source: str, region: str) -> None:
                 events.extend(tc_events)
                 reports.append(tc_report)
                 logger.info(
-                    "scraper source=tc job_id=%d events=%d links=%d errors=%d duration=%.2fs",
+                    "scraper source=tc job_id=%d events=%d links=%d skipped=%d errors=%d duration=%.2fs",
                     job_id,
                     tc_report.events_ok,
                     tc_report.links_seen,
+                    tc_report.events_skipped,
                     len(tc_report.errors),
                     tc_report.duration_s,
                 )
@@ -67,10 +68,11 @@ def _do_scrape(source: str, region: str) -> None:
                 events.extend(h_events)
                 reports.append(h_report)
                 logger.info(
-                    "scraper source=hanabi job_id=%d events=%d links=%d errors=%d duration=%.2fs",
+                    "scraper source=hanabi job_id=%d events=%d links=%d skipped=%d errors=%d duration=%.2fs",
                     job_id,
                     h_report.events_ok,
                     h_report.links_seen,
+                    h_report.events_skipped,
                     len(h_report.errors),
                     h_report.duration_s,
                 )
@@ -119,9 +121,13 @@ def _do_scrape(source: str, region: str) -> None:
                     error_count=error_count,
                 )
                 logger.error(
-                    "scrape_fail source=%s job_id=%d %s",
+                    "scrape_fail source=%s job_id=%d events=%d links=%d errors=%d duration=%.2fs reason=%s",
                     source,
                     job_id,
+                    events_ok,
+                    links_seen,
+                    error_count,
+                    job_duration,
                     msg,
                 )
             else:
