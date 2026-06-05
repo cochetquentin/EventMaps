@@ -1,8 +1,11 @@
 import json
 import os
 import sqlite3
+from datetime import UTC, datetime, timedelta, timezone
 from datetime import date as _date
-from datetime import datetime, timedelta, timezone
+
+from models.event import Event
+from models.identity import make_event_id
 
 _JST = timezone(timedelta(hours=9))
 
@@ -11,8 +14,6 @@ def _today_jst() -> str:
     """Return today's date in JST (UTC+9) as YYYY-MM-DD."""
     return datetime.now(_JST).date().isoformat()
 
-from models.event import Event
-from models.identity import make_event_id
 
 _make_id = make_event_id  # backward-compatible alias for existing callers
 
@@ -59,8 +60,19 @@ _SCRAPE_JOBS_MIGRATIONS = [
 ]
 
 _EVENTS_HEADERS = [
-    "id", "source", "title", "url", "start_date", "end_date",
-    "times", "venue", "latitude", "longitude", "price", "attributes", "created_at",
+    "id",
+    "source",
+    "title",
+    "url",
+    "start_date",
+    "end_date",
+    "times",
+    "venue",
+    "latitude",
+    "longitude",
+    "price",
+    "attributes",
+    "created_at",
 ]
 
 
@@ -89,9 +101,9 @@ def _migrate_scrape_jobs(conn: sqlite3.Connection) -> None:
 
 def _migrate(conn: sqlite3.Connection) -> None:
     """Migrate tokyo_cheapo + hanabi tables → events table if they still exist."""
-    tables = {r[0] for r in conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'"
-    ).fetchall()}
+    tables = {
+        r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+    }
 
     if "tokyo_cheapo" in tables:
         rows = conn.execute("SELECT * FROM tokyo_cheapo").fetchall()
@@ -124,20 +136,35 @@ def _migrate(conn: sqlite3.Connection) -> None:
             elif start_time:
                 times = start_time
 
-            attributes = json.dumps({
-                "categories": json.loads(categories or "[]"),
-                "tags": json.loads(tags or "[]"),
-                "official_link": official_link,
-                "location_name": location_name,
-            })
+            attributes = json.dumps(
+                {
+                    "categories": json.loads(categories or "[]"),
+                    "tags": json.loads(tags or "[]"),
+                    "official_link": official_link,
+                    "location_name": location_name,
+                }
+            )
 
             conn.execute(
                 """INSERT OR IGNORE INTO events
                    (id, source, title, url, start_date, end_date, times,
                     venue, latitude, longitude, price, attributes, created_at)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (r_id, "tc", title, url, norm_start, norm_end, times,
-                 None, lat, lng, price, attributes, scraped_at),
+                (
+                    r_id,
+                    "tc",
+                    title,
+                    url,
+                    norm_start,
+                    norm_end,
+                    times,
+                    None,
+                    lat,
+                    lng,
+                    price,
+                    attributes,
+                    scraped_at,
+                ),
             )
         conn.execute("DROP TABLE tokyo_cheapo")
 
@@ -183,30 +210,45 @@ def _migrate(conn: sqlite3.Connection) -> None:
             elif start_time:
                 times = start_time
 
-            attributes = json.dumps({
-                "fireworks_count": fireworks_count,
-                "fireworks_duration": fireworks_duration,
-                "expected_crowd": expected_crowd,
-                "rain_policy": rain_policy,
-                "paid_seating": paid_seating,
-                "paid_seating_details": paid_seating_details,
-                "food_stalls": food_stalls,
-                "notes": notes,
-                "access": access,
-                "parking": parking,
-                "official_site": official_site,
-                "official_x": official_x,
-                "contact": contact,
-                "contact2": contact2,
-            })
+            attributes = json.dumps(
+                {
+                    "fireworks_count": fireworks_count,
+                    "fireworks_duration": fireworks_duration,
+                    "expected_crowd": expected_crowd,
+                    "rain_policy": rain_policy,
+                    "paid_seating": paid_seating,
+                    "paid_seating_details": paid_seating_details,
+                    "food_stalls": food_stalls,
+                    "notes": notes,
+                    "access": access,
+                    "parking": parking,
+                    "official_site": official_site,
+                    "official_x": official_x,
+                    "contact": contact,
+                    "contact2": contact2,
+                }
+            )
 
             conn.execute(
                 """INSERT OR IGNORE INTO events
                    (id, source, title, url, start_date, end_date, times,
                     venue, latitude, longitude, price, attributes, created_at)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (r_id, "hanabi", title, url, norm_start, None, times,
-                 venue, lat, lng, None, attributes, scraped_at),
+                (
+                    r_id,
+                    "hanabi",
+                    title,
+                    url,
+                    norm_start,
+                    None,
+                    times,
+                    venue,
+                    lat,
+                    lng,
+                    None,
+                    attributes,
+                    scraped_at,
+                ),
             )
         conn.execute("DROP TABLE hanabi")
 
@@ -224,7 +266,9 @@ class EventStore:
         self._conn.execute(_SCRAPE_JOBS_DDL)
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_events_source ON events(source)")
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_events_start_date ON events(start_date)")
-        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_events_coords ON events(latitude, longitude)")
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_events_coords ON events(latitude, longitude)"
+        )
         self._conn.commit()
         _migrate_scrape_jobs(self._conn)
         _migrate(self._conn)
@@ -291,9 +335,7 @@ class EventStore:
             params.append(_today_jst())
         if bbox:
             min_lon, min_lat, max_lon, max_lat = bbox
-            clauses.append(
-                "latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?"
-            )
+            clauses.append("latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?")
             params.extend([min_lat, max_lat, min_lon, max_lon])
         where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
         rows = self._conn.execute(
@@ -303,9 +345,7 @@ class EventStore:
         return [self._event_from_row(r) for r in rows]
 
     def get_event(self, event_id: str) -> Event | None:
-        row = self._conn.execute(
-            "SELECT * FROM events WHERE id = ?", (event_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
         return self._event_from_row(row) if row else None
 
     # --- Scrape jobs ---
@@ -313,7 +353,7 @@ class EventStore:
     def start_job(self, source: str) -> int:
         cur = self._conn.execute(
             "INSERT INTO scrape_jobs (source, status, started_at) VALUES (?, 'running', ?)",
-            (source, datetime.now(timezone.utc).isoformat()),
+            (source, datetime.now(UTC).isoformat()),
         )
         self._conn.commit()
         return cur.lastrowid
@@ -334,7 +374,7 @@ class EventStore:
                    links_seen=?, events_ok=?, events_skipped=?, error_count=?
                WHERE id=?""",
             (
-                datetime.now(timezone.utc).isoformat(),
+                datetime.now(UTC).isoformat(),
                 count,
                 links_seen,
                 events_ok,
@@ -361,7 +401,7 @@ class EventStore:
                    links_seen=?, events_ok=?, events_skipped=?, error_count=?
                WHERE id=?""",
             (
-                datetime.now(timezone.utc).isoformat(),
+                datetime.now(UTC).isoformat(),
                 error,
                 links_seen,
                 events_ok,
@@ -385,8 +425,17 @@ class EventStore:
         if row is None:
             return None
         keys = [
-            "id", "source", "status", "started_at", "finished_at", "events_scraped", "error",
-            "links_seen", "events_ok", "events_skipped", "error_count",
+            "id",
+            "source",
+            "status",
+            "started_at",
+            "finished_at",
+            "events_scraped",
+            "error",
+            "links_seen",
+            "events_ok",
+            "events_skipped",
+            "error_count",
         ]
         return dict(zip(keys, row))
 

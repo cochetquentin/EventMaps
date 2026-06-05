@@ -1,4 +1,5 @@
-from datetime import date as DateType, timedelta
+from datetime import date as DateType
+from datetime import timedelta
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
@@ -9,7 +10,9 @@ from db.store import EventStore
 from models.event import Event
 
 try:
-    from icalendar import Calendar, Event as ICSEvent
+    from icalendar import Calendar
+    from icalendar import Event as ICSEvent
+
     _ICAL_AVAILABLE = True
 except ImportError:
     _ICAL_AVAILABLE = False
@@ -20,7 +23,9 @@ router = APIRouter()
 def _parse_bbox(s: str) -> tuple[float, float, float, float]:
     parts = s.split(",")
     if len(parts) != 4:
-        raise HTTPException(status_code=422, detail="bbox: 4 floats attendus (min_lon,min_lat,max_lon,max_lat)")
+        raise HTTPException(
+            status_code=422, detail="bbox: 4 floats attendus (min_lon,min_lat,max_lon,max_lat)"
+        )
     try:
         min_lon, min_lat, max_lon, max_lat = map(float, parts)
     except ValueError:
@@ -37,8 +42,12 @@ def list_events(
     source: Literal["tc", "hanabi"] | None = Query(None),
     date: DateType | None = Query(None, description="YYYY-MM-DD overlap filter"),
     bbox: str | None = Query(None, description="min_lon,min_lat,max_lon,max_lat"),
-    start_from: DateType | None = Query(None, description="Lower bound on event end/start date (overrides upcoming default)"),
-    start_to: DateType | None = Query(None, description="Upper bound on event start date (overrides upcoming default)"),
+    start_from: DateType | None = Query(
+        None, description="Lower bound on event end/start date (overrides upcoming default)"
+    ),
+    start_to: DateType | None = Query(
+        None, description="Upper bound on event start date (overrides upcoming default)"
+    ),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ):

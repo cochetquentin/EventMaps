@@ -1,4 +1,5 @@
 """Tests vérifiant la présence des hashes SRI dans frontend/index.html (SEC-003)."""
+
 import re
 from pathlib import Path
 
@@ -28,8 +29,7 @@ def test_sri_hashes_present():
     for url, expected_hash in EXPECTED_SRI.items():
         assert url in HTML, f"URL CDN absente du HTML : {url}"
         assert expected_hash in HTML, (
-            f"Hash SRI manquant ou incorrect pour {url}\n"
-            f"Attendu : {expected_hash}"
+            f"Hash SRI manquant ou incorrect pour {url}\nAttendu : {expected_hash}"
         )
 
 
@@ -39,15 +39,11 @@ def test_crossorigin_present_for_unpkg_resources():
     tags = tag_pattern.findall(HTML)
     assert len(tags) == 5, f"Attendu 5 balises unpkg, trouvé {len(tags)}"
     for tag in tags:
-        assert 'crossorigin="anonymous"' in tag, (
-            f"crossorigin manquant sur la balise : {tag[:120]}"
-        )
+        assert 'crossorigin="anonymous"' in tag, f"crossorigin manquant sur la balise : {tag[:120]}"
 
 
 def test_integrity_attribute_format():
     """Les attributs integrity doivent suivre le format sha384-<base64>."""
     integrity_pattern = re.compile(r'integrity="(sha384-[A-Za-z0-9+/]+=*)"')
     found = integrity_pattern.findall(HTML)
-    assert len(found) == 5, (
-        f"Attendu 5 attributs integrity sha384, trouvé {len(found)}"
-    )
+    assert len(found) == 5, f"Attendu 5 attributs integrity sha384, trouvé {len(found)}"

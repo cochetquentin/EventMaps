@@ -1,0 +1,12 @@
+# Force LF line endings for all text files in the repo.
+# Prevents CRLF/LF mismatches between Windows dev environments and Linux CI.
+* text=auto eol=lf
+*.py eol=lf
+*.yml eol=lf
+*.toml eol=lf
+*.md eol=lf
+*.txt eol=lf
+*.json eol=lf
+*.html eol=lf
+*.css eol=lf
+*.js eol=lf

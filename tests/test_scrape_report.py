@@ -1,17 +1,18 @@
 """Tests for ScrapeReport, partial error detection and threshold-based job failure."""
-from datetime import datetime, timezone, date
-from unittest.mock import patch, MagicMock
+
+from datetime import UTC, date, datetime
+from unittest.mock import patch
 
 import pytest
 
-from scrapers.base import ScrapeReport
-from scrapers.tokyo_cheapo import TokyoCheapo
-from scrapers.hanabi_walker import HanabiWalker
 from db.store import EventStore, _make_id
 from models.event import Event
-
+from scrapers.base import ScrapeReport
+from scrapers.hanabi_walker import HanabiWalker
+from scrapers.tokyo_cheapo import TokyoCheapo
 
 # ── ScrapeReport unit tests ──────────────────────────────────────────────────
+
 
 def test_scrape_report_error_rate_zero_links():
     report = ScrapeReport(source="tc", links_seen=0)
@@ -43,6 +44,7 @@ def test_scrape_report_includes_skipped_in_rate():
 
 
 # ── Scraper partial error collection ────────────────────────────────────────
+
 
 def test_tokyo_cheapo_scrape_all_counts_errors():
     """scrape_all() must record failing URLs in the errors list."""
@@ -136,6 +138,7 @@ def test_tokyo_cheapo_scrape_returns_tuple():
 
 # ── _do_scrape error threshold ───────────────────────────────────────────────
 
+
 def _make_event():
     return Event(
         id=_make_id(["https://example.com", ""]),
@@ -144,14 +147,14 @@ def _make_event():
         url="https://example.com",
         start_date=date(2026, 6, 1),
         attributes={},
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
 
 def test_do_scrape_fails_job_on_high_error_rate(tmp_path, monkeypatch):
     """_do_scrape() must call fail_job when error_rate > threshold."""
-    import config
     import api.routes.scrape as scrape_module
+    import config
 
     db_path = str(tmp_path / "events.db")
     monkeypatch.setattr(config.settings, "db_path", db_path)
@@ -179,8 +182,8 @@ def test_do_scrape_fails_job_on_high_error_rate(tmp_path, monkeypatch):
 
 def test_do_scrape_finishes_job_on_low_error_rate(tmp_path, monkeypatch):
     """_do_scrape() must call finish_job when error_rate <= threshold."""
-    import config
     import api.routes.scrape as scrape_module
+    import config
 
     db_path = str(tmp_path / "events.db")
     monkeypatch.setattr(config.settings, "db_path", db_path)
@@ -209,8 +212,8 @@ def test_do_scrape_finishes_job_on_low_error_rate(tmp_path, monkeypatch):
 
 def test_do_scrape_zero_links_does_not_fail(tmp_path, monkeypatch):
     """_do_scrape() must not fail the job when links_seen == 0 (source empty)."""
-    import config
     import api.routes.scrape as scrape_module
+    import config
 
     db_path = str(tmp_path / "events.db")
     monkeypatch.setattr(config.settings, "db_path", db_path)
@@ -231,8 +234,8 @@ def test_do_scrape_zero_links_does_not_fail(tmp_path, monkeypatch):
 
 def test_do_scrape_persists_metrics_on_failed_job(tmp_path, monkeypatch):
     """Metrics must be stored even when fail_job is called (threshold exceeded)."""
-    import config
     import api.routes.scrape as scrape_module
+    import config
 
     db_path = str(tmp_path / "events.db")
     monkeypatch.setattr(config.settings, "db_path", db_path)
@@ -259,8 +262,8 @@ def test_do_scrape_persists_metrics_on_failed_job(tmp_path, monkeypatch):
 
 def test_do_scrape_all_fails_if_one_source_broken(tmp_path, monkeypatch):
     """source=all must fail if one source exceeds threshold, even if the other is healthy."""
-    import config
     import api.routes.scrape as scrape_module
+    import config
 
     db_path = str(tmp_path / "events.db")
     monkeypatch.setattr(config.settings, "db_path", db_path)
@@ -291,11 +294,13 @@ def test_do_scrape_all_fails_if_one_source_broken(tmp_path, monkeypatch):
 
 # ── GET /scrape/status returns metric columns ────────────────────────────────
 
+
 def test_scrape_status_exposes_metric_columns(tmp_path, monkeypatch):
     """GET /scrape/status must include links_seen, events_ok, events_skipped, error_count."""
-    import config
-    import api.routes.scrape as scrape_module
     from fastapi.testclient import TestClient
+
+    import api.routes.scrape as scrape_module
+    import config
     from api.app import app
 
     db_path = str(tmp_path / "events.db")

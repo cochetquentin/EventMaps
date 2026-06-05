@@ -1,16 +1,17 @@
+import calendar
 import html as _html
 import json
 import logging
 import re
+from datetime import UTC, datetime
+from datetime import date as _date
+
 import requests
 from bs4 import BeautifulSoup
-import calendar
-from datetime import date as _date, datetime, timezone
+from tenacity import before_log, retry, stop_after_attempt, wait_exponential
 
-from tenacity import retry, stop_after_attempt, wait_exponential, before_log
-
-from models.identity import make_event_id as _make_id
 from models.event import Event
+from models.identity import make_event_id as _make_id
 from scrapers.base import BaseScraper, ScrapeReport
 
 logger = logging.getLogger(__name__)
@@ -22,22 +23,46 @@ _HEADERS = {
 }
 
 _MONTHS = [
-    "january", "february", "march", "april", "may", "june",
-    "july", "august", "september", "october", "november", "december",
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
 ]
 
 _EXCLUDE_LINKS = {
-    "/events/", "/events/this-week/", "/events/weekend/",
-    "/events/this-month/", "/events/next-month/",
-    "/events/this-week", "/events/this-month",
+    "/events/",
+    "/events/this-week/",
+    "/events/weekend/",
+    "/events/this-month/",
+    "/events/next-month/",
+    "/events/this-week",
+    "/events/this-month",
     *[f"/events/{m}" for m in _MONTHS],
 }
 
 BASE_URL = "https://tokyocheapo.com"
 
 _MONTH_ABBREVS = {
-    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
-    'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+    "jan": 1,
+    "feb": 2,
+    "mar": 3,
+    "apr": 4,
+    "may": 5,
+    "jun": 6,
+    "jul": 7,
+    "aug": 8,
+    "sep": 9,
+    "oct": 10,
+    "nov": 11,
+    "dec": 12,
 }
 
 
@@ -62,42 +87,43 @@ def _parse_iso_date(s: str) -> _date | None:
 
 
 def _clean_whitespace(text: str) -> str:
-    return re.sub(r'\s+', ' ', text).strip()
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def _is_price_text(text: str) -> bool:
     t = text.strip()
-    return bool(re.match(r'^(Free|¥|\$|€)', t, re.IGNORECASE)) \
-        or bool(re.search(r'advance sales|at the door', t, re.IGNORECASE))
+    return bool(re.match(r"^(Free|¥|\$|€)", t, re.IGNORECASE)) or bool(
+        re.search(r"advance sales|at the door", t, re.IGNORECASE)
+    )
 
 
 def _parse_12h_time(token: str) -> str:
     """'7:30pm' → '19:30'. Retourne le token original si non parseable."""
-    m = re.match(r'^(\d{1,2}):(\d{2})\s*(am|pm)$', token.strip(), re.IGNORECASE)
+    m = re.match(r"^(\d{1,2}):(\d{2})\s*(am|pm)$", token.strip(), re.IGNORECASE)
     if not m:
         return token.strip()
     h, mn, period = int(m.group(1)), int(m.group(2)), m.group(3).lower()
-    if period == 'pm' and h != 12:
+    if period == "pm" and h != 12:
         h += 12
-    elif period == 'am' and h == 12:
+    elif period == "am" and h == 12:
         h = 0
     return f"{h:02d}:{mn:02d}"
 
 
 def _split_time(time_str: str) -> tuple[str, str]:
     """'7:30pm – 10:00pm' → ('19:30', '22:00'). Retourne ('', '') si vide."""
-    parts = re.split(r'\s*[–—\-]\s*', time_str.strip(), maxsplit=1)
+    parts = re.split(r"\s*[–—\-]\s*", time_str.strip(), maxsplit=1)
     if len(parts) == 2:
         return _parse_12h_time(parts[0]), _parse_12h_time(parts[1])
     if parts[0]:
-        return _parse_12h_time(parts[0]), ''
-    return '', ''
+        return _parse_12h_time(parts[0]), ""
+    return "", ""
 
 
 def _parse_date_part(text: str, year: int) -> _date | None:
     """Parse 'May 15', 'Fri, May 15', 'Mar 27' → date object."""
-    text = re.sub(r'^(Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s*', '', text, flags=re.IGNORECASE).strip()
-    m = re.match(r'^([A-Za-z]{3,})\s+(\d{1,2})$', text)
+    text = re.sub(r"^(Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s*", "", text, flags=re.IGNORECASE).strip()
+    m = re.match(r"^([A-Za-z]{3,})\s+(\d{1,2})$", text)
     if m:
         month = _MONTH_ABBREVS.get(m.group(1)[:3].lower())
         if month:
@@ -107,9 +133,13 @@ def _parse_date_part(text: str, year: int) -> _date | None:
 
 _FUZZY_PERIODS = {"early": (1, 10), "mid": (11, 20), "late": (21, None)}
 
-_FUZZY_SINGLE_RE = re.compile(r'^(early|mid|late)\s+([a-z]+)$', re.IGNORECASE)
-_FUZZY_SAME_MONTH_RE = re.compile(r'^(early|mid|late)\s*~\s*(early|mid|late)\s+([a-z]+)$', re.IGNORECASE)
-_FUZZY_CROSS_MONTH_RE = re.compile(r'^(early|mid|late)\s+([a-z]+)\s*~\s*(early|mid|late)\s+([a-z]+)$', re.IGNORECASE)
+_FUZZY_SINGLE_RE = re.compile(r"^(early|mid|late)\s+([a-z]+)$", re.IGNORECASE)
+_FUZZY_SAME_MONTH_RE = re.compile(
+    r"^(early|mid|late)\s*~\s*(early|mid|late)\s+([a-z]+)$", re.IGNORECASE
+)
+_FUZZY_CROSS_MONTH_RE = re.compile(
+    r"^(early|mid|late)\s+([a-z]+)\s*~\s*(early|mid|late)\s+([a-z]+)$", re.IGNORECASE
+)
 
 
 def _fuzzy_start(period: str, month: int, year: int) -> _date:
@@ -128,8 +158,8 @@ def _parse_fuzzy_date_range(date_str: str, year: int) -> tuple[str, str] | None:
         month = _MONTH_ABBREVS.get(mon[:3].lower())
         if month:
             return (
-                _fuzzy_start(period, month, year).strftime('%Y/%m/%d'),
-                _fuzzy_end(period, month, year).strftime('%Y/%m/%d'),
+                _fuzzy_start(period, month, year).strftime("%Y/%m/%d"),
+                _fuzzy_end(period, month, year).strftime("%Y/%m/%d"),
             )
 
     m = _FUZZY_SAME_MONTH_RE.match(date_str)
@@ -138,8 +168,8 @@ def _parse_fuzzy_date_range(date_str: str, year: int) -> tuple[str, str] | None:
         month = _MONTH_ABBREVS.get(mon[:3].lower())
         if month:
             return (
-                _fuzzy_start(p1, month, year).strftime('%Y/%m/%d'),
-                _fuzzy_end(p2, month, year).strftime('%Y/%m/%d'),
+                _fuzzy_start(p1, month, year).strftime("%Y/%m/%d"),
+                _fuzzy_end(p2, month, year).strftime("%Y/%m/%d"),
             )
 
     m = _FUZZY_CROSS_MONTH_RE.match(date_str)
@@ -149,8 +179,8 @@ def _parse_fuzzy_date_range(date_str: str, year: int) -> tuple[str, str] | None:
         month2 = _MONTH_ABBREVS.get(mon2[:3].lower())
         if month1 and month2:
             return (
-                _fuzzy_start(p1, month1, year).strftime('%Y/%m/%d'),
-                _fuzzy_end(p2, month2, year).strftime('%Y/%m/%d'),
+                _fuzzy_start(p1, month1, year).strftime("%Y/%m/%d"),
+                _fuzzy_end(p2, month2, year).strftime("%Y/%m/%d"),
             )
 
     return None
@@ -166,17 +196,17 @@ def _parse_date_range(date_str: str, year: int | None = None) -> tuple[str, str]
     if year is None:
         year = _date.today().year
 
-    range_m = re.match(r'^(.+?)\s+-\s+(.+)$', date_str.strip())
+    range_m = re.match(r"^(.+?)\s+-\s+(.+)$", date_str.strip())
     if range_m:
         start = _parse_date_part(range_m.group(1).strip(), year)
         end = _parse_date_part(range_m.group(2).strip(), year)
         if start and end:
-            return start.strftime('%Y/%m/%d'), end.strftime('%Y/%m/%d')
+            return start.strftime("%Y/%m/%d"), end.strftime("%Y/%m/%d")
         return date_str, ""
 
     single = _parse_date_part(date_str.strip(), year)
     if single:
-        d = single.strftime('%Y/%m/%d')
+        d = single.strftime("%Y/%m/%d")
         return d, d
 
     fuzzy = _parse_fuzzy_date_range(date_str.strip(), year)
@@ -188,6 +218,7 @@ def _parse_date_range(date_str: str, year: int | None = None) -> tuple[str, str]
 class TokyoCheapo(BaseScraper):
     def __init__(self):
         from config import settings
+
         self.session = requests.Session()
         self.session.headers.update(_HEADERS)
         self.session.headers["User-Agent"] = settings.scrape_user_agent
@@ -206,7 +237,8 @@ class TokyoCheapo(BaseScraper):
 
             soup = BeautifulSoup(response.content, "html.parser")
             page_links = {
-                href for a in soup.find_all("a")
+                href
+                for a in soup.find_all("a")
                 if (href := a.get("href"))
                 and href.startswith("/events/")
                 and href not in _EXCLUDE_LINKS
@@ -322,7 +354,7 @@ class TokyoCheapo(BaseScraper):
         """Scrape toutes les infos d'un événement depuis son URL."""
         soup = self.get_event_page(url)
         time_raw, price = self.parse_time_and_price(soup)
-        start_time, end_time = _split_time(time_raw) if time_raw else ('', '')
+        start_time, end_time = _split_time(time_raw) if time_raw else ("", "")
         date_raw = self.parse_date(soup)
         start_date, end_date = _parse_date_range(date_raw)
         return {
@@ -360,7 +392,7 @@ class TokyoCheapo(BaseScraper):
 
     def scrape(self, max_pages: int = 10) -> tuple[list[Event], ScrapeReport]:
         """Retourne les événements sous forme de modèles canoniques Event avec un rapport."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         raw_events, counts = self.scrape_all(max_pages=max_pages)
         report = ScrapeReport(
             source="tc",
@@ -380,26 +412,28 @@ class TokyoCheapo(BaseScraper):
                 elif start_time:
                     times = start_time
                 location_name = loc.get("name") or ""
-                events.append(Event(
-                    id=_make_id([e["url"], location_name]),
-                    source="tc",
-                    title=e.get("title", ""),
-                    url=e["url"],
-                    start_date=_parse_iso_date(e.get("start_date", "")),
-                    end_date=_parse_iso_date(e.get("end_date", "")),
-                    times=times,
-                    venue=None,
-                    latitude=loc.get("lat"),
-                    longitude=loc.get("lng"),
-                    price=e.get("price") or None,
-                    attributes={
-                        "categories": e.get("categories") or [],
-                        "tags": e.get("tags") or [],
-                        "official_link": e.get("official_link") or None,
-                        "location_name": location_name or None,
-                    },
-                    created_at=now,
-                ))
+                events.append(
+                    Event(
+                        id=_make_id([e["url"], location_name]),
+                        source="tc",
+                        title=e.get("title", ""),
+                        url=e["url"],
+                        start_date=_parse_iso_date(e.get("start_date", "")),
+                        end_date=_parse_iso_date(e.get("end_date", "")),
+                        times=times,
+                        venue=None,
+                        latitude=loc.get("lat"),
+                        longitude=loc.get("lng"),
+                        price=e.get("price") or None,
+                        attributes={
+                            "categories": e.get("categories") or [],
+                            "tags": e.get("tags") or [],
+                            "official_link": e.get("official_link") or None,
+                            "location_name": location_name or None,
+                        },
+                        created_at=now,
+                    )
+                )
         if not events:
             logger.critical(
                 "Scraper %s returned 0 events — likely a parser failure (HTML structure changed?)",

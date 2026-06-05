@@ -25,5 +25,11 @@ jobs:
       - name: Audit des dépendances
         run: uv run --locked pip-audit
 
+      - name: Lint (Ruff)
+        run: uv run --locked ruff check .
+
+      - name: Format (Ruff)
+        run: uv run --locked ruff format --check .
+
       - name: Lancer les tests
         run: uv run --locked python -m pytest --cov=. --cov-fail-under=80 tests/ -v

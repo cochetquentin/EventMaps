@@ -3,37 +3,62 @@ import csv
 import logging
 import sys
 
-logger = logging.getLogger(__name__)
-
-from scrapers.tokyo_cheapo import TokyoCheapo
-from scrapers.hanabi_walker import HanabiWalker
 from db.store import EventStore
 from models.event import Event
+from scrapers.hanabi_walker import HanabiWalker
+from scrapers.tokyo_cheapo import TokyoCheapo
+
+logger = logging.getLogger(__name__)
 
 
 def _write_events_csv(events: list[Event]) -> None:
     sys.stdout.reconfigure(encoding="utf-8", newline="")
     writer = csv.writer(sys.stdout)
-    writer.writerow([
-        "id", "source", "title", "url", "start_date", "end_date",
-        "times", "venue", "latitude", "longitude", "price", "attributes", "created_at",
-    ])
+    writer.writerow(
+        [
+            "id",
+            "source",
+            "title",
+            "url",
+            "start_date",
+            "end_date",
+            "times",
+            "venue",
+            "latitude",
+            "longitude",
+            "price",
+            "attributes",
+            "created_at",
+        ]
+    )
     for e in events:
-        writer.writerow([
-            e.id, e.source, e.title, e.url,
-            e.start_date.isoformat() if e.start_date else "",
-            e.end_date.isoformat() if e.end_date else "",
-            e.times or "", e.venue or "",
-            e.latitude, e.longitude, e.price or "",
-            str(e.attributes), e.created_at.isoformat(),
-        ])
+        writer.writerow(
+            [
+                e.id,
+                e.source,
+                e.title,
+                e.url,
+                e.start_date.isoformat() if e.start_date else "",
+                e.end_date.isoformat() if e.end_date else "",
+                e.times or "",
+                e.venue or "",
+                e.latitude,
+                e.longitude,
+                e.price or "",
+                str(e.attributes),
+                e.created_at.isoformat(),
+            ]
+        )
 
 
 def cmd_tc(args):
     events, report = TokyoCheapo().scrape()
     logger.info(
         "Tokyo Cheapo: %d ok, %d skipped, %d errors (of %d links)",
-        report.events_ok, report.events_skipped, len(report.errors), report.links_seen,
+        report.events_ok,
+        report.events_skipped,
+        len(report.errors),
+        report.links_seen,
     )
     if args.output == "db":
         with EventStore(args.db) as store:
@@ -47,7 +72,10 @@ def cmd_hanabi(args):
     events, report = HanabiWalker(region=args.region).scrape()
     logger.info(
         "Hanabi Walker: %d ok, %d skipped, %d errors (of %d links)",
-        report.events_ok, report.events_skipped, len(report.errors), report.links_seen,
+        report.events_ok,
+        report.events_skipped,
+        len(report.errors),
+        report.links_seen,
     )
     if args.output == "db":
         with EventStore(args.db) as store:
@@ -62,11 +90,17 @@ def cmd_all(args):
     hanabi_events, hanabi_report = HanabiWalker(region=args.region).scrape()
     logger.info(
         "Tokyo Cheapo: %d ok, %d skipped, %d errors (of %d links)",
-        tc_report.events_ok, tc_report.events_skipped, len(tc_report.errors), tc_report.links_seen,
+        tc_report.events_ok,
+        tc_report.events_skipped,
+        len(tc_report.errors),
+        tc_report.links_seen,
     )
     logger.info(
         "Hanabi Walker: %d ok, %d skipped, %d errors (of %d links)",
-        hanabi_report.events_ok, hanabi_report.events_skipped, len(hanabi_report.errors), hanabi_report.links_seen,
+        hanabi_report.events_ok,
+        hanabi_report.events_skipped,
+        len(hanabi_report.errors),
+        hanabi_report.links_seen,
     )
     if args.output == "db":
         with EventStore(args.db) as store:
@@ -92,7 +126,9 @@ def main():
     p_all = sub.add_parser("all", help="Scrape all sources")
     p_all.add_argument("--region", default="ar0300", metavar="CODE")
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s"
+    )
     args = parser.parse_args()
 
     if args.source == "tc":

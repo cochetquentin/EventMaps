@@ -1,18 +1,19 @@
+from datetime import UTC, date, datetime, timedelta
+
 import pytest
-from datetime import date, datetime, timedelta, timezone
 from fastapi.testclient import TestClient
 
 from api.app import app
 from db.store import EventStore, _make_id
 from models.event import Event
 
-_NOW = datetime(2026, 5, 16, 12, 0, 0, tzinfo=timezone.utc)
+_NOW = datetime(2026, 5, 16, 12, 0, 0, tzinfo=UTC)
 _TC_URL = "https://tokyocheapo.com/event/foo"
 _HW_URL = "https://hanabi.walkerplus.com/detail/ar0300e001/"
 
 
-_TC_START  = date.today() + timedelta(days=90)   # always in the future
-_HW_START  = date.today() + timedelta(days=60)   # always in the future, < TC
+_TC_START = date.today() + timedelta(days=90)  # always in the future
+_HW_START = date.today() + timedelta(days=60)  # always in the future, < TC
 
 
 def make_tc(**kwargs) -> Event:
@@ -33,8 +34,7 @@ def make_tc(**kwargs) -> Event:
     )
     defaults.update(kwargs)
     defaults.setdefault(
-        "id",
-        _make_id([defaults["url"], defaults.get("attributes", {}).get("location_name") or ""])
+        "id", _make_id([defaults["url"], defaults.get("attributes", {}).get("location_name") or ""])
     )
     return Event(**defaults)
 
@@ -62,6 +62,7 @@ def make_hanabi(**kwargs) -> Event:
 def db(tmp_path, monkeypatch):
     """Return a populated DB path and patch settings to use it."""
     import config
+
     db_path = str(tmp_path / "events.db")
     with EventStore(db_path) as store:
         store.upsert_events([make_tc(), make_hanabi()])
@@ -75,6 +76,7 @@ def client(db):
 
 
 # --- GET /events ---
+
 
 def test_list_events_returns_both_sources(client):
     resp = client.get("/events")
@@ -141,13 +143,20 @@ def test_start_from_and_start_to_combined(client):
 
 def test_list_events_pagination(db, monkeypatch):
     with EventStore(db) as store:
-        store.upsert_events([
-            make_tc(
-                url=f"https://tokyocheapo.com/event/{i}",
-                attributes={"categories": [], "tags": [], "official_link": None, "location_name": f"Loc {i}"},
-            )
-            for i in range(5)
-        ])
+        store.upsert_events(
+            [
+                make_tc(
+                    url=f"https://tokyocheapo.com/event/{i}",
+                    attributes={
+                        "categories": [],
+                        "tags": [],
+                        "official_link": None,
+                        "location_name": f"Loc {i}",
+                    },
+                )
+                for i in range(5)
+            ]
+        )
     client = TestClient(app)
     resp = client.get("/events?source=tc&limit=3&offset=0")
     assert resp.status_code == 200
@@ -160,6 +169,7 @@ def test_list_events_pagination(db, monkeypatch):
 
 def test_list_events_empty_db(tmp_path, monkeypatch):
     import config
+
     db_path = str(tmp_path / "empty.db")
     EventStore(db_path).close()
     monkeypatch.setattr(config.settings, "db_path", db_path)
@@ -169,6 +179,7 @@ def test_list_events_empty_db(tmp_path, monkeypatch):
 
 
 # --- GET /events/{id} ---
+
 
 def test_get_event_tc(client):
     event = make_tc()
@@ -199,7 +210,16 @@ def test_get_event_not_found(client):
 def test_event_shape_tc(client):
     event = make_tc()
     data = client.get(f"/events/{event.id}").json()
-    for field in ["id", "source", "title", "url", "start_date", "latitude", "longitude", "attributes"]:
+    for field in [
+        "id",
+        "source",
+        "title",
+        "url",
+        "start_date",
+        "latitude",
+        "longitude",
+        "attributes",
+    ]:
         assert field in data
 
 
@@ -211,6 +231,7 @@ def test_event_shape_hanabi(client):
 
 
 # --- Validation 422 ---
+
 
 def test_invalid_source_returns_422(client):
     resp = client.get("/events?source=invalid")
@@ -238,6 +259,7 @@ def test_limit_max_accepted(client):
 
 
 # --- iCal export ---
+
 
 def test_ical_returns_vcalendar(client):
     event = make_tc()
@@ -283,6 +305,7 @@ def test_ical_hanabi_has_location(client):
 
 
 # --- Bbox filter ---
+
 
 def test_bbox_returns_tc_event(client):
     # TC: lat=35.671, lon=139.694 → inside; Hanabi: lat=35.711, lon=139.801 → outside

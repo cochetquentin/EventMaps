@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
@@ -29,7 +29,7 @@ def _is_stale(job: dict) -> bool:
     """Return True if a 'running' job was started more than scrape_timeout_hours ago."""
     try:
         started = datetime.fromisoformat(job["started_at"])
-        age = datetime.now(timezone.utc) - started
+        age = datetime.now(UTC) - started
         return age.total_seconds() > settings.scrape_timeout_hours * 3600
     except (ValueError, TypeError, KeyError):
         return True
@@ -61,13 +61,19 @@ def _do_scrape(source: str, region: str) -> None:
             )
             # Also check per-source so a healthy source can't mask a broken one
             failing_source = next(
-                (r for r in reports if r.links_seen > 0 and r.error_rate > settings.scrape_error_threshold),
+                (
+                    r
+                    for r in reports
+                    if r.links_seen > 0 and r.error_rate > settings.scrape_error_threshold
+                ),
                 None,
             )
 
             store.upsert_events(events)
 
-            if failing_source is not None or (links_seen > 0 and combined_error_rate > settings.scrape_error_threshold):
+            if failing_source is not None or (
+                links_seen > 0 and combined_error_rate > settings.scrape_error_threshold
+            ):
                 if failing_source is not None:
                     msg = (
                         f"Source '{failing_source.source}' error rate {failing_source.error_rate:.0%} "
@@ -100,7 +106,10 @@ def _do_scrape(source: str, region: str) -> None:
                 )
                 logger.info(
                     "Scrape done (%s): %d events, %d links, %d errors",
-                    source, len(events), links_seen, error_count,
+                    source,
+                    len(events),
+                    links_seen,
+                    error_count,
                 )
         except Exception as e:
             store.fail_job(job_id, str(e))

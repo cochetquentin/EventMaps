@@ -1,9 +1,9 @@
 """Tests for the empty-scrape CRITICAL alert (Phase 2.6)."""
-import pytest
+
 from unittest.mock import patch
 
-from scrapers.tokyo_cheapo import TokyoCheapo
 from scrapers.hanabi_walker import HanabiWalker
+from scrapers.tokyo_cheapo import TokyoCheapo
 
 _EMPTY_COUNTS = {"links_seen": 0, "events_ok": 0, "errors": []}
 
@@ -28,9 +28,8 @@ def test_hanabi_walker_critical_on_zero_events(caplog):
 
 def test_tokyo_cheapo_no_alert_when_events_returned():
     """No CRITICAL log when events are actually returned."""
-    import logging
     import io
-    from datetime import datetime, timezone
+    import logging
 
     raw_event = {
         "url": "https://example.com",

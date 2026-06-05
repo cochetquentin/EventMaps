@@ -1,8 +1,9 @@
 """Tests for POST /scrape authentication and GET /scrape/config."""
 
+from unittest.mock import patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch
 
 from api.app import app
 
@@ -27,11 +28,13 @@ def client(db):
 @pytest.fixture()
 def client_with_token(db, monkeypatch):
     import config
+
     monkeypatch.setattr(config.settings, "scrape_token", "secret")
     return TestClient(app)
 
 
 # ── GET /scrape/config ────────────────────────────────────────────────────────
+
 
 def test_scrape_config_public_when_no_token(client):
     resp = client.get("/scrape/config")
@@ -47,6 +50,7 @@ def test_scrape_config_not_public_when_token_set(client_with_token):
 
 # ── POST /scrape — mode sans token ────────────────────────────────────────────
 
+
 def test_scrape_without_token_config_succeeds(client):
     with patch("api.routes.scrape._do_scrape"):
         resp = client.post("/scrape")
@@ -55,6 +59,7 @@ def test_scrape_without_token_config_succeeds(client):
 
 
 # ── POST /scrape — mode avec token requis ────────────────────────────────────
+
 
 def test_scrape_without_header_returns_403(client_with_token):
     resp = client_with_token.post("/scrape")
@@ -79,6 +84,7 @@ def test_scrape_with_correct_token_succeeds(client_with_token):
 
 
 # ── GET /scrape/status — toujours public ────────────────────────────────────
+
 
 def test_scrape_status_public_without_token(client_with_token):
     resp = client_with_token.get("/scrape/status")
