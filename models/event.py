@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Event(BaseModel):
@@ -18,5 +18,5 @@ class Event(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     price: str | None = None
-    attributes: dict = {}
+    attributes: dict = Field(default_factory=dict)
     created_at: datetime

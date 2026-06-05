@@ -741,7 +741,7 @@ Tâches :
 4. ~~`TEST-003` — fixtures Tokyo Cheapo — protège parser — dépendances : aucune.~~ **[DONE]**
 5. ~~`TEST-004` — fixtures Hanabi — protège parser — dépendances : BUG-004.~~ **[DONE]**
 6. ~~`BUG-005` — fallback description Tokyo Cheapo — petite robustesse — dépendances : aucune.~~ **[DONE]**
-7. `CLEAN-006` — default factory attributes — hygiène modèle — dépendances : aucune.
+7. ~~`CLEAN-006` — default factory attributes — hygiène modèle — dépendances : aucune.~~ **[DONE]**
 
 ### Phase 2 — Maintenabilité & architecture
 
