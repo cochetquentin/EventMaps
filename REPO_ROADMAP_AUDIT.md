@@ -764,7 +764,7 @@ Tâches :
 
 ### Phase 4 — Features produit
 
-1. `FEAT-001` — filtres/recherche serveur complets — scalabilité UX — dépendances : BUG-001, ARCH-001.
+1. ~~`FEAT-001` — filtres/recherche serveur complets — scalabilité UX — dépendances : BUG-001, ARCH-001.~~ **[DONE]**
 2. `FEAT-003` — événements à proximité — valeur mobile — dépendances : SEC-002.
 3. `FEAT-005` — drawer détail événement — valorise données existantes — dépendances : SEC-002, ARCH-001.
 4. `FEAT-002` — URLs partageables — UX/support — dépendances : BUG-001.

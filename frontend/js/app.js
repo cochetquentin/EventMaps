@@ -122,7 +122,14 @@ document.getElementById('reset-filters').addEventListener('click', () => {
 });
 
 // ── Search ────────────────────────────────────────────────────────────────
-document.getElementById('search-input').addEventListener('input', renderMarkers);
+let searchDebounceTimer = null;
+document.getElementById('search-input').addEventListener('input', () => {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    const q = document.getElementById('search-input').value.trim() || null;
+    fetchEventsByBbox({ q });
+  }, 300);
+});
 
 // ── Scrape ────────────────────────────────────────────────────────────────
 const scrapeBtn = document.getElementById('scrape-btn');

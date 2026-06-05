@@ -37,6 +37,8 @@ class EventStore:
         start_to=None,
         limit=100,
         offset=0,
+        q=None,
+        category=None,
     ) -> list[Event]:
         return self._events.get_events(
             source=source,
@@ -47,6 +49,8 @@ class EventStore:
             start_to=start_to,
             limit=limit,
             offset=offset,
+            q=q,
+            category=category,
         )
 
     def get_event(self, event_id: str) -> Event | None:

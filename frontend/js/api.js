@@ -9,7 +9,7 @@ let bboxFetchController = null;
 export function setBboxFetchEnabled(v) { bboxFetchEnabled = v; }
 export function setFetchDebounceTimer(v) { fetchDebounceTimer = v; }
 
-export async function fetchEventsByBbox() {
+export async function fetchEventsByBbox({ q = null, category = null } = {}) {
   if (bboxFetchController) bboxFetchController.abort();
   bboxFetchController = new AbortController();
   const signal = bboxFetchController.signal;
@@ -31,6 +31,8 @@ export async function fetchEventsByBbox() {
       if (fromS) params.start_from = fromS;
       const toS = document.getElementById('filter-date-to').value;
       if (toS) params.start_to = toS;
+      if (q) params.q = q;
+      if (category) params.category = category;
       const res = await fetch(`/events?${new URLSearchParams(params)}`, { signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const page = await res.json();
