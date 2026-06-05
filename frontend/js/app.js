@@ -13,6 +13,7 @@ import {
   setFetchDebounceTimer,
 } from './api.js';
 import { setupGeolocation, cancelGeolocation } from './geolocation.js';
+import { initDrawer } from './drawer.js';
 
 // ── Map init ──────────────────────────────────────────────────────────────
 const map = L.map('map').setView([35.68, 139.69], 11);
@@ -25,6 +26,7 @@ setMap(map);
 const clusterGroup = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 });
 map.addLayer(clusterGroup);
 setClusterGroup(clusterGroup);
+initDrawer();
 
 // ── Debounced bbox fetch on map move ──────────────────────────────────────
 // bboxFetchEnabled is a live binding — false until initial load succeeds

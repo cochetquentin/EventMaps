@@ -523,6 +523,7 @@ class TokyoCheapo(BaseScraper):
                             tags=e.get("tags") or [],
                             official_link=e.get("official_link") or None,
                             location_name=location_name or None,
+                            description=e.get("description") or None,
                         ),
                         created_at=now,
                     )

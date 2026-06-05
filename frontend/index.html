@@ -588,6 +588,129 @@
       justify-content: center;
     }
     .pop-fav-btn.active { background: #fef3c7; color: #f59e0b; }
+
+    /* ── Event Drawer ── */
+    #event-drawer {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    #event-drawer.open {
+      visibility: visible;
+      pointer-events: auto;
+    }
+    .drawer-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.25);
+      cursor: pointer;
+    }
+    .drawer-panel {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: min(400px, 100vw);
+      background: var(--bg);
+      box-shadow: -4px 0 32px rgba(0,0,0,0.12);
+      display: flex;
+      flex-direction: column;
+      transform: translateX(100%);
+      transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+    }
+    #event-drawer.open .drawer-panel { transform: translateX(0); }
+    .drawer-source-bar { height: 6px; flex-shrink: 0; }
+    .drawer-source-bar.tc     { background: var(--tc); }
+    .drawer-source-bar.hanabi { background: linear-gradient(90deg, #f97316, #fbbf24); }
+    .drawer-header {
+      padding: 16px 18px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .drawer-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .drawer-source-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.3px;
+      color: var(--muted);
+    }
+    #drawer-close {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 18px;
+      color: var(--muted);
+      padding: 0;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+    #drawer-close:hover { color: var(--text); }
+    .drawer-title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.25;
+      color: var(--text);
+      margin: 0;
+    }
+    .drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0,0,0,0.1) transparent;
+    }
+    .drawer-meta { margin-bottom: 14px; }
+    .drawer-meta-line {
+      display: flex;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+    .drawer-section { margin-bottom: 18px; }
+    .drawer-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .drawer-section-content {
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+    .drawer-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 16px 18px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    @media (max-width: 480px) {
+      .drawer-panel {
+        top: auto;
+        width: 100vw;
+        height: 75vh;
+        border-radius: 20px 20px 0 0;
+        transform: translateY(100%);
+      }
+      #event-drawer.open .drawer-panel { transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
@@ -637,6 +760,37 @@
 <div id="bottom-bar">
   <div id="stats">Chargement…</div>
   <div id="event-list"></div>
+</div>
+
+<!-- ── Event Drawer ── -->
+<div id="event-drawer">
+  <div class="drawer-backdrop"></div>
+  <div class="drawer-panel">
+    <div class="drawer-source-bar"></div>
+    <div class="drawer-header">
+      <div class="drawer-title-row">
+        <span class="drawer-source-label"></span>
+        <button id="drawer-close" title="Fermer">✕</button>
+      </div>
+      <h2 class="drawer-title"></h2>
+    </div>
+    <div class="drawer-body">
+      <div class="drawer-meta"></div>
+      <div class="drawer-description drawer-section" style="display:none">
+        <div class="drawer-section-title">Description</div>
+        <div class="drawer-section-content"></div>
+      </div>
+      <div class="drawer-attributes"></div>
+    </div>
+    <div class="drawer-actions">
+      <a class="pop-btn primary drawer-link-event" href="#" target="_blank" rel="noopener">Voir l'événement →</a>
+      <div style="display:flex;gap:8px">
+        <a class="pop-btn secondary drawer-link-google" href="#" target="_blank" rel="noopener" style="flex:1">🗺 Google Maps</a>
+        <a class="pop-btn secondary drawer-link-apple" href="#" target="_blank" rel="noopener" style="flex:1"> Apple Maps</a>
+      </div>
+      <a class="drawer-link-ical" href="#" style="font-size:11px;text-align:center;color:var(--muted);text-decoration:underline">📅 Ajouter au calendrier</a>
+    </div>
+  </div>
 </div>
 
 <script type="module" src="/js/app.js"></script>
