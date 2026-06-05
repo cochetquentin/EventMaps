@@ -766,7 +766,7 @@ Tâches :
 
 1. ~~`FEAT-001` — filtres/recherche serveur complets — scalabilité UX — dépendances : BUG-001, ARCH-001.~~ **[DONE]**
 2. ~~`FEAT-003` — événements à proximité — valeur mobile — dépendances : SEC-002.~~ **[DONE]**
-3. `FEAT-005` — drawer détail événement — valorise données existantes — dépendances : SEC-002, ARCH-001.
+3. ~~`FEAT-005` — drawer détail événement — valorise données existantes — dépendances : SEC-002, ARCH-001.~~ **[DONE]**
 4. `FEAT-002` — URLs partageables — UX/support — dépendances : BUG-001.
 5. `FEAT-004` — export calendrier liste filtrée — productivité utilisateur — dépendances : FEAT-001 si endpoint.
 6. `FEAT-006` — nouvelle source — croissance contenu — dépendances : ARCH-001/002, fixtures.
