@@ -209,8 +209,8 @@ def make_event_id(parts: list[str]) -> str:
 ```
 
 **Parties discriminantes par source :**
-- Tokyo Cheapo : `[source, title, start_date_str, location_name]`
-- Hanabi Walker : `[source, title, start_date_str]`
+- Tokyo Cheapo : `[url, location_name]`
+- Hanabi Walker : `[url, date_val]`
 
 L'algorithme est stable et ne doit **jamais être modifié** : les IDs persistés en DB en dépendent.
 

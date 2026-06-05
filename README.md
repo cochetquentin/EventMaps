@@ -118,17 +118,20 @@ Paramètres : `source` (`tc` | `hanabi` | `all`), `region` (code Hanabi Walker).
     "source": "tc",
     "title": "Dry Noodle Grand Prix",
     "url": "https://tokyocheapo.com/events/dry-noodle-grand-prix/",
-    "start_date": "2026/05/11",
-    "end_date": "2026/05/20",
-    "start_time": "10:00",
-    "end_time": "18:00",
+    "start_date": "2026-05-11",
+    "end_date": "2026-05-20",
+    "times": "10:00-18:00",
+    "venue": null,
+    "latitude": 35.627198,
+    "longitude": 139.661894,
     "price": "Free",
-    "categories": ["food"],
-    "tags": ["food", "noodles"],
-    "location_name": "Komazawa Olympic Park",
-    "lat": 35.627198,
-    "lng": 139.661894,
-    "scraped_at": "2026-05-16T12:51:25+00:00"
+    "attributes": {
+      "categories": ["food"],
+      "tags": ["food", "noodles"],
+      "official_link": null,
+      "location_name": "Komazawa Olympic Park"
+    },
+    "created_at": "2026-05-16T12:51:25+00:00"
   }
 ]
 ```
