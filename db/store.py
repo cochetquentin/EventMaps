@@ -1,4 +1,3 @@
-import hashlib
 import json
 import os
 import sqlite3
@@ -13,11 +12,9 @@ def _today_jst() -> str:
     return datetime.now(_JST).date().isoformat()
 
 from models.event import Event
+from models.identity import make_event_id
 
-
-def _make_id(parts: list[str]) -> str:
-    key = "|".join(parts)
-    return hashlib.sha256(key.encode()).hexdigest()[:16]
+_make_id = make_event_id  # backward-compatible alias for existing callers
 
 
 _EVENTS_DDL = """

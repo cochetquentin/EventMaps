@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 
 from tenacity import retry, stop_after_attempt, wait_exponential, before_log
 
-from db.store import _make_id
+from models.identity import make_event_id as _make_id
 from models.event import Event
 from scrapers.base import BaseScraper, ScrapeReport
 

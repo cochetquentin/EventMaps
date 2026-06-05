@@ -747,7 +747,7 @@ Tâches :
 
 1. `ARCH-002` — introduire `ScrapeResult` — observabilité et qualité scraping — dépendances : BUG-003.
 2. `ARCH-001` — typer attributes par source — contrat plus stable — dépendances : TEST-001.
-3. `ARCH-005` — déplacer génération ID hors DB — découplage métier — dépendances : aucune.
+3. ~~`ARCH-005` — déplacer génération ID hors DB — découplage métier — dépendances : aucune.~~ **[DONE]**
 4. `ARCH-004` — scinder `db.store` — maintenabilité — dépendances : TEST-001.
 5. `ARCH-006` — centraliser config scraping — ops — dépendances : BUG-003.
 6. `ARCH-007` — logs structurés scrape/job — diagnostic — dépendances : ARCH-002.
@@ -1130,7 +1130,7 @@ uv run python -m pytest -q
 **Peut être fait en parallèle avec :** PR-006, PR-008.
 **Ne pas faire dans cette PR :** upgrades massifs.
 
-### PR-010 — Déplacer génération d'ID hors DB
+### PR-010 — Déplacer génération d'ID hors DB ✅ DONE
 
 **Source :** ARCH-005
 **Objectif :** découpler règle métier d'identité événement de `db.store`.
