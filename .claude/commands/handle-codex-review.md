@@ -7,12 +7,14 @@ Automatise le cycle de review Codex ↔ Claude Code sur la PR courante.
 ## Phase 1 — Identifier la PR et le repo
 
 ```bash
-gh repo view --json nameWithOwner -q .nameWithOwner
-gh pr view --json number,headRefName,title,state
-git branch --show-current
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+PR_INFO=$(gh pr view --json number,headRefName,title,state)
+PR_NUMBER=$(echo "$PR_INFO" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['number'])")
+STATE=$(echo "$PR_INFO" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['state'])")
+HEAD_BRANCH=$(git branch --show-current)
 ```
 
-Extraire : `REPO` (ex: `cochetquentin/EventMaps`), `PR_NUMBER`, `HEAD_BRANCH`, `STATE`.
+Extraire depuis ces résultats : `REPO`, `PR_NUMBER`, `HEAD_BRANCH`, `STATE`.
 Si `STATE != "OPEN"` → arrêter : "PR fermée ou mergée."
 Mémoriser ces variables pour toutes les étapes suivantes.
 
@@ -21,7 +23,7 @@ Mémoriser ces variables pour toutes les étapes suivantes.
 ## Phase 2 — Protection anti-boucle
 
 ```bash
-gh api repos/{REPO}/issues/{PR_NUMBER}/comments
+gh api "repos/${REPO}/issues/${PR_NUMBER}/comments"
 git log -1 --format="%cI"
 ```
 
@@ -37,9 +39,9 @@ Logique :
 ## Phase 3 — Récupérer les remarques Codex
 
 ```bash
-gh api repos/{REPO}/pulls/{PR_NUMBER}/reviews
-gh api repos/{REPO}/pulls/{PR_NUMBER}/comments
-gh api repos/{REPO}/issues/{PR_NUMBER}/comments
+gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews"
+gh api "repos/${REPO}/pulls/${PR_NUMBER}/comments"
+gh api "repos/${REPO}/issues/${PR_NUMBER}/comments"
 ```
 
 Filtrer uniquement les objets dont `user.login` contient `codex` ou `openai` (insensible à la casse).
@@ -104,13 +106,13 @@ Re-vérifier l'anti-boucle (précaution post-push) :
 
 ```bash
 git log -1 --format="%cI"
-gh api repos/{REPO}/issues/{PR_NUMBER}/comments
+gh api "repos/${REPO}/issues/${PR_NUMBER}/comments"
 ```
 
 Confirmer que `T_commit > T_comment` (ou pas de commentaire `@Codex review`), puis :
 
 ```bash
-gh pr comment {PR_NUMBER} --body "@Codex review"
+gh pr comment "${PR_NUMBER}" --body "@Codex review"
 ```
 
 ---
