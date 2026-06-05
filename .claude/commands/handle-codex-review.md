@@ -23,28 +23,30 @@ Mémoriser ces variables pour toutes les étapes suivantes.
 ## Phase 2 — Protection anti-boucle
 
 ```bash
-gh api "repos/${REPO}/issues/${PR_NUMBER}/comments"
+gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments"
+gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews"
 git log -1 --format="%cI"
 ```
 
 Logique :
-1. Dans les commentaires, trouver le **dernier** dont le `body` contient `@Codex review` (insensible à la casse).
-2. Comparer son `created_at` avec le timestamp du dernier commit.
-3. Si `T_comment > T_commit` → **STOP** avec le message :
-   "Anti-boucle : `@Codex review` déjà posté après le dernier commit. Attendre la réponse de Codex."
-4. Si aucun tel commentaire ou `T_commit > T_comment` → continuer.
+1. Dans les issue comments (paginés), trouver le **dernier** dont le `body` contient `@Codex review` (insensible à la casse) → `T_trigger`.
+2. Dans les reviews formelles, trouver le `submitted_at` de la **dernière** review de l'identité Codex exacte (`chatgpt-codex-connector[bot]`) → `T_codex_review`.
+3. Si `T_trigger` existe ET `T_trigger > T_commit` ET (`T_codex_review` est absent ou `T_codex_review < T_trigger`) → **STOP** :
+   "Anti-boucle : `@Codex review` déjà posté après le dernier commit et Codex n'a pas encore répondu."
+4. Sinon → continuer.
 
 ---
 
 ## Phase 3 — Récupérer les remarques Codex
 
 ```bash
-gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews"
-gh api "repos/${REPO}/pulls/${PR_NUMBER}/comments"
-gh api "repos/${REPO}/issues/${PR_NUMBER}/comments"
+gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/reviews"
+gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/comments"
+gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments"
 ```
 
-Filtrer uniquement les objets dont `user.login` contient `codex` ou `openai` (insensible à la casse).
+Filtrer uniquement les objets dont `user.login` est exactement `chatgpt-codex-connector[bot]`
+(identité exacte du bot Codex — ne pas utiliser un substring match pour éviter l'usurpation).
 Exclure les `body` vides ou contenant seulement `@Codex review`.
 
 Classer par priorité :
@@ -79,7 +81,9 @@ uv run pytest --cov=. --cov-fail-under=80 tests/ -v
 
 - **Succès** → continuer.
 - **Échec** → diagnostiquer, corriger, relancer (max 2 tentatives).
-  Si toujours KO après 2 tentatives : `git checkout -- <fichiers problématiques>`,
+  Si toujours KO après 2 tentatives : vérifier d'abord `git status` pour s'assurer
+  qu'il n'y a pas de modifications non liées ; annuler uniquement les fichiers
+  introduits par ce workflow (`git checkout -- <fichiers modifiés dans ce cycle>`),
   noter les corrections non appliquées, continuer sans elles.
 - **Coverage < 80%** → ajouter des tests pour le code modifié.
 
@@ -106,7 +110,7 @@ Re-vérifier l'anti-boucle (précaution post-push) :
 
 ```bash
 git log -1 --format="%cI"
-gh api "repos/${REPO}/issues/${PR_NUMBER}/comments"
+gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments"
 ```
 
 Confirmer que `T_commit > T_comment` (ou pas de commentaire `@Codex review`), puis :
