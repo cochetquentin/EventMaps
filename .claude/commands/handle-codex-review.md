@@ -23,20 +23,47 @@ Mémoriser ces variables pour toutes les étapes suivantes.
 ## Phase 2 — Protection anti-boucle
 
 ```bash
-# --slurp est incompatible avec --jq ; utiliser --paginate --jq pour filtrer page par page
+# T_TRIGGER : dernier @Codex review dans les issue comments (toutes pages)
 T_TRIGGER=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
   --jq '.[] | select(.body | test("@Codex review"; "i")) | .created_at' | tail -1)
-T_CODEX=$(gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
+
+# T_CODEX : dernière réponse Codex parmi les 3 endpoints (reviews formelles, inline, issue comments)
+T_CODEX_R=$(gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
   --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .submitted_at' | tail -1)
-T_COMMIT=$(git log -1 --format="%cI")
+T_CODEX_C=$(gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/comments" \
+  --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .created_at' | tail -1)
+T_CODEX_I=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+  --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .created_at' | tail -1)
+
+# T_COMMIT : HEAD remote du PR (évite décalage si checkout local en retard)
+T_COMMIT=$(gh pr view --json commits --jq '.commits[-1].committedDate' 2>/dev/null \
+  || git log -1 --format="%cI")
+
+# Normaliser en epoch UTC pour comparaison cross-timezone (GitHub = UTC Z, git = offset local)
+T_TRIGGER_E=$(python3 -c "
+from datetime import datetime,timezone
+s='$T_TRIGGER'
+print(int(datetime.fromisoformat(s.replace('Z','+00:00')).timestamp()) if s else 0)
+")
+T_CODEX_E=$(python3 -c "
+from datetime import datetime,timezone
+def e(s): return int(datetime.fromisoformat(s.strip().replace('Z','+00:00')).timestamp()) if s.strip() else 0
+print(max(e('$T_CODEX_R'), e('$T_CODEX_C'), e('$T_CODEX_I')))
+")
+T_COMMIT_E=$(python3 -c "
+from datetime import datetime,timezone
+s='$T_COMMIT'
+print(int(datetime.fromisoformat(s.replace('Z','+00:00')).timestamp()))
+")
 ```
 
 Logique :
-1. `T_TRIGGER` = `created_at` du dernier commentaire contenant `@Codex review`.
-2. `T_CODEX` = `submitted_at` de la dernière review formelle de `chatgpt-codex-connector[bot]`.
-3. Si `T_TRIGGER` existe ET `T_TRIGGER > T_COMMIT` ET (`T_CODEX` absent ou `T_CODEX < T_TRIGGER`) → **STOP** :
+1. `T_TRIGGER_E` = epoch UTC du dernier commentaire contenant `@Codex review`.
+2. `T_CODEX_E` = epoch UTC de la dernière réponse Codex (reviews formelles **+ inline + issue comments**).
+3. `T_COMMIT_E` = epoch UTC du dernier commit du PR (remote).
+4. Si `T_TRIGGER_E > 0` ET `T_TRIGGER_E > T_COMMIT_E` ET `T_CODEX_E < T_TRIGGER_E` → **STOP** :
    "Anti-boucle : `@Codex review` déjà posté après le dernier commit et Codex n'a pas encore répondu."
-4. Sinon → continuer.
+5. Sinon → continuer.
 
 ---
 
@@ -116,12 +143,15 @@ Si **aucune modification** → ne pas commiter. Passer en Phase 7 avec note expl
 Re-vérifier l'anti-boucle (précaution post-push) :
 
 ```bash
-T_COMMIT=$(git log -1 --format="%cI")
+T_COMMIT=$(gh pr view --json commits --jq '.commits[-1].committedDate' 2>/dev/null \
+  || git log -1 --format="%cI")
 T_TRIGGER=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
   --jq '.[] | select(.body | test("@Codex review"; "i")) | .created_at' | tail -1)
+T_COMMIT_E=$(python3 -c "from datetime import datetime,timezone; s='$T_COMMIT'; print(int(datetime.fromisoformat(s.replace('Z','+00:00')).timestamp()))")
+T_TRIGGER_E=$(python3 -c "from datetime import datetime,timezone; s='$T_TRIGGER'; print(int(datetime.fromisoformat(s.replace('Z','+00:00')).timestamp()) if s else 0)")
 ```
 
-Confirmer que `T_COMMIT > T_TRIGGER` (ou `T_TRIGGER` absent), puis :
+Confirmer que `T_COMMIT_E > T_TRIGGER_E` (ou `T_TRIGGER_E == 0`), puis :
 
 ```bash
 gh pr comment "${PR_NUMBER}" --body "@Codex review"
