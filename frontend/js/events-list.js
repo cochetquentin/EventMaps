@@ -48,7 +48,14 @@ export function buildEventList(events) {
     groups.get(key).events.push(ev);
   });
 
+  const minGroupDist = (group) => Math.min(...group.events.map(ev =>
+    (ev.latitude != null && ev.longitude != null)
+      ? haversineKm(userPosition.lat, userPosition.lng, ev.latitude, ev.longitude)
+      : Infinity,
+  ));
+
   const sorted = [...groups.entries()].sort(([ka, a], [kb, b]) => {
+    if (inProximity) return minGroupDist(a) - minGroupDist(b);
     if (ka === 'hanabi') return -1;
     if (kb === 'hanabi') return  1;
     return b.events.length - a.events.length;

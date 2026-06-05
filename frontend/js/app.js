@@ -12,7 +12,7 @@ import {
   fetchDebounceTimer,
   setFetchDebounceTimer,
 } from './api.js';
-import { setupGeolocation } from './geolocation.js';
+import { setupGeolocation, cancelGeolocation } from './geolocation.js';
 
 // ── Map init ──────────────────────────────────────────────────────────────
 const map = L.map('map').setView([35.68, 139.69], 11);
@@ -111,9 +111,13 @@ document.getElementById('reset-filters').addEventListener('click', () => {
   document.getElementById('search-input').value     = '';
   deactivatedPills.clear();
   setShowOnlyFavorites(false);
+  cancelGeolocation();
   setProximityMode(false);
   setUserPosition(null);
-  document.getElementById('locate-btn').classList.remove('active');
+  const locBtn = document.getElementById('locate-btn');
+  locBtn.classList.remove('active');
+  locBtn.textContent = '📍';
+  locBtn.disabled = false;
   document.querySelectorAll('.pill').forEach(p => {
     if (p.classList.contains('fav-pill')) p.classList.remove('active');
     else p.classList.add('active');
