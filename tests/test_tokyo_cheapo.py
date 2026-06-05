@@ -434,6 +434,22 @@ def test_parse_date_range_cross_year_normal_unaffected():
     assert end == "2026/06/02"
 
 
+def test_parse_date_range_single_cross_year_dec_scraping():
+    # Date unique en janvier scrapée en décembre → année suivante
+    ref = _date_cls(2026, 12, 5)
+    start, end = _parse_date_range("Jan 2", year=2026, reference=ref)
+    assert start == "2027/01/02"
+    assert end == "2027/01/02"
+
+
+def test_parse_date_range_single_normal_unaffected():
+    # Date unique dans l'année courante → pas de bump
+    ref = _date_cls(2026, 5, 1)
+    start, end = _parse_date_range("May 17", year=2026, reference=ref)
+    assert start == "2026/05/17"
+    assert end == "2026/05/17"
+
+
 # ---------------------------------------------------------------------------
 # Fixture-based contract tests
 # ---------------------------------------------------------------------------
