@@ -231,9 +231,11 @@ def _parse_date_range(
                     start = start.replace(year=start.year - 1)
                 else:
                     end = end.replace(year=end.year + 1)
-            elif reference_explicit and (reference - start).days > 182:
-                # Plage dans le passé lointain (ex: "Jan 2 - Jan 5" en décembre)
-                # → les deux dates appartiennent à l'année suivante
+            elif reference_explicit and (reference - end).days > 182:
+                # Toute la plage est dans le passé lointain (ex: "Jan 2 - Jan 5" en décembre)
+                # → les deux dates appartiennent à l'année suivante.
+                # On teste end (pas start) pour ne pas bumper les plages encore en cours
+                # (ex: "Mar 27 - Sep 30" scrapée le 30 sep aurait start > 182 jours).
                 start = start.replace(year=start.year + 1)
                 end = end.replace(year=end.year + 1)
             return start.strftime("%Y/%m/%d"), end.strftime("%Y/%m/%d")
@@ -251,6 +253,15 @@ def _parse_date_range(
 
     fuzzy = _parse_fuzzy_date_range(date_str.strip(), year)
     if fuzzy:
+        if reference_explicit:
+            # Appliquer la même inférence cross-year que pour les dates exactes.
+            fuzzy_end = _date.fromisoformat(fuzzy[1].replace("/", "-"))
+            if (reference - fuzzy_end).days > 182:
+                fuzzy_start = _date.fromisoformat(fuzzy[0].replace("/", "-"))
+                fuzzy = (
+                    fuzzy_start.replace(year=fuzzy_start.year + 1).strftime("%Y/%m/%d"),
+                    fuzzy_end.replace(year=fuzzy_end.year + 1).strftime("%Y/%m/%d"),
+                )
         return fuzzy
     return date_str, ""
 

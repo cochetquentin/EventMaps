@@ -441,6 +441,22 @@ def test_parse_date_range_range_same_month_future_dec_scraping():
     assert end == "2027/01/05"
 
 
+def test_parse_date_range_ongoing_long_range_unaffected():
+    # "Mar 27 - Sep 30" scrapée le 30 sep : plage en cours, pas de bump
+    ref = _date_cls(2026, 9, 30)
+    start, end = _parse_date_range("Mar 27 - Sep 30", year=2026, reference=ref)
+    assert start == "2026/03/27"
+    assert end == "2026/09/30"
+
+
+def test_parse_date_range_fuzzy_cross_year_dec_scraping():
+    # "Early Jan" scrapée en décembre → année suivante
+    ref = _date_cls(2026, 12, 5)
+    start, end = _parse_date_range("Early Jan", year=2026, reference=ref)
+    assert start == "2027/01/01"
+    assert end == "2027/01/10"
+
+
 def test_parse_date_range_single_cross_year_dec_scraping():
     # Date unique en janvier scrapée en décembre → année suivante
     ref = _date_cls(2026, 12, 5)
