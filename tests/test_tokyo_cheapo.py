@@ -579,5 +579,5 @@ def test_scrape_multi_location_creates_two_events(tc, monkeypatch):
     # Each location produces a distinct ID
     ids = {e.id for e in events}
     assert len(ids) == 2
-    locs = {e.attributes.get("location_name") for e in events}
+    locs = {e.attributes.location_name for e in events}
     assert locs == {"Ueno Park", "Asakusa Temple"}

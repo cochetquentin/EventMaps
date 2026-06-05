@@ -188,11 +188,11 @@ def test_upsert_hanabi_updates_on_rerun(tmp_path):
     with EventStore(db) as store:
         store.upsert_events([make_hanabi()])
         updated = make_hanabi()
-        updated.attributes["expected_crowd"] = "約100万人"
+        updated.attributes.expected_crowd = "約100万人"
         store.upsert_events([updated])
         result = store.get_event(make_hanabi().id)
     assert result is not None
-    assert result.attributes["expected_crowd"] == "約100万人"
+    assert result.attributes.expected_crowd == "約100万人"
 
 
 # --- Query ---
@@ -354,15 +354,15 @@ def test_migration_from_old_schema(tmp_path):
     assert tc.title == "Old TC Event"
     assert str(tc.start_date) == "2026-05-15"
     assert tc.times == "10:00-18:00"
-    assert tc.attributes["categories"] == ["festival"]
-    assert tc.attributes["location_name"] == "Yoyogi Park"
+    assert tc.attributes.categories == ["festival"]
+    assert tc.attributes.location_name == "Yoyogi Park"
     assert tc.venue is None
 
     assert hw.id == "def456"
     assert hw.title == "Old Hanabi"
     assert str(hw.start_date) == "2026-07-25"
     assert hw.venue == "隅田川"
-    assert hw.attributes["fireworks_count"] == "約1万発"
+    assert hw.attributes.fireworks_count == "約1万発"
 
     # Vérifier que les vieilles tables ont été supprimées
     with EventStore(db) as store:
@@ -581,5 +581,5 @@ def test_bbox_combined_with_source(tmp_path):
 def test_event_attributes_not_shared():
     e1 = make_tc(attributes={})
     e2 = make_tc(attributes={})
-    e1.attributes["foo"] = "bar"
-    assert "foo" not in e2.attributes
+    # Each event must have an independent attributes instance
+    assert e1.attributes is not e2.attributes

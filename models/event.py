@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, model_validator
+
+from models.attributes import HanabiWalkerAttributes, TokyoCheapoAttributes
 
 
 class Event(BaseModel):
@@ -18,5 +20,19 @@ class Event(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     price: str | None = None
-    attributes: dict = Field(default_factory=dict)
+    attributes: TokyoCheapoAttributes | HanabiWalkerAttributes
     created_at: datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_attributes(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        source = data.get("source")
+        attrs = data.get("attributes", {})
+        if isinstance(attrs, dict):
+            if source == "tc":
+                data["attributes"] = TokyoCheapoAttributes.model_validate(attrs)
+            elif source == "hanabi":
+                data["attributes"] = HanabiWalkerAttributes.model_validate(attrs)
+        return data
