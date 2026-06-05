@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     scrape_retry_attempts: int = 3
     scrape_retry_wait_min: int = 2
     scrape_retry_wait_max: int = 10
+    request_logging: bool = False  # EVENTMAPS_REQUEST_LOGGING — log HTTP requests
 
     model_config = SettingsConfigDict(
         env_prefix="EVENTMAPS_",
