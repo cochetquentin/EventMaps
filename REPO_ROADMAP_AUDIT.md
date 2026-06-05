@@ -355,7 +355,7 @@ EventMaps est une application Python/FastAPI + frontend statique Leaflet qui scr
 **Taille estimée :** L
 **Candidat PR indépendante :** Non, découper par composant
 
-### ARCH-004 — `db.store` mélange DDL, migration, queries et jobs
+### ~~ARCH-004 — `db.store` mélange DDL, migration, queries et jobs~~ **[DONE]**
 
 **Impact :** Medium
 **Zone concernée :** `db/store.py`
@@ -748,7 +748,7 @@ Tâches :
 1. `ARCH-002` — introduire `ScrapeResult` — observabilité et qualité scraping — dépendances : BUG-003.
 2. ~~`ARCH-001` — typer attributes par source — contrat plus stable — dépendances : TEST-001.~~ **[DONE]**
 3. ~~`ARCH-005` — déplacer génération ID hors DB — découplage métier — dépendances : aucune.~~ **[DONE]**
-4. `ARCH-004` — scinder `db.store` — maintenabilité — dépendances : TEST-001.
+4. ~~`ARCH-004` — scinder `db.store` — maintenabilité — dépendances : TEST-001.~~ **[DONE]**
 5. `ARCH-006` — centraliser config scraping — ops — dépendances : BUG-003.
 6. `ARCH-007` — logs structurés scrape/job — diagnostic — dépendances : ARCH-002.
 
