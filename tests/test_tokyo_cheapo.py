@@ -405,18 +405,104 @@ def test_parse_date_range_fuzzy_late_month_end():
 
 
 # ---------------------------------------------------------------------------
-# Cross-year date range — BUG-002 documentation
+# Cross-year date range — BUG-002
 # ---------------------------------------------------------------------------
 
 
-def test_parse_date_range_cross_year_documents_bug():
-    # BUG-002: "Dec 31 - Jan 2" with year=2026 produces end < start (both in 2026).
-    # This test captures the CURRENT (broken) behaviour so a regression is detected
-    # if anything changes before BUG-002 is properly fixed.
-    start, end = _parse_date_range("Dec 31 - Jan 2", year=2026)
+def test_parse_date_range_cross_year_dec_scraping():
+    # Scraping en décembre : "Dec 31 - Jan 2" → end passe à l'année suivante
+    ref = _date_cls(2026, 12, 5)
+    start, end = _parse_date_range("Dec 31 - Jan 2", year=2026, reference=ref)
     assert start == "2026/12/31"
-    # Jan 2 is resolved to 2026 — end precedes start (cross-year bug)
-    assert end == "2026/01/02"
+    assert end == "2027/01/02"
+
+
+def test_parse_date_range_cross_year_jan_scraping():
+    # Scraping en janvier : "Dec 31 - Jan 2" → start revient à l'année précédente
+    ref = _date_cls(2027, 1, 5)
+    start, end = _parse_date_range("Dec 31 - Jan 2", year=2027, reference=ref)
+    assert start == "2026/12/31"
+    assert end == "2027/01/02"
+
+
+def test_parse_date_range_cross_year_normal_unaffected():
+    # Plage same-year ne doit pas bumper l'année de end
+    ref = _date_cls(2026, 5, 1)
+    start, end = _parse_date_range("May 15 - Jun 2", year=2026, reference=ref)
+    assert start == "2026/05/15"
+    assert end == "2026/06/02"
+
+
+def test_parse_date_range_range_same_month_future_dec_scraping():
+    # "Jan 2 - Jan 5" scraping en décembre : les deux dates passent à l'année suivante
+    ref = _date_cls(2026, 12, 5)
+    start, end = _parse_date_range("Jan 2 - Jan 5", year=2026, reference=ref)
+    assert start == "2027/01/02"
+    assert end == "2027/01/05"
+
+
+def test_parse_date_range_ongoing_long_range_unaffected():
+    # "Mar 27 - Sep 30" scrapée le 30 sep : plage en cours, pas de bump
+    ref = _date_cls(2026, 9, 30)
+    start, end = _parse_date_range("Mar 27 - Sep 30", year=2026, reference=ref)
+    assert start == "2026/03/27"
+    assert end == "2026/09/30"
+
+
+def test_parse_date_range_fuzzy_cross_year_dec_scraping():
+    # "Early Jan" scrapée en décembre → année suivante
+    ref = _date_cls(2026, 12, 5)
+    start, end = _parse_date_range("Early Jan", year=2026, reference=ref)
+    assert start == "2027/01/01"
+    assert end == "2027/01/10"
+
+
+def test_parse_date_range_fuzzy_cross_month_cross_year_dec_scraping():
+    # "Late Dec ~ Early Jan" scraping en décembre → start 2026, end 2027
+    ref = _date_cls(2026, 12, 5)
+    start, end = _parse_date_range("Late Dec ~ Early Jan", year=2026, reference=ref)
+    assert start == "2026/12/21"
+    assert end == "2027/01/10"
+
+
+def test_parse_date_range_fuzzy_cross_month_cross_year_jan_scraping():
+    # "Late Dec ~ Early Jan" scraping en janvier → start 2026, end 2027
+    ref = _date_cls(2027, 1, 5)
+    start, end = _parse_date_range("Late Dec ~ Early Jan", year=2027, reference=ref)
+    assert start == "2026/12/21"
+    assert end == "2027/01/10"
+
+
+def test_parse_date_range_range_same_month_dec_jan_scraping():
+    # "Dec 30 - Dec 31" scraping en janvier → revient à l'année précédente
+    ref = _date_cls(2027, 1, 5)
+    start, end = _parse_date_range("Dec 30 - Dec 31", year=2027, reference=ref)
+    assert start == "2026/12/30"
+    assert end == "2026/12/31"
+
+
+def test_parse_date_range_single_dec_jan_scraping():
+    # "Dec 31" scraping en janvier → revient à l'année précédente
+    ref = _date_cls(2027, 1, 5)
+    start, end = _parse_date_range("Dec 31", year=2027, reference=ref)
+    assert start == "2026/12/31"
+    assert end == "2026/12/31"
+
+
+def test_parse_date_range_single_cross_year_dec_scraping():
+    # Date unique en janvier scrapée en décembre → année suivante
+    ref = _date_cls(2026, 12, 5)
+    start, end = _parse_date_range("Jan 2", year=2026, reference=ref)
+    assert start == "2027/01/02"
+    assert end == "2027/01/02"
+
+
+def test_parse_date_range_single_normal_unaffected():
+    # Date unique dans l'année courante → pas de bump
+    ref = _date_cls(2026, 5, 1)
+    start, end = _parse_date_range("May 17", year=2026, reference=ref)
+    assert start == "2026/05/17"
+    assert end == "2026/05/17"
 
 
 # ---------------------------------------------------------------------------
@@ -487,13 +573,16 @@ def test_scrape_event_full_fixture(tc, monkeypatch):
     html_bytes = (FIXTURES_DIR / "tc_event_full.html").read_bytes()
     soup = BeautifulSoup(html_bytes, "html.parser")
     monkeypatch.setattr(tc, "get_event_page", lambda url: soup)
+    # Figer l'horloge JST pour que l'assertion de date soit déterministe quelle
+    # que soit la période de l'année où le test tourne.
+    fixed_jst = _date_cls(2026, 6, 5)
+    monkeypatch.setattr("scrapers.tokyo_cheapo._today_jst", lambda: fixed_jst)
 
     result = tc.scrape_event("https://tokyocheapo.com/events/kawaii-flea-market-2026/")
 
-    year = _date_cls.today().year
     assert result["title"] == "Kawaii Flea Market"
-    assert result["start_date"] == f"{year}/05/17"
-    assert result["end_date"] == f"{year}/05/17"
+    assert result["start_date"] == "2026/05/17"
+    assert result["end_date"] == "2026/05/17"
     assert result["start_time"] == "10:00"
     assert result["end_time"] == "17:00"
     assert result["price"] == "Free"

@@ -133,7 +133,7 @@ EventMaps est une application Python/FastAPI + frontend statique Leaflet qui scr
 **Taille estimée :** S
 **Candidat PR indépendante :** Oui
 
-### BUG-002 — Année Tokyo Cheapo calculée avec l'année locale courante
+### ~~BUG-002 — Année Tokyo Cheapo calculée avec l'année locale courante~~ **[DONE]**
 
 **Sévérité :** Medium
 **Confiance :** Medium

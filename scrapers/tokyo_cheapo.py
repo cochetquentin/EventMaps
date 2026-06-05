@@ -3,7 +3,7 @@ import html as _html
 import json
 import logging
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from datetime import date as _date
 
 import requests
@@ -16,6 +16,13 @@ from models.identity import make_event_id as _make_id
 from scrapers.base import BaseScraper, ScrapeReport
 
 logger = logging.getLogger(__name__)
+
+_JST = timezone(timedelta(hours=9))
+
+
+def _today_jst() -> _date:
+    return datetime.now(_JST).date()
+
 
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -187,31 +194,92 @@ def _parse_fuzzy_date_range(date_str: str, year: int) -> tuple[str, str] | None:
     return None
 
 
-def _parse_date_range(date_str: str, year: int | None = None) -> tuple[str, str]:
+def _parse_date_range(
+    date_str: str,
+    year: int | None = None,
+    reference: _date | None = None,
+) -> tuple[str, str]:
     """
     Retourne (start_date, end_date) en format YYYY/MM/DD.
     - Date unique → (date, "")
     - Plage → (start, end) normalisés
     - Dates fuzzy ('Mid May') → (date_str, "")
+
+    reference sert à résoudre les ambiguïtés cross-year et n'est utilisé que
+    lorsqu'il est fourni explicitement par l'appelant (pour ne pas réécrire une
+    année passée explicitement) :
+    - Plage : si start est à plus de 182 jours dans le futur, start appartient
+      à l'année précédente (scraping en janvier pour "Dec 31 - Jan 2") ; sinon
+      end passe à l'année suivante (scraping en décembre).
+    - Date unique : si la date est à plus de 182 jours dans le passé, elle
+      appartient à l'année suivante (scraping en décembre pour "Jan 2").
     """
+    reference_explicit = reference is not None
+    if reference is None:
+        reference = _today_jst()
     if year is None:
-        year = _date.today().year
+        year = reference.year
 
     range_m = re.match(r"^(.+?)\s+-\s+(.+)$", date_str.strip())
     if range_m:
         start = _parse_date_part(range_m.group(1).strip(), year)
         end = _parse_date_part(range_m.group(2).strip(), year)
         if start and end:
+            if end < start:  # plage cross-year (mois différents), ex: "Dec 31 - Jan 2"
+                if reference_explicit and (start - reference).days > 182:
+                    # Scraping en janvier : start (déc) trop loin dans le futur
+                    start = start.replace(year=start.year - 1)
+                else:
+                    # Scraping en décembre : end (jan) passe à l'année suivante
+                    end = end.replace(year=end.year + 1)
+            elif reference_explicit and (reference - end).days > 182:
+                # Toute la plage est dans le passé lointain (ex: "Jan 2 - Jan 5" en décembre)
+                # On teste end pour ne pas bumper les plages encore en cours.
+                start = start.replace(year=start.year + 1)
+                end = end.replace(year=end.year + 1)
+            elif reference_explicit and (start - reference).days > 182:
+                # Toute la plage est dans le futur lointain (ex: "Dec 30 - Dec 31" en janvier)
+                start = start.replace(year=start.year - 1)
+                end = end.replace(year=end.year - 1)
             return start.strftime("%Y/%m/%d"), end.strftime("%Y/%m/%d")
         return date_str, ""
 
     single = _parse_date_part(date_str.strip(), year)
     if single:
+        # Inférence cross-year pour dates uniques (uniquement si reference est explicite).
+        if reference_explicit:
+            if (reference - single).days > 182:
+                # Scraping en décembre : "Jan 2" → année suivante
+                single = single.replace(year=single.year + 1)
+            elif (single - reference).days > 182:
+                # Scraping en janvier : "Dec 31" → année précédente
+                single = single.replace(year=single.year - 1)
         d = single.strftime("%Y/%m/%d")
         return d, d
 
     fuzzy = _parse_fuzzy_date_range(date_str.strip(), year)
     if fuzzy:
+        if reference_explicit:
+            fuzzy_start = _date.fromisoformat(fuzzy[0].replace("/", "-"))
+            fuzzy_end = _date.fromisoformat(fuzzy[1].replace("/", "-"))
+            if fuzzy_end < fuzzy_start:
+                # Fuzzy cross-year : "Late Dec ~ Early Jan"
+                if (fuzzy_start - reference).days > 182:
+                    fuzzy_start = fuzzy_start.replace(year=fuzzy_start.year - 1)
+                else:
+                    fuzzy_end = fuzzy_end.replace(year=fuzzy_end.year + 1)
+            elif (reference - fuzzy_end).days > 182:
+                # Toute la plage dans le passé lointain
+                fuzzy_start = fuzzy_start.replace(year=fuzzy_start.year + 1)
+                fuzzy_end = fuzzy_end.replace(year=fuzzy_end.year + 1)
+            elif (fuzzy_start - reference).days > 182:
+                # Toute la plage dans le futur lointain
+                fuzzy_start = fuzzy_start.replace(year=fuzzy_start.year - 1)
+                fuzzy_end = fuzzy_end.replace(year=fuzzy_end.year - 1)
+            fuzzy = (
+                fuzzy_start.strftime("%Y/%m/%d"),
+                fuzzy_end.strftime("%Y/%m/%d"),
+            )
         return fuzzy
     return date_str, ""
 
@@ -357,7 +425,8 @@ class TokyoCheapo(BaseScraper):
         time_raw, price = self.parse_time_and_price(soup)
         start_time, end_time = _split_time(time_raw) if time_raw else ("", "")
         date_raw = self.parse_date(soup)
-        start_date, end_date = _parse_date_range(date_raw)
+        today_jst = _today_jst()
+        start_date, end_date = _parse_date_range(date_raw, year=today_jst.year, reference=today_jst)
         return {
             "url": url,
             "title": self.parse_title(soup),
