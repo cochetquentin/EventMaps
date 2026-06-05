@@ -1,7 +1,7 @@
-import { deactivatedPills, showOnlyFavorites, setShowOnlyFavorites } from './state.js';
+import { deactivatedPills, showOnlyFavorites, setShowOnlyFavorites, map } from './state.js';
 import { isoDate, todayJST } from './utils.js';
 
-const KNOWN_PARAMS = ['from', 'to', 'q', 'off', 'favs'];
+const KNOWN_PARAMS = ['from', 'to', 'q', 'off', 'favs', 'lat', 'lng', 'z'];
 
 /**
  * Encode l'état courant des filtres dans les query params de l'URL.
@@ -25,6 +25,13 @@ export function updateURL() {
 
   if (showOnlyFavorites) params.set('favs', '1');
 
+  if (map) {
+    const c = map.getCenter();
+    params.set('lat', c.lat.toFixed(4));
+    params.set('lng', c.lng.toFixed(4));
+    params.set('z', String(map.getZoom()));
+  }
+
   const qs = params.toString();
   window.history.replaceState(null, '', qs ? `?${qs}` : location.pathname);
 }
@@ -43,12 +50,16 @@ export function restoreFromURL() {
   const q    = params.get('q');
   const off  = params.get('off');
   const favs = params.get('favs');
+  const lat  = params.get('lat');
+  const lng  = params.get('lng');
+  const z    = params.get('z');
 
   document.getElementById('filter-date-from').value = from || isoDate(todayJST());
   if (to)   document.getElementById('filter-date-to').value   = to;
   if (q)    document.getElementById('search-input').value     = q;
   if (off)  off.split(',').filter(Boolean).forEach(t => deactivatedPills.add(t));
   if (favs === '1') setShowOnlyFavorites(true);
+  if (lat && lng && z && map) map.setView([parseFloat(lat), parseFloat(lng)], parseInt(z, 10));
 
   return true;
 }
