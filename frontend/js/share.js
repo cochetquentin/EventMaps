@@ -44,7 +44,7 @@ export function restoreFromURL() {
   const off  = params.get('off');
   const favs = params.get('favs');
 
-  if (from) document.getElementById('filter-date-from').value = from;
+  document.getElementById('filter-date-from').value = from || isoDate(todayJST());
   if (to)   document.getElementById('filter-date-to').value   = to;
   if (q)    document.getElementById('search-input').value     = q;
   if (off)  off.split(',').filter(Boolean).forEach(t => deactivatedPills.add(t));

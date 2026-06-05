@@ -184,11 +184,15 @@ setupGeolocation();
 // ── Copy-link button ──────────────────────────────────────────────────────
 document.getElementById('copy-link-btn').addEventListener('click', () => {
   updateURL();
-  navigator.clipboard.writeText(location.href);
   const btn = document.getElementById('copy-link-btn');
-  btn.textContent = '✓';
-  btn.classList.add('copied');
-  setTimeout(() => { btn.textContent = '🔗'; btn.classList.remove('copied'); }, 1500);
+  const onSuccess = () => {
+    btn.textContent = '✓';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '🔗'; btn.classList.remove('copied'); }, 1500);
+  };
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(location.href).then(onSuccess).catch(() => {});
+  }
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────
