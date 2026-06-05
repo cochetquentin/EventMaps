@@ -26,7 +26,7 @@ Mémoriser ces variables pour toutes les étapes suivantes.
 # T_TRIGGER : dernier commentaire dont le body est EXACTEMENT "@Codex review" (trim)
 # Évite que des mentions incidentes (ex: "j'ai posté @Codex review hier") deviennent le trigger
 T_TRIGGER=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
-  --jq '.[] | select(.body | ltrimstr("\n") | rtrimstr("\n") | ascii_downcase | test("^@codex review\\s*$")) | .created_at' | tail -1)
+  --jq '.[] | select(.body | ltrimstr("\n") | rtrimstr("\n") | ltrimstr("\r") | rtrimstr("\r") | ascii_downcase | . == "@codex review") | .created_at' | tail -1)
 
 # T_CODEX : dernière réponse Codex parmi les 3 endpoints (reviews formelles, inline, issue comments)
 T_CODEX_R=$(gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
@@ -168,7 +168,7 @@ HEAD_SHA=$(gh pr view --json headRefOid -q .headRefOid)
 T_COMMIT=$(gh api "repos/${REPO}/commits/${HEAD_SHA}" --jq '.commit.committer.date' 2>/dev/null \
   || git log -1 --format="%cI")
 T_TRIGGER=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
-  --jq '.[] | select(.body | ltrimstr("\n") | rtrimstr("\n") | ascii_downcase | test("^@codex review\\s*$")) | .created_at' | tail -1)
+  --jq '.[] | select(.body | ltrimstr("\n") | rtrimstr("\n") | ltrimstr("\r") | rtrimstr("\r") | ascii_downcase | . == "@codex review") | .created_at' | tail -1)
 T_COMMIT_E=$(uv run python -c "from datetime import datetime,timezone; s='$T_COMMIT'; print(int(datetime.fromisoformat(s.replace('Z','+00:00')).timestamp()))")
 T_TRIGGER_E=$(uv run python -c "from datetime import datetime,timezone; s='$T_TRIGGER'; print(int(datetime.fromisoformat(s.replace('Z','+00:00')).timestamp()) if s else 0)")
 ```
