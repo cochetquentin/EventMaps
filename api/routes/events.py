@@ -92,7 +92,7 @@ def export_event_ical(event_id: str):
     if end:
         ics_event.add("dtend", end + timedelta(days=1))
     ics_event.add("url", event.url)
-    location = event.venue or getattr(event.attributes, "location_name", None)
+    location = event.venue or event.attributes.get("location_name")
     if location:
         ics_event.add("location", location)
     if event.price:

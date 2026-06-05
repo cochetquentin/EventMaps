@@ -746,7 +746,7 @@ Tâches :
 ### Phase 2 — Maintenabilité & architecture
 
 1. `ARCH-002` — introduire `ScrapeResult` — observabilité et qualité scraping — dépendances : BUG-003.
-2. ~~`ARCH-001` — typer attributes par source — contrat plus stable — dépendances : TEST-001.~~ **[DONE]**
+2. `ARCH-001` — typer attributes par source — contrat plus stable — dépendances : TEST-001.
 3. ~~`ARCH-005` — déplacer génération ID hors DB — découplage métier — dépendances : aucune.~~ **[DONE]**
 4. `ARCH-004` — scinder `db.store` — maintenabilité — dépendances : TEST-001.
 5. `ARCH-006` — centraliser config scraping — ops — dépendances : BUG-003.
