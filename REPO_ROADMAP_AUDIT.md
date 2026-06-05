@@ -758,9 +758,9 @@ Tâches :
 2. ~~`TEST-006` — tests frontend — protège XSS/filtres — dépendances : SEC-002.~~ **[DONE]**
 3. ~~`TEST-007` — Docker smoke CI — production readiness — dépendances : CLEAN-002.~~ **[DONE]**
 4. ~~`TEST-008` — tests config env — évite régressions ops — dépendances : SEC-001/SEC-004.~~ **[DONE]**
-5. `DOC-001` — README actuel — onboarding — dépendances : SEC-001.
-6. `DOC-003` — architecture/contrat data — facilite LLM/devs — dépendances : ARCH-001.
-7. `DOC-004` — CONTRIBUTING — DX — dépendances : tooling.
+5. ~~`DOC-001` — README actuel — onboarding — dépendances : SEC-001.~~ **[DONE]**
+6. ~~`DOC-003` — architecture/contrat data — facilite LLM/devs — dépendances : ARCH-001.~~ **[DONE]**
+7. ~~`DOC-004` — CONTRIBUTING — DX — dépendances : tooling.~~ **[DONE]**
 
 ### Phase 4 — Features produit
 
