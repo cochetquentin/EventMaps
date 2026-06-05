@@ -66,14 +66,25 @@ class EventsRepository:
             clauses.append("latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?")
             params.extend([min_lat, max_lat, min_lon, max_lon])
         if q:
-            # MVP : LIKE simple, % et _ non échappés (élargit le match — acceptable MVP).
-            clauses.append("title LIKE ?")
-            params.append(f"%{q}%")
+            # Recherche sur titre, venue, location_name et access.
+            # json_extract évite de matcher les noms de champs (ex: "food_stalls").
+            # % et _ non échappés — élargit le match légèrement (acceptable MVP).
+            clauses.append(
+                "(title LIKE ? OR venue LIKE ?"
+                " OR json_extract(attributes, '$.location_name') LIKE ?"
+                " OR json_extract(attributes, '$.access') LIKE ?)"
+            )
+            params.extend([f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"])
         if category:
-            # Filtre sur JSON attributes : "category" comme valeur de chaîne JSON.
-            # Fiable car json.dumps utilise toujours des guillemets doubles.
-            clauses.append("attributes LIKE ?")
-            params.append(f'%"{category}"%')
+            # Filtre exact sur le tableau $.categories via json_each pour éviter
+            # les faux positifs sur les autres champs du JSON attributes.
+            clauses.append(
+                "EXISTS ("
+                "SELECT 1 FROM json_each(json_extract(attributes, '$.categories')) "
+                "WHERE value = ?"
+                ")"
+            )
+            params.append(category)
         where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
         rows = self._conn.execute(
             f"SELECT * FROM events {where} ORDER BY start_date LIMIT ? OFFSET ?",

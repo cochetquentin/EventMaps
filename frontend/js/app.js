@@ -125,10 +125,8 @@ document.getElementById('reset-filters').addEventListener('click', () => {
 let searchDebounceTimer = null;
 document.getElementById('search-input').addEventListener('input', () => {
   clearTimeout(searchDebounceTimer);
-  searchDebounceTimer = setTimeout(() => {
-    const q = document.getElementById('search-input').value.trim() || null;
-    fetchEventsByBbox({ q });
-  }, 300);
+  // fetchEventsByBbox lit le champ search directement depuis le DOM
+  searchDebounceTimer = setTimeout(fetchEventsByBbox, 300);
 });
 
 // ── Scrape ────────────────────────────────────────────────────────────────

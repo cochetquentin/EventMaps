@@ -356,6 +356,24 @@ def test_search_q_matches_hanabi(client):
     assert data[0]["source"] == "hanabi"
 
 
+def test_search_q_matches_venue(client):
+    # make_hanabi has venue="隅田川" — q doit chercher aussi dans venue
+    resp = client.get("/events?q=隅田川")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["source"] == "hanabi"
+
+
+def test_search_q_matches_location_name(client):
+    # make_tc has location_name="Yoyogi Park" dans attributes
+    resp = client.get("/events?q=Yoyogi")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["source"] == "tc"
+
+
 def test_search_q_no_match_returns_empty(client):
     resp = client.get("/events?q=NOMATCH_XYZ")
     assert resp.status_code == 200
@@ -389,6 +407,31 @@ def test_category_no_match_returns_empty(client):
     resp = client.get("/events?category=NONEXISTENT")
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+def test_category_exact_match_only(db, monkeypatch):
+    """Un tag nommé 'festival' dans un autre champ ne doit pas créer un faux positif."""
+    import config
+
+    monkeypatch.setattr(config.settings, "db_path", db)
+    # Créer un TC event dont location_name contient "festival" mais pas dans categories
+    with EventStore(db) as store:
+        tricky = make_tc(
+            url="https://tokyocheapo.com/event/tricky",
+            attributes={
+                "categories": ["music"],
+                "tags": ["festival-related"],
+                "official_link": None,
+                "location_name": "festival hall",
+            },
+        )
+        store.upsert_events([tricky])
+    client_local = TestClient(app)
+    resp = client_local.get("/events?category=festival")
+    assert resp.status_code == 200
+    # Seul le TC event original (categories=["festival"]) doit matcher, pas tricky
+    data = resp.json()
+    assert all("festival" in (e["attributes"].get("categories") or []) for e in data)
 
 
 def test_category_empty_string_returns_all(client):
