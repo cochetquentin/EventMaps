@@ -1,8 +1,13 @@
 import { deactivatedPills, showOnlyFavorites, setShowOnlyFavorites } from './state.js';
+import { isoDate, todayJST } from './utils.js';
+
+const KNOWN_PARAMS = ['from', 'to', 'q', 'off', 'favs'];
 
 /**
  * Encode l'état courant des filtres dans les query params de l'URL.
  * Utilise replaceState pour ne pas polluer l'historique à chaque frappe.
+ * La date `from` n'est pas sérialisée si elle correspond à la valeur par défaut
+ * (aujourd'hui en JST), pour éviter de "figer" la date dans l'URL après init/reset.
  */
 export function updateURL() {
   const params = new URLSearchParams();
@@ -10,7 +15,8 @@ export function updateURL() {
   const to   = document.getElementById('filter-date-to').value;
   const q    = document.getElementById('search-input').value.trim();
 
-  if (from) params.set('from', from);
+  const today = isoDate(todayJST());
+  if (from && from !== today) params.set('from', from);
   if (to)   params.set('to', to);
   if (q)    params.set('q', q);
 
@@ -30,7 +36,7 @@ export function updateURL() {
  */
 export function restoreFromURL() {
   const params = new URLSearchParams(location.search);
-  if (!params.size) return false;
+  if (!KNOWN_PARAMS.some(k => params.has(k))) return false;
 
   const from = params.get('from');
   const to   = params.get('to');
