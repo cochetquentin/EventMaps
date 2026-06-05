@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 from tenacity import (
     Retrying,
     before_log,
-    retry_if_not_exception_type,
+    retry_if_exception,
     stop_after_attempt,
     wait_exponential,
 )
@@ -19,6 +19,14 @@ from models.identity import make_event_id as _make_id
 from scrapers.base import BaseScraper, ScrapeReport
 
 logger = logging.getLogger(__name__)
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    """Retente les erreurs transitoires (5xx, 429) mais pas les erreurs client définitives (4xx)."""
+    if isinstance(exc, requests.HTTPError) and exc.response is not None:
+        status = exc.response.status_code
+        return status == 429 or status >= 500
+    return True
 
 
 # Pour ces champs, on extrait le href de l'<a> plutôt que le texte
@@ -202,7 +210,7 @@ class HanabiWalker(BaseScraper):
                 min=settings.scrape_retry_wait_min,
                 max=settings.scrape_retry_wait_max,
             ),
-            retry=retry_if_not_exception_type(requests.HTTPError),
+            retry=retry_if_exception(_is_retryable),
             before=before_log(logger, logging.WARNING),
             reraise=True,
         )
