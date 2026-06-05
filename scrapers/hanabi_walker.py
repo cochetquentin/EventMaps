@@ -7,6 +7,7 @@ import requests
 from bs4 import BeautifulSoup
 from tenacity import before_log, retry, stop_after_attempt, wait_exponential
 
+from models.attributes import HanabiWalkerAttributes
 from models.event import Event
 from models.identity import make_event_id as _make_id
 from scrapers.base import BaseScraper, ScrapeReport
@@ -355,22 +356,22 @@ class HanabiWalker(BaseScraper):
                     latitude=e.get("lat"),
                     longitude=e.get("lng"),
                     price=None,
-                    attributes={
-                        "fireworks_count": e.get("fireworks_count") or None,
-                        "fireworks_duration": e.get("fireworks_duration") or None,
-                        "expected_crowd": e.get("expected_crowd") or None,
-                        "rain_policy": e.get("rain_policy") or None,
-                        "paid_seating": e.get("paid_seating") or None,
-                        "paid_seating_details": e.get("paid_seating_details") or None,
-                        "food_stalls": e.get("food_stalls") or None,
-                        "notes": e.get("notes") or None,
-                        "access": e.get("access") or None,
-                        "parking": e.get("parking") or None,
-                        "official_site": e.get("official_site") or None,
-                        "official_x": e.get("official_x") or None,
-                        "contact": e.get("contact") or None,
-                        "contact2": e.get("contact2") or None,
-                    },
+                    attributes=HanabiWalkerAttributes(
+                        fireworks_count=e.get("fireworks_count") or None,
+                        fireworks_duration=e.get("fireworks_duration") or None,
+                        expected_crowd=e.get("expected_crowd") or None,
+                        rain_policy=e.get("rain_policy") or None,
+                        paid_seating=e.get("paid_seating") or None,
+                        paid_seating_details=e.get("paid_seating_details") or None,
+                        food_stalls=e.get("food_stalls") or None,
+                        notes=e.get("notes") or None,
+                        access=e.get("access") or None,
+                        parking=e.get("parking") or None,
+                        official_site=e.get("official_site") or None,
+                        official_x=e.get("official_x") or None,
+                        contact=e.get("contact") or None,
+                        contact2=e.get("contact2") or None,
+                    ),
                     created_at=now,
                 )
             )
