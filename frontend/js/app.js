@@ -122,7 +122,12 @@ document.getElementById('reset-filters').addEventListener('click', () => {
 });
 
 // ── Search ────────────────────────────────────────────────────────────────
-document.getElementById('search-input').addEventListener('input', renderMarkers);
+let searchDebounceTimer = null;
+document.getElementById('search-input').addEventListener('input', () => {
+  clearTimeout(searchDebounceTimer);
+  // fetchEventsByBbox lit le champ search directement depuis le DOM
+  searchDebounceTimer = setTimeout(fetchEventsByBbox, 300);
+});
 
 // ── Scrape ────────────────────────────────────────────────────────────────
 const scrapeBtn = document.getElementById('scrape-btn');

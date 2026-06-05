@@ -329,3 +329,130 @@ def test_bbox_wrong_count_422(client):
 def test_bbox_inverted_range_422(client):
     resp = client.get("/events?bbox=140.0,35.0,139.0,36.0")
     assert resp.status_code == 422
+
+
+# --- Search q param ---
+
+
+def test_search_q_matches_title(client):
+    resp = client.get("/events?q=Foo")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["title"] == "Foo Festival"
+
+
+def test_search_q_case_insensitive(client):
+    resp = client.get("/events?q=foo")
+    assert resp.status_code == 200
+    assert len(resp.json()) == 1
+
+
+def test_search_q_matches_hanabi(client):
+    resp = client.get("/events?q=Sumida")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["source"] == "hanabi"
+
+
+def test_search_q_matches_venue(client):
+    # make_hanabi has venue="隅田川" — q doit chercher aussi dans venue
+    resp = client.get("/events?q=隅田川")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["source"] == "hanabi"
+
+
+def test_search_q_matches_location_name(client):
+    # make_tc has location_name="Yoyogi Park" dans attributes
+    resp = client.get("/events?q=Yoyogi")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["source"] == "tc"
+
+
+def test_search_q_no_match_returns_empty(client):
+    resp = client.get("/events?q=NOMATCH_XYZ")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_search_q_empty_string_returns_all(client):
+    resp = client.get("/events?q=")
+    assert resp.status_code == 200
+    assert len(resp.json()) == 2
+
+
+# --- Category filter ---
+
+
+def test_category_filter_matches_tc_event(client):
+    resp = client.get("/events?category=festival")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["source"] == "tc"
+
+
+def test_category_filter_excludes_hanabi(client):
+    resp = client.get("/events?category=festival")
+    assert resp.status_code == 200
+    assert all(e["source"] == "tc" for e in resp.json())
+
+
+def test_category_no_match_returns_empty(client):
+    resp = client.get("/events?category=NONEXISTENT")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_category_exact_match_only(db, monkeypatch):
+    """Un tag nommé 'festival' dans un autre champ ne doit pas créer un faux positif."""
+    import config
+
+    monkeypatch.setattr(config.settings, "db_path", db)
+    # Créer un TC event dont location_name contient "festival" mais pas dans categories
+    with EventStore(db) as store:
+        tricky = make_tc(
+            url="https://tokyocheapo.com/event/tricky",
+            attributes={
+                "categories": ["music"],
+                "tags": ["festival-related"],
+                "official_link": None,
+                "location_name": "festival hall",
+            },
+        )
+        store.upsert_events([tricky])
+    client_local = TestClient(app)
+    resp = client_local.get("/events?category=festival")
+    assert resp.status_code == 200
+    # Seul le TC event original (categories=["festival"]) doit matcher, pas tricky
+    data = resp.json()
+    assert all("festival" in (e["attributes"].get("categories") or []) for e in data)
+
+
+def test_category_empty_string_returns_all(client):
+    resp = client.get("/events?category=")
+    assert resp.status_code == 200
+    assert len(resp.json()) == 2
+
+
+# --- Combined q + category ---
+
+
+def test_q_and_category_combined(client):
+    resp = client.get("/events?q=Foo&category=festival")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["title"] == "Foo Festival"
+
+
+def test_q_and_category_no_overlap_returns_empty(client):
+    # q=Sumida matches hanabi, but category=festival doesn't match hanabi (attributes={})
+    resp = client.get("/events?q=Sumida&category=festival")
+    assert resp.status_code == 200
+    assert resp.json() == []

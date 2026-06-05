@@ -10,7 +10,6 @@ export function renderMarkers() {
   const active = getActivePills();
   const fromS  = document.getElementById('filter-date-from').value || null;
   const toS    = document.getElementById('filter-date-to').value   || null;
-  const query  = document.getElementById('search-input').value.trim().toLowerCase();
   const favs   = getFavorites();
 
   clusterGroup.clearLayers();
@@ -34,12 +33,6 @@ export function renderMarkers() {
       const onlyFW = TC_EXCLUDED_CATS.every(c => ((ev.attributes || {}).categories || []).includes(c)) && cats.length === 0;
       if (onlyFW) return;
       if (cats.length > 0 && !cats.some(c => active.has(c))) return;
-    }
-
-    if (query) {
-      const attrs = ev.attributes || {};
-      const hay = [ev.title, attrs.location_name, ev.venue, attrs.access].filter(Boolean).join(' ').toLowerCase();
-      if (!hay.includes(query)) return;
     }
 
     const icon   = getIcon(ev, favs.has(ev.id));
