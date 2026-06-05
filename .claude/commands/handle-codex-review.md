@@ -1,0 +1,135 @@
+# handle-codex-review
+
+Automatise le cycle de review Codex ↔ Claude Code sur la PR courante.
+
+---
+
+## Phase 1 — Identifier la PR et le repo
+
+```bash
+gh repo view --json nameWithOwner -q .nameWithOwner
+gh pr view --json number,headRefName,title,state
+git branch --show-current
+```
+
+Extraire : `REPO` (ex: `cochetquentin/EventMaps`), `PR_NUMBER`, `HEAD_BRANCH`, `STATE`.
+Si `STATE != "OPEN"` → arrêter : "PR fermée ou mergée."
+Mémoriser ces variables pour toutes les étapes suivantes.
+
+---
+
+## Phase 2 — Protection anti-boucle
+
+```bash
+gh api repos/{REPO}/issues/{PR_NUMBER}/comments
+git log -1 --format="%cI"
+```
+
+Logique :
+1. Dans les commentaires, trouver le **dernier** dont le `body` contient `@Codex review` (insensible à la casse).
+2. Comparer son `created_at` avec le timestamp du dernier commit.
+3. Si `T_comment > T_commit` → **STOP** avec le message :
+   "Anti-boucle : `@Codex review` déjà posté après le dernier commit. Attendre la réponse de Codex."
+4. Si aucun tel commentaire ou `T_commit > T_comment` → continuer.
+
+---
+
+## Phase 3 — Récupérer les remarques Codex
+
+```bash
+gh api repos/{REPO}/pulls/{PR_NUMBER}/reviews
+gh api repos/{REPO}/pulls/{PR_NUMBER}/comments
+gh api repos/{REPO}/issues/{PR_NUMBER}/comments
+```
+
+Filtrer uniquement les objets dont `user.login` contient `codex` ou `openai` (insensible à la casse).
+Exclure les `body` vides ou contenant seulement `@Codex review`.
+
+Classer par priorité :
+1. Reviews formelles avec state `CHANGES_REQUESTED`
+2. Commentaires inline (associés à un fichier:ligne)
+3. Commentaires généraux
+
+Si aucune remarque trouvée → afficher "Aucune remarque Codex sur cette PR." et s'arrêter.
+
+Sinon, **afficher un résumé des points à traiter** avant toute modification.
+
+---
+
+## Phase 4 — Appliquer les corrections
+
+Pour chaque remarque (dans l'ordre de priorité) :
+
+1. Lire le fichier concerné pour comprendre le contexte actuel.
+2. **Évaluer** : la remarque est-elle valide ? Déjà corrigée par un commit précédent ?
+3. Si **valide** → appliquer la correction, noter : `[APPLIQUÉ] fichier:ligne — description`.
+4. Si **invalide / non applicable** → ignorer avec justification courte.
+
+Ne pas modifier les tests pour faire passer une règle de coverage — corriger le code de production.
+
+---
+
+## Phase 5 — Tests
+
+```bash
+uv run pytest --cov=. --cov-fail-under=80 tests/ -v
+```
+
+- **Succès** → continuer.
+- **Échec** → diagnostiquer, corriger, relancer (max 2 tentatives).
+  Si toujours KO après 2 tentatives : `git checkout -- <fichiers problématiques>`,
+  noter les corrections non appliquées, continuer sans elles.
+- **Coverage < 80%** → ajouter des tests pour le code modifié.
+
+---
+
+## Phase 6 — Commit et push
+
+Si des modifications ont été appliquées :
+
+```bash
+git status
+git add <fichiers modifiés spécifiquement>
+git commit -m "fix: appliquer corrections Codex — {résumé 1 ligne}"
+git push
+```
+
+Si **aucune modification** → ne pas commiter. Passer en Phase 7 avec note explicative.
+
+---
+
+## Phase 7 — Relancer Codex
+
+Re-vérifier l'anti-boucle (précaution post-push) :
+
+```bash
+git log -1 --format="%cI"
+gh api repos/{REPO}/issues/{PR_NUMBER}/comments
+```
+
+Confirmer que `T_commit > T_comment` (ou pas de commentaire `@Codex review`), puis :
+
+```bash
+gh pr comment {PR_NUMBER} --body "@Codex review"
+```
+
+---
+
+## Résumé de sortie
+
+Afficher à la fin :
+
+```
+## /handle-codex-review — Résultat
+
+PR : #{PR_NUMBER} — {title}
+Branche : {HEAD_BRANCH}
+
+Remarques Codex : N trouvées
+Corrections : X appliquées, Y ignorées
+Tests : PASS | FAIL (coverage : Z%)
+Commit : {sha} — "{message}"
+Push : OK | SKIPPED
+
+@Codex review relancé : OUI / NON (raison si NON)
+```
