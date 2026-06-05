@@ -18,6 +18,6 @@ EXPOSE 8000
 ENV EVENTMAPS_PORT=8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+    CMD python -c "import urllib.request, os; urllib.request.urlopen('http://localhost:' + os.environ.get('EVENTMAPS_PORT', '8000') + '/health')" || exit 1
 
 CMD ["sh", "-c", "uv run --no-sync uvicorn api.app:app --host 0.0.0.0 --port ${EVENTMAPS_PORT}"]
