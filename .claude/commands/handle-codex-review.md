@@ -8,9 +8,9 @@ Automatise le cycle de review Codex ↔ Claude Code sur la PR courante.
 
 ```bash
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-PR_INFO=$(gh pr view --json number,headRefName,title,state)
-PR_NUMBER=$(echo "$PR_INFO" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['number'])")
-STATE=$(echo "$PR_INFO" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['state'])")
+PR_NUMBER=$(gh pr view --json number -q .number)
+STATE=$(gh pr view --json state -q .state)
+TITLE=$(gh pr view --json title -q .title)
 HEAD_BRANCH=$(git branch --show-current)
 ```
 
@@ -71,17 +71,23 @@ Logique :
 
 ```bash
 # --paginate --jq applique le filtre à chaque page et concatène les résultats
+# Filtrer sur le cycle courant uniquement (depuis T_TRIGGER) pour éviter de retraiter
+# des remarques déjà corrigées dans des cycles précédents.
 gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
-  --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]")'
+  --jq --arg since "${T_TRIGGER}" \
+  '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | select(.submitted_at > $since)'
 gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/comments" \
-  --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]")'
+  --jq --arg since "${T_TRIGGER}" \
+  '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | select(.created_at > $since)'
 gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
-  --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]")'
+  --jq --arg since "${T_TRIGGER}" \
+  '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | select(.created_at > $since)'
 ```
 
 Filtrer uniquement les objets dont `user.login` est exactement `chatgpt-codex-connector[bot]`
 (identité exacte du bot Codex — ne pas utiliser un substring match pour éviter l'usurpation).
 Exclure les `body` vides ou contenant seulement `@Codex review`.
+Seules les remarques postées **après `T_TRIGGER`** sont traitées (cycle courant).
 
 Classer par priorité :
 1. Reviews formelles avec state `CHANGES_REQUESTED`
@@ -95,6 +101,16 @@ Sinon, **afficher un résumé des points à traiter** avant toute modification.
 ---
 
 ## Phase 4 — Appliquer les corrections
+
+**Avant toute modification**, enregistrer l'état du working tree :
+
+```bash
+DIRTY_FILES=$(git status --porcelain | awk '{print $2}')
+```
+
+Ces fichiers (`DIRTY_FILES`) étaient déjà modifiés avant ce workflow. Si Phase 5 échoue,
+le rollback **ne touchera jamais** ces fichiers — uniquement les fichiers propres que ce
+workflow a modifiés.
 
 Pour chaque remarque (dans l'ordre de priorité) :
 
@@ -115,9 +131,9 @@ uv run pytest --cov=. --cov-fail-under=80 tests/ -v
 
 - **Succès** → continuer.
 - **Échec** → diagnostiquer, corriger, relancer (max 2 tentatives).
-  Si toujours KO après 2 tentatives : vérifier d'abord `git status` pour s'assurer
-  qu'il n'y a pas de modifications non liées ; annuler uniquement les fichiers
-  introduits par ce workflow (`git checkout -- <fichiers modifiés dans ce cycle>`),
+  Si toujours KO après 2 tentatives : annuler uniquement les fichiers modifiés par ce
+  workflow ET absents de `DIRTY_FILES` (enregistré en Phase 4) :
+  `git checkout -- <fichiers modifiés dans ce cycle sauf DIRTY_FILES>`,
   noter les corrections non appliquées, continuer sans elles.
 - **Coverage < 80%** → ajouter des tests pour le code modifié.
 
