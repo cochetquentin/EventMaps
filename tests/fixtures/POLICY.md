@@ -13,10 +13,11 @@ corrigée avant d'être mergée.
 Capture complète d'une page telle que renvoyée par le serveur tiers (Tokyo Cheapo, Hanabi Walker,
 Time Out Tokyo), enregistrée manuellement à une date donnée.
 
-**Rôle** : test de contrat — vérifier que le parseur fonctionne sur du HTML réel tel qu'il existe
-en production.  
-**Hypothèse** : la structure peut changer côté source, ce qui déclenchera l'échec du test et alertera
-l'équipe d'une rupture de contrat.
+**Rôle** : couverture de régression sur des structures HTML réellement observées — vérifier que le
+parseur fonctionne sur du HTML réel capturé à une date donnée.  
+**Hypothèse** : la fixture est un instantané statique. Si la structure upstream change, les tests
+sur la fixture continueront à passer (ils ne détectent pas les changements en production). Renouveler
+la fixture manuellement lorsqu'une rupture de sélecteur est détectée en production.
 
 ### `synthetic`
 

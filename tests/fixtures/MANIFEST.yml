@@ -77,7 +77,7 @@ fixtures:
   - file: tot_listing.html
     category: real
     source: tot
-    captured_at: "2026-06-05"
+    captured_at: "2026-06-06"
     url: "https://www.timeout.com/tokyo/things-to-do/things-to-do-this-week-in-tokyo"
     purpose: >
       Capture réelle du listing hebdomadaire Time Out Tokyo.
@@ -88,7 +88,7 @@ fixtures:
   - file: tot_event_full.html
     category: real
     source: tot
-    captured_at: "2026-06-05"
+    captured_at: "2026-06-06"
     url: "https://www.timeout.com/tokyo/things-to-do/bunkyo-ajisai-matsuri-2015"
     purpose: >
       Capture réelle d'un événement Time Out Tokyo avec JSON-LD complet
@@ -99,7 +99,7 @@ fixtures:
   - file: tot_event_news_article.html
     category: real
     source: tot
-    captured_at: "2026-06-05"
+    captured_at: "2026-06-06"
     url: "https://www.timeout.com/tokyo/news/the-worlds-largest-projection-mapping-show-is-now-held-in-shinjuku-every-night-022724"
     purpose: >
       Capture réelle d'un article de news Time Out Tokyo (JSON-LD type

@@ -1,14 +1,17 @@
 """Configuration globale pytest — EventMaps.
 
 Règles appliquées automatiquement à chaque session/test :
-- Aucun appel HTTP live via requests (POLICY.md §2 Tests réseau live)
-- Chaque fixture HTML doit être déclarée dans MANIFEST.yml (POLICY.md §4)
+- Aucun appel réseau live (blocage socket + requests) — POLICY.md §2
+- Chaque fixture HTML doit être déclarée dans MANIFEST.yml — POLICY.md §4
 """
 
 from __future__ import annotations
 
 import re
+import socket as _socket_module
 import unittest.mock
+import urllib.parse
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -19,23 +22,40 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 MANIFEST_PATH = FIXTURES_DIR / "MANIFEST.yml"
 VALID_CATEGORIES = {"real", "synthetic"}
 REQUIRED_KEYS = {"file", "category", "source", "captured_at", "url", "purpose"}
+_DATE_RE = re.compile(r"\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])")
 
+_ERROR_MSG = (
+    "Connexion réseau live interdite pendant les tests (POLICY.md §2). "
+    "Utiliser des fixtures HTML statiques dans tests/fixtures/ "
+    "et mocker les appels HTTP (unittest.mock ou monkeypatch)."
+)
 
 # ── Blocage réseau — installé à l'import du module ───────────────────────────
 # Protège la phase de collection, les fixtures session/module-scoped et chaque
 # test sans exception (contrairement à une fixture function-scoped).
+#
+# Deux niveaux de blocage (belt-and-suspenders) :
+# 1. socket.socket.connect — bloque tous les clients HTTP (requests, httpx, etc.)
+#    Les connexions loopback (127.x, ::1) sont autorisées pour asyncio et le
+#    TestClient ASGI de starlette (socketpair interne sur Windows).
+# 2. requests.Session.send — défense en profondeur spécifique à requests.
+
+_original_connect = _socket_module.socket.connect
 
 
-def _network_blocked(self: object, *args: object, **kwargs: object) -> None:  # type: ignore[override]
-    raise RuntimeError(
-        "Appel réseau live interdit pendant les tests (POLICY.md §2). "
-        "Utiliser des fixtures HTML statiques dans tests/fixtures/ "
-        "et mocker les appels HTTP (unittest.mock ou monkeypatch)."
-    )
+def _no_external_connect(self: _socket_module.socket, address: object) -> None:
+    host = address[0] if isinstance(address, tuple) else str(address)
+    if host in ("127.0.0.1", "::1", "localhost"):
+        return _original_connect(self, address)
+    raise RuntimeError(_ERROR_MSG)
 
 
-_network_patcher = unittest.mock.patch.object(requests.Session, "send", _network_blocked)
-_network_patcher.start()
+_socket_module.socket.connect = _no_external_connect  # type: ignore[method-assign]
+
+_requests_patcher = unittest.mock.patch.object(
+    requests.Session, "send", side_effect=RuntimeError(_ERROR_MSG)
+)
+_requests_patcher.start()
 
 
 # ── Conformité du manifeste ───────────────────────────────────────────────────
@@ -103,18 +123,46 @@ def pytest_sessionstart(session: pytest.Session) -> None:
                     "au format YYYY-MM-DD.",
                     pytrace=False,
                 )
-            if not re.fullmatch(
-                r"\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])", str(captured_at)
-            ):
+            if not _DATE_RE.fullmatch(str(captured_at)):
                 pytest.fail(
                     f"MANIFEST.yml : fixture réelle '{filename}' — 'captured_at' doit "
                     f"respecter le format YYYY-MM-DD (valeur : '{captured_at}').",
                     pytrace=False,
                 )
-            if not entry.get("url"):
+            try:
+                date.fromisoformat(str(captured_at))
+            except ValueError:
+                pytest.fail(
+                    f"MANIFEST.yml : fixture réelle '{filename}' — 'captured_at' "
+                    f"'{captured_at}' n'est pas une date calendaire valide.",
+                    pytrace=False,
+                )
+            url = entry.get("url")
+            if not url:
                 pytest.fail(
                     f"MANIFEST.yml : fixture réelle '{filename}' doit avoir 'url' non-null "
                     "(URL canonique de la page capturée).",
+                    pytrace=False,
+                )
+            parsed = urllib.parse.urlparse(str(url))
+            if parsed.scheme not in ("http", "https") or not parsed.netloc:
+                pytest.fail(
+                    f"MANIFEST.yml : fixture réelle '{filename}' — 'url' doit être une URL "
+                    f"HTTP(S) absolue valide (valeur : '{url}').",
+                    pytrace=False,
+                )
+
+        elif cat == "synthetic":
+            if entry.get("url") is not None:
+                pytest.fail(
+                    f"MANIFEST.yml : fixture synthétique '{filename}' doit avoir 'url: null' "
+                    "(les synthétiques ne proviennent pas d'une page réelle).",
+                    pytrace=False,
+                )
+            if entry.get("captured_at") is not None:
+                pytest.fail(
+                    f"MANIFEST.yml : fixture synthétique '{filename}' doit avoir "
+                    "'captured_at: null' (pas de date de capture pour les synthétiques).",
                     pytrace=False,
                 )
 
