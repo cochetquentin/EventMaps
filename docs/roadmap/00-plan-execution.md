@@ -47,7 +47,7 @@
 | `Frontend / Tests` | `frontend-tests` |
 | `Docker / Build and smoke test` | `docker-build` |
 
-Configuration : `strict: true` (branche doit être à jour), `enforce_admins: false`.
+Configuration : `strict: true` (branche doit être à jour), `enforce_admins: true` (règle appliquée aux admins).
 
 ## STAB-003 — Créer un tableau de suivi à partir de cette roadmap
 
