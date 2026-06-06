@@ -21,7 +21,7 @@
 
 **Objectif.** Empêcher de nouvelles fonctionnalités de déplacer la cible pendant la stabilisation.
 
-**Actions.** Définir une date de début/fin, n'autoriser que les corrections, la dette technique, les tests, la documentation et l'exploitation ; étiqueter ou repousser les demandes produit.
+**Actions.** Définir une date de début et une condition de sortie, n'autoriser que les corrections, la dette technique, les tests, la documentation et l'exploitation ; étiqueter ou repousser les demandes produit. La date de fin sera déterminée lors de la revue STAB-004.
 
 **Critères d'acceptation.** La règle est visible dans le processus de contribution et les PR actives sont classées selon cette règle.
 
@@ -63,6 +63,6 @@
 
 - **Statut : Terminé**
 - **Priorité : P0**
-- **Suivi :** cette roadmap
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/77
 
 **Résultat.** L'audit monolithique précédent a été remplacé par des documents thématiques et des tâches indépendantes avec statuts, priorités et critères d'acceptation.

@@ -13,7 +13,7 @@
 
 - **Statut : Terminé**
 - **Priorité : P0**
-- **Suivi :** déjà effectif sur la branche auditée
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/78
 
 **Résultat.** Le fichier local n'est ni versionné ni requis par le fonctionnement de l'application. Son entrée `.gitignore` est appropriée.
 
