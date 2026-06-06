@@ -1,6 +1,6 @@
 # Contributing to EventMaps
 
-## Gel de stabilisation (actif depuis le 6 juin 2026)
+## Gel de stabilisation (début : 6 juin 2026 — fin : définie lors de STAB-004)
 
 Le dépôt est en phase de **stabilisation**. Seules les contributions suivantes sont acceptées :
 

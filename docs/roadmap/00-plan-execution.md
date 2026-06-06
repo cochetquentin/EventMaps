@@ -17,7 +17,7 @@
 
 - **Statut : Terminé**
 - **Priorité : P0**
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/47
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/76
 
 **Objectif.** Empêcher de nouvelles fonctionnalités de déplacer la cible pendant la stabilisation.
 
@@ -40,7 +40,7 @@
 
 - **Statut : Terminé**
 - **Priorité : P1**
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/52
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/76
 
 **Objectif.** Rendre l'avancement visible sans dupliquer le détail des tâches.
 
