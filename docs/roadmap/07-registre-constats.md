@@ -39,7 +39,7 @@ Lorsqu'un constat classé terminé s'avère encore reproductible, il doit être 
 | TEST-003 | **Couvert** | [TEST-003](02-fixtures-tests.md#test-003--constituer-un-corpus-réel-tokyo-cheapo) |
 | TEST-004 | **Couvert** | [TEST-004](02-fixtures-tests.md#test-004--constituer-un-corpus-réel-hanabi-walker) |
 | TEST-005 | Terminé avant cette roadmap | Les routes de scrape, le `job_id` et les conflits de jobs possèdent des tests dédiés. |
-| TEST-008 | Terminé avant cette roadmap | `tests/test_config.py` couvre les variables d'environnement et leur normalisation. |
+| TEST-008 | **Actif** | [LEGACY-011](#legacy-011--valider-les-configurations-invalides) ; les valeurs valides, defaults et normalisations sont couverts, mais pas les valeurs invalides. |
 | DOC-001 | **Couvert** | [DOC-001](05-documentation.md#doc-001--corriger-les-faits-périssables-du-readme) |
 | DOC-002 | **Couvert** | [DOC-002](05-documentation.md#doc-002--clarifier-le-parcours-dinstallation-et-dexploitation) |
 | DOC-003 | **Couvert** | [DOC-004](05-documentation.md#doc-004--synchroniser-la-documentation-darchitecture-avec-le-code) |
@@ -163,3 +163,17 @@ Lorsqu'un constat classé terminé s'avère encore reproductible, il doit être 
 **Décision attendue.** Choisir explicitement entre une liste de régions supportées et validées, ou le support assumé de codes arbitraires respectant un format sûr.
 
 **Critères d'acceptation.** La politique est centralisée, appliquée de façon cohérente par la CLI et l'API, testée pour les valeurs valides et invalides, et documentée sans bloquer l'ajout futur d'une région légitime.
+
+## LEGACY-011 — Valider les configurations invalides
+
+- **Statut : À faire**
+- **Priorité : P2**
+- **Origine :** TEST-008
+- **Dépendances :** LEGACY-003, LEGACY-010
+- **Suivi :** à renseigner
+
+**Problème.** `tests/test_config.py` couvre les valeurs par défaut, le parsing CSV/JSON des origines, la normalisation du token et des overrides valides. Il ne définit toutefois pas le comportement attendu pour les valeurs invalides. Plusieurs réglages numériques sont actuellement de simples `int` ou `float` sans bornes déclarées, et la politique des origines/régions reste à préciser.
+
+**Cas minimaux à décider et couvrir.** Origines JSON malformées ou types inattendus ; port hors plage ; timeouts, limites de pages et tentatives nuls ou négatifs ; seuil d'erreur hors de l'intervalle retenu ; booléen invalide ; région Hanabi rejetée selon la politique issue de LEGACY-010.
+
+**Critères d'acceptation.** Pour chaque réglage public, le comportement sur valeur invalide est explicite — rejet avec erreur compréhensible ou normalisation documentée — et testé depuis les sources réellement supportées (`env`, `.env` ou initialisation directe selon le contrat). Les tests ne doivent pas seulement figer le comportement permissif actuel : ils doivent refléter les contraintes décidées.

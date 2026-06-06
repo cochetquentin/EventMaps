@@ -42,7 +42,7 @@ Chaque ligne ne doit démarrer qu'après les dépendances déclarées dans les t
 3. **Configurer la protection de branche** : STAB-002, désormais débloqué par CI-001 et CI-002 ; poursuivre avec CI-003 à CI-005.
 4. **Renforcer les contrats des scrapers** : TEST-001 à TEST-007 dans l'ordre de leurs dépendances.
 5. **Simplifier le cœur de l'automatisation de review** : TOOL-002 à TOOL-004.
-6. **Traiter la structure, la documentation et les constats hérités** : TREE-001 à TREE-006, DOC-001 à DOC-004, et les tâches actives de [LEGACY-001 à LEGACY-010](07-registre-constats.md), selon leurs priorités.
+6. **Traiter la structure, la documentation et les constats hérités** : TREE-001 à TREE-006, DOC-001 à DOC-004, et les tâches actives de [LEGACY-001 à LEGACY-011](07-registre-constats.md), selon leurs priorités.
 7. **Finaliser la documentation de l'outil** : TOOL-005, uniquement après TOOL-003 et DOC-003 ; puis DOC-005.
 8. **Nettoyer et gouverner les branches** : GIT-001 et GIT-002 ; GIT-003 après CI-001 et STAB-002 ; enfin GIT-004.
 9. **Clôturer la stabilisation** : STAB-004 après résolution ou acceptation explicite de toutes les autres tâches P0/P1.
