@@ -113,8 +113,11 @@ Les tests ne font **jamais** de vraies requêtes HTTP vers les sources tierces. 
 - `unittest.mock` (stdlib) pour mocker les appels `requests`
 
 Ajouter une fixture :
-1. Sauvegarder le HTML de la page dans `tests/fixtures/<source>_<description>.html`
-2. Charger ce fichier dans le test avec `open("tests/fixtures/...")` ou un fixture pytest
+1. Sauvegarder le HTML dans `tests/fixtures/{source}/{category}/{type}[_{variante}].html`
+   — où `{source}` est `tc`, `hanabi` ou `tot` ; `{category}` est `real` ou `synthetic`.
+   Exemples : `tests/fixtures/tc/synthetic/event_no_price.html`, `tests/fixtures/tot/real/event_full.html`.
+2. Déclarer le fichier dans `tests/fixtures/MANIFEST.yml` (voir `tests/fixtures/POLICY.md` §3-4).
+3. Charger ce fichier dans le test avec `Path(__file__).parent / "fixtures" / "{source}/{category}/{nom}.html"`
 
 ### Coverage
 

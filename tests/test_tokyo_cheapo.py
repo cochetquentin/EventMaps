@@ -522,7 +522,7 @@ def _make_404_http_error() -> requests.HTTPError:
 
 def test_get_event_links_from_fixture(tc, monkeypatch):
     """Listing fixture contains 2 real event links; excluded links are filtered out."""
-    html_bytes = (FIXTURES_DIR / "tc_listing.html").read_bytes()
+    html_bytes = (FIXTURES_DIR / "tc/synthetic/listing.html").read_bytes()
     call_count = 0
 
     def mock_fetch(url, session, timeout=10):
@@ -570,7 +570,7 @@ def test_get_event_links_stops_on_empty_page(tc, monkeypatch):
 
 def test_scrape_event_full_fixture(tc, monkeypatch):
     """scrape_event returns all expected fields from a complete event page."""
-    html_bytes = (FIXTURES_DIR / "tc_event_full.html").read_bytes()
+    html_bytes = (FIXTURES_DIR / "tc/synthetic/event_full.html").read_bytes()
     soup = BeautifulSoup(html_bytes, "html.parser")
     monkeypatch.setattr(tc, "get_event_page", lambda url: soup)
     # Figer l'horloge JST pour que l'assertion de date soit déterministe quelle
@@ -604,7 +604,7 @@ def test_scrape_event_full_fixture(tc, monkeypatch):
 
 def test_scrape_event_no_description_returns_empty_string(tc, monkeypatch):
     """parse_description returns '' when div.entry-content__text is absent (BUG-005 fix)."""
-    html_bytes = (FIXTURES_DIR / "tc_event_no_description.html").read_bytes()
+    html_bytes = (FIXTURES_DIR / "tc/synthetic/event_no_description.html").read_bytes()
     soup = BeautifulSoup(html_bytes, "html.parser")
     monkeypatch.setattr(tc, "get_event_page", lambda url: soup)
 
@@ -619,7 +619,7 @@ def test_scrape_event_no_description_returns_empty_string(tc, monkeypatch):
 
 def test_scrape_event_multi_location_fixture(tc, monkeypatch):
     """scrape_event returns multiple location entries when Apple Maps JSON has locations array."""
-    html_bytes = (FIXTURES_DIR / "tc_event_multi_location.html").read_bytes()
+    html_bytes = (FIXTURES_DIR / "tc/synthetic/event_multi_location.html").read_bytes()
     soup = BeautifulSoup(html_bytes, "html.parser")
     monkeypatch.setattr(tc, "get_event_page", lambda url: soup)
 
