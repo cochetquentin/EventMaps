@@ -297,6 +297,21 @@
     #copy-link-btn:hover { border-color: var(--accent); color: var(--accent); }
     #copy-link-btn.copied { border-color: var(--accent); color: var(--accent); }
 
+    #export-ics-btn {
+      flex-shrink: 0;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1.5px solid var(--border);
+      background: transparent;
+      font-family: inherit;
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    #export-ics-btn:hover { border-color: var(--accent); color: var(--accent); }
+
     /* Custom date dropdown */
     #date-dropdown {
       margin-top: 8px;
@@ -759,6 +774,7 @@
       <div class="row2-sep"></div>
       <button id="reset-filters">✕ Reset</button>
       <button id="copy-link-btn" title="Copier le lien">🔗</button>
+      <button id="export-ics-btn" title="Exporter la liste filtrée au format ICS">📅 ICS</button>
     </div>
   </div>
 

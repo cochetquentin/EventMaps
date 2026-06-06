@@ -624,7 +624,7 @@ EventMaps est une application Python/FastAPI + frontend statique Leaflet qui scr
 **Dépendances :** SEC-002.
 **Candidat PR indépendante :** Oui pour MVP
 
-### FEAT-004 — Import/export calendrier par liste filtrée
+### ~~FEAT-004 — Import/export calendrier par liste filtrée~~ [DONE]
 
 **Valeur utilisateur :** Medium
 **Complexité :** S/M
@@ -768,7 +768,7 @@ Tâches :
 2. ~~`FEAT-003` — événements à proximité — valeur mobile — dépendances : SEC-002.~~ **[DONE]**
 3. ~~`FEAT-005` — drawer détail événement — valorise données existantes — dépendances : SEC-002, ARCH-001.~~ **[DONE]**
 4. ~~`FEAT-002` — URLs partageables — UX/support — dépendances : BUG-001.~~ **[DONE]**
-5. `FEAT-004` — export calendrier liste filtrée — productivité utilisateur — dépendances : FEAT-001 si endpoint.
+5. ~~`FEAT-004` — export calendrier liste filtrée — productivité utilisateur — dépendances : FEAT-001 si endpoint.~~ **[DONE]**
 6. `FEAT-006` — nouvelle source — croissance contenu — dépendances : ARCH-001/002, fixtures.
 
 ## 12. Dependency Graph Between Tasks

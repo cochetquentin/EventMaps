@@ -7,6 +7,7 @@ import { renderMarkers } from './markers.js';
 import { buildPills } from './filters.js';
 import {
   fetchEventsByBbox,
+  buildIcsUrl,
   setBboxFetchEnabled,
   bboxFetchEnabled,
   fetchDebounceTimer,
@@ -199,6 +200,11 @@ document.getElementById('copy-link-btn').addEventListener('click', () => {
   } else {
     onFailure();
   }
+});
+
+// ── Export ICS button ─────────────────────────────────────────────────────
+document.getElementById('export-ics-btn').addEventListener('click', () => {
+  window.location.href = buildIcsUrl();
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────

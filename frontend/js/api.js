@@ -10,6 +10,18 @@ let bboxFetchController = null;
 export function setBboxFetchEnabled(v) { bboxFetchEnabled = v; }
 export function setFetchDebounceTimer(v) { fetchDebounceTimer = v; }
 
+export function buildIcsUrl() {
+  const params = new URLSearchParams();
+  const fromS = document.getElementById('filter-date-from').value;
+  if (fromS) params.set('start_from', fromS);
+  const toS = document.getElementById('filter-date-to').value;
+  if (toS) params.set('start_to', toS);
+  const q = document.getElementById('search-input')?.value.trim();
+  if (q) params.set('q', q);
+  const qs = params.toString();
+  return `/events.ics${qs ? `?${qs}` : ''}`;
+}
+
 export async function fetchEventsByBbox({ category = null } = {}) {
   if (bboxFetchController) bboxFetchController.abort();
   bboxFetchController = new AbortController();
