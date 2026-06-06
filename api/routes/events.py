@@ -102,6 +102,7 @@ def list_events(
 
 
 _ICS_PAGE = 500
+_ICS_MAX = 5000
 
 
 @router.get(".ics")
@@ -124,7 +125,7 @@ def export_events_ical(
     all_events: list[Event] = []
     offset = 0
     with EventStore(settings.db_path) as store:
-        while True:
+        while len(all_events) < _ICS_MAX:
             page = store.get_events(
                 source=source,
                 date=date_str,
