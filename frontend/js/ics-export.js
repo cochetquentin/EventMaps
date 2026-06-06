@@ -81,7 +81,9 @@ export function downloadICS() {
         lines.push(`DTSTART:${toUtcStamp(startUtc)}`);
         let endUtc = endHM
           ? jstToUtcDate(endDate, endHM)
-          : new Date(startUtc.getTime() + 60 * 60 * 1000); // +1 hour
+          : endDate !== ev.start_date
+            ? jstToUtcDate(endDate, startHM) // multi-day: end at same time on end_date
+            : new Date(startUtc.getTime() + 60 * 60 * 1000); // +1 hour
         // Overnight range (e.g. 23:00-02:00): advance end by one day
         if (endHM && endUtc <= startUtc) endUtc = new Date(endUtc.getTime() + 24 * 60 * 60 * 1000);
         lines.push(`DTEND:${toUtcStamp(endUtc)}`);

@@ -86,7 +86,18 @@ def _build_ics_event(event: Event) -> "ICSEvent":
                 if dtend <= dtstart:
                     dtend += timedelta(days=1)
             else:
-                dtend = dtstart + timedelta(hours=1)
+                # Multi-day event with start time only: end at same time on end_date
+                if end_date != event.start_date:
+                    dtend = datetime(
+                        end_date.year,
+                        end_date.month,
+                        end_date.day,
+                        start_hm[0],
+                        start_hm[1],
+                        tzinfo=_JST,
+                    ).astimezone(UTC)
+                else:
+                    dtend = dtstart + timedelta(hours=1)
             ics_event.add("dtend", dtend)
         else:
             ics_event.add("dtstart", event.start_date)
