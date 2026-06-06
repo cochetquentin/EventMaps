@@ -153,10 +153,17 @@ async function startScrape() {
     scrapeBtn.title = 'Scraping non autorisé (token requis)';
     return;
   }
+  const data = await res.json();
+  if (data.status === 'already_running') {
+    scrapeBtn.classList.remove('running');
+    return;
+  }
+  const jobId = data.job_id;
+  const statusUrl = jobId != null ? `/scrape/status?job_id=${jobId}` : '/scrape/status';
   pollInterval = setInterval(async () => {
-    const statusRes  = await fetch('/scrape/status');
-    const data = await statusRes.json();
-    if (data.status !== 'running') {
+    const statusRes = await fetch(statusUrl);
+    const statusData = await statusRes.json();
+    if (statusData.status !== 'running') {
       clearInterval(pollInterval);
       scrapeBtn.classList.remove('running');
       await loadEvents();

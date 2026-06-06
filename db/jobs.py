@@ -68,6 +68,28 @@ class JobsRepository:
         )
         self._conn.commit()
 
+    def get_job_by_id(self, job_id: int) -> dict | None:
+        row = self._conn.execute(
+            "SELECT * FROM scrape_jobs WHERE id=?",
+            (job_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        keys = [
+            "id",
+            "source",
+            "status",
+            "started_at",
+            "finished_at",
+            "events_scraped",
+            "error",
+            "links_seen",
+            "events_ok",
+            "events_skipped",
+            "error_count",
+        ]
+        return dict(zip(keys, row))
+
     def get_last_job(self, source: str | None = None) -> dict | None:
         if source:
             row = self._conn.execute(

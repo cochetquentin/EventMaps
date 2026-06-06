@@ -304,7 +304,7 @@ EventMaps est une application Python/FastAPI + frontend statique Leaflet qui scr
 **Taille estimée :** XS
 **Candidat PR indépendante :** Oui
 
-### SEC-007 — Image Docker lancée en root sans hardening minimal
+### ~~SEC-007 — Image Docker lancée en root sans hardening minimal~~ **[DONE]**
 
 **Sévérité :** Low
 **Confiance :** High
@@ -331,7 +331,7 @@ EventMaps est une application Python/FastAPI + frontend statique Leaflet qui scr
 **Taille estimée :** M
 **Candidat PR indépendante :** Oui
 
-### ARCH-002 — Résultat de scraping sans métadonnées de qualité
+### ~~ARCH-002 — Résultat de scraping sans métadonnées de qualité~~ **[DONE]**
 
 **Impact :** High
 **Zone concernée :** `scrapers/base.py`, `scrapers/*.py`, `api/routes/scrape.py`, `db/store.py`
@@ -499,7 +499,7 @@ EventMaps est une application Python/FastAPI + frontend statique Leaflet qui scr
 **Taille estimée :** M
 **Candidat PR indépendante :** Oui
 
-### TEST-007 — Smoke test Docker/production start
+### ~~TEST-007 — Smoke test Docker/production start~~ **[DONE]**
 
 **Priorité :** P2
 **Zone concernée :** `Dockerfile`, `.github/workflows/ci.yml`, `api/app.py`
@@ -573,7 +573,7 @@ EventMaps est une application Python/FastAPI + frontend statique Leaflet qui scr
 **Taille estimée :** XS
 **Candidat PR indépendante :** Oui
 
-### DOC-006 — Ajouter `.env.example`
+### ~~DOC-006 — Ajouter `.env.example`~~ **[DONE]**
 
 **Priorité :** P2
 **Problème :** variables env discoverables seulement via `config.py`.
@@ -745,7 +745,7 @@ Tâches :
 
 ### Phase 2 — Maintenabilité & architecture
 
-1. `ARCH-002` — introduire `ScrapeResult` — observabilité et qualité scraping — dépendances : BUG-003.
+1. ~~`ARCH-002` — introduire `ScrapeResult` — observabilité et qualité scraping — dépendances : BUG-003.~~ **[DONE]**
 2. ~~`ARCH-001` — typer attributes par source — contrat plus stable — dépendances : TEST-001.~~ **[DONE]**
 3. ~~`ARCH-005` — déplacer génération ID hors DB — découplage métier — dépendances : aucune.~~ **[DONE]**
 4. ~~`ARCH-004` — scinder `db.store` — maintenabilité — dépendances : TEST-001.~~ **[DONE]**
@@ -769,7 +769,7 @@ Tâches :
 3. ~~`FEAT-005` — drawer détail événement — valorise données existantes — dépendances : SEC-002, ARCH-001.~~ **[DONE]**
 4. ~~`FEAT-002` — URLs partageables — UX/support — dépendances : BUG-001.~~ **[DONE]**
 5. ~~`FEAT-004` — export calendrier liste filtrée — productivité utilisateur — dépendances : FEAT-001 si endpoint.~~ **[DONE]**
-6. `FEAT-006` — nouvelle source — croissance contenu — dépendances : ARCH-001/002, fixtures.
+6. ~~`FEAT-006` — nouvelle source — croissance contenu — dépendances : ARCH-001/002, fixtures.~~ **[DONE]**
 
 ## 12. Dependency Graph Between Tasks
 
@@ -933,7 +933,7 @@ uv run --locked python -m pytest -q
 **Peut être fait en parallèle avec :** PR-001, PR-002.
 **Ne pas faire dans cette PR :** recherche plein texte/catégories serveur.
 
-### PR-004 — Ajouter un rapport de scraping et seuil d'échec partiel
+### PR-004 — Ajouter un rapport de scraping et seuil d'échec partiel ✅ DONE
 
 **Source :** BUG-003, ARCH-002, ARCH-007
 **Objectif :** rendre visibles les scrapes partiels et éviter les succès silencieux.
@@ -966,7 +966,7 @@ uv run --locked python -m pytest -q
 **Peut être fait en parallèle avec :** PR-006, PR-007.
 **Ne pas faire dans cette PR :** migration vers Celery/Redis.
 
-### PR-005 — Fixer l'inférence d'année Tokyo Cheapo
+### PR-005 — Fixer l'inférence d'année Tokyo Cheapo ✅ DONE
 
 **Source :** BUG-002, TEST-003
 **Objectif :** éviter dates incorrectes autour du Nouvel An.
@@ -1064,7 +1064,7 @@ uv run --locked python -m pytest --cov=. --cov-fail-under=80 tests/ -q
 **Peut être fait en parallèle avec :** PR-001, PR-002, PR-006.
 **Ne pas faire dans cette PR :** changer comportement CLI.
 
-### PR-008 — Corriger `.dockerignore` et hardening Docker minimal
+### PR-008 — Corriger `.dockerignore` et hardening Docker minimal ✅ DONE
 
 **Source :** CLEAN-002, SEC-007, TEST-007
 **Objectif :** produire une image plus propre et moins risquée.
