@@ -149,20 +149,28 @@ def _parse_ld_json_blocks(soup: BeautifulSoup) -> list[dict]:
 
     Also exposes ``itemReviewed`` nested objects so that Time Out Tokyo's
     ``Review``-wrapped event data is surfaced alongside top-level entries.
+    The expansion is applied to every collected dict (top-level, graph, and
+    array members) so that Review entries inside @graph or JSON-LD arrays are
+    also unwrapped.
     """
-    items = []
+    raw: list = []
     for script in soup.find_all("script", type="application/ld+json"):
         try:
             data = json.loads(script.string or "")
         except (json.JSONDecodeError, TypeError, ValueError):
             continue
         if isinstance(data, list):
-            items.extend(data)
+            raw.extend(data)
         elif isinstance(data, dict):
-            items.append(data)
-            items.extend(data.get("@graph", []))
-            # Time Out Tokyo wraps event data inside a Review's itemReviewed
-            item_reviewed = data.get("itemReviewed")
+            raw.append(data)
+            raw.extend(data.get("@graph", []))
+
+    # Second pass: expand itemReviewed from every collected dict
+    items: list = []
+    for entry in raw:
+        items.append(entry)
+        if isinstance(entry, dict):
+            item_reviewed = entry.get("itemReviewed")
             if isinstance(item_reviewed, dict):
                 items.append(item_reviewed)
     return items
@@ -281,8 +289,10 @@ class TimeoutTokyo(BaseScraper):
         latitude, longitude = self._parse_zone_location(soup)
 
         if ld is None:
-            # HTML fallback: require at minimum a title AND either a date or GPS
-            # coordinates so the event can actually surface in the API.
+            # HTML fallback: require a title, GPS coordinates, AND a parseable date.
+            # Without all three the event cannot surface via the API (date filter)
+            # or on the map (coords), and accepting any h1+coords would incorrectly
+            # treat venue/restaurant pages as events.
             h1 = soup.find("h1")
             if not h1:
                 raise ValueError(f"No JSON-LD event data and no <h1> found at: {url}")
@@ -290,10 +300,25 @@ class TimeoutTokyo(BaseScraper):
                 raise ValueError(
                     f"No Event JSON-LD and no coordinates — page would be unreachable: {url}"
                 )
+            # Require at least one parseable date from <time datetime="…">
+            fallback_date: str | None = None
+            for time_el in soup.find_all("time", attrs={"datetime": True}):
+                try:
+                    dt = datetime.fromisoformat(time_el["datetime"])
+                    if dt.tzinfo is not None:
+                        dt = dt.astimezone(_JST)
+                    fallback_date = dt.date().isoformat()
+                    break
+                except (ValueError, TypeError):
+                    continue
+            if fallback_date is None:
+                raise ValueError(
+                    f"No Event JSON-LD and no extractable date — likely a venue page: {url}"
+                )
             return {
                 "url": url,
                 "title": h1.get_text(strip=True),
-                "start_date": None,
+                "start_date": fallback_date,
                 "end_date": None,
                 "times": None,
                 "price": None,
@@ -322,6 +347,9 @@ class TimeoutTokyo(BaseScraper):
             raw_start = ld.get("startDate")
             if raw_start:
                 dt_start = datetime.fromisoformat(raw_start)
+                # Normalise to JST so stored dates/times match the rest of the app
+                if dt_start.tzinfo is not None:
+                    dt_start = dt_start.astimezone(_JST)
                 start_date = dt_start.date().isoformat()
                 # Include time only if it's not midnight
                 if dt_start.hour != 0 or dt_start.minute != 0:
@@ -332,6 +360,8 @@ class TimeoutTokyo(BaseScraper):
             raw_end = ld.get("endDate")
             if raw_end:
                 dt_end = datetime.fromisoformat(raw_end)
+                if dt_end.tzinfo is not None:
+                    dt_end = dt_end.astimezone(_JST)
                 end_date = dt_end.date().isoformat()
                 # Don't store same-day end as end_date (single-day event),
                 # but append the end time to times so "19:30-22:00" is preserved.

@@ -549,19 +549,42 @@ def test_bbox_filters_by_coords(tmp_path):
     assert results[0].source == "tc"
 
 
-def test_bbox_includes_null_coords(tmp_path):
-    """Events without coordinates are always included in bbox searches.
+def test_bbox_includes_null_coords_for_tot(tmp_path):
+    """tot events without coordinates are always included in bbox searches."""
+    from models.attributes import TimeoutTokyoAttributes
 
-    They cannot be placed on a map but should still appear in the list view
-    (e.g. tot events that lack GPS coordinates).
-    """
+    db = str(tmp_path / "events.db")
+    tot_event = Event(
+        id="tot000000000001",
+        source="tot",
+        title="Tot No Coords",
+        url="https://www.timeout.com/tokyo/art/no-coords",
+        start_date=date(2026, 7, 1),
+        end_date=None,
+        times=None,
+        venue=None,
+        latitude=None,
+        longitude=None,
+        price=None,
+        attributes=TimeoutTokyoAttributes(),
+        created_at=_NOW,
+    )
+    bbox = (139.0, 35.0, 140.0, 36.0)
+    with EventStore(db) as store:
+        store.upsert_events([tot_event])
+        results = store.get_events(bbox=bbox, upcoming=False)
+    assert len(results) == 1
+
+
+def test_bbox_excludes_null_coords_for_other_sources(tmp_path):
+    """Non-tot events without coordinates are excluded by bbox filter."""
     db = str(tmp_path / "events.db")
     no_coords = make_tc(latitude=None, longitude=None)
     bbox = (139.0, 35.0, 140.0, 36.0)
     with EventStore(db) as store:
         store.upsert_events([no_coords])
         results = store.get_events(bbox=bbox, upcoming=False)
-    assert len(results) == 1
+    assert len(results) == 0
 
 
 def test_no_bbox_includes_null_coords(tmp_path):

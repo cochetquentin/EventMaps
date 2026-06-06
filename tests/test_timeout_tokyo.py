@@ -251,11 +251,12 @@ def test_scrape_event_html_fallback_raises_without_coords(tot, monkeypatch):
         tot.scrape_event("https://www.timeout.com/tokyo/shopping/oi-racecourse-flea-market")
 
 
-def test_scrape_event_html_fallback_with_coords(tot, monkeypatch):
-    """Pages without Event JSON-LD are accepted when GPS coordinates are present."""
+def test_scrape_event_html_fallback_with_coords_and_date(tot, monkeypatch):
+    """Pages without Event JSON-LD are accepted when GPS coords AND a date are present."""
     html = """
     <html><body>
       <h1>Oi Racecourse Tokyo City Flea Market</h1>
+      <time datetime="2026-09-21T09:00:00+09:00">Until September 21, 2026</time>
       <div data-component="maps" data-zone-location-info="{&quot;zones&quot;:[{&quot;latitude&quot;:35.598,&quot;longitude&quot;:139.737,&quot;name&quot;:&quot;Oi Racecourse&quot;}]}"></div>
     </body></html>
     """
@@ -265,9 +266,24 @@ def test_scrape_event_html_fallback_with_coords(tot, monkeypatch):
     result = tot.scrape_event("https://www.timeout.com/tokyo/shopping/oi-racecourse-flea-market")
 
     assert result["title"] == "Oi Racecourse Tokyo City Flea Market"
-    assert result["start_date"] is None
+    assert result["start_date"] == "2026-09-21"
     assert result["price"] is None
     assert result["latitude"] == pytest.approx(35.598)
+
+
+def test_scrape_event_html_fallback_raises_without_date(tot, monkeypatch):
+    """Pages without Event JSON-LD AND without a parseable date are rejected (venue pages)."""
+    html = """
+    <html><body>
+      <h1>Some Tokyo Venue</h1>
+      <div data-component="maps" data-zone-location-info="{&quot;zones&quot;:[{&quot;latitude&quot;:35.6,&quot;longitude&quot;:139.7,&quot;name&quot;:&quot;Venue&quot;}]}"></div>
+    </body></html>
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    monkeypatch.setattr(tot, "get_event_page", lambda url: soup)
+
+    with pytest.raises(ValueError, match="venue page"):
+        tot.scrape_event("https://www.timeout.com/tokyo/restaurants/some-venue")
 
 
 def test_scrape_event_raises_on_news_article(tot, monkeypatch):
