@@ -6,7 +6,7 @@
 
 Le dépôt possède un unique workflow `.github/workflows/ci.yml`, nommé `CI`, déclenché sur les pull requests vers `main`, les push vers `main` et manuellement. Six jobs sont exposés : `Python / Lint`, `Python / Format`, `Python / Tests`, `Python / Security`, `Frontend / Tests` et `Docker / Build and smoke test`.
 
-Chaque responsabilité Python dispose de son propre job : Ruff lint, Ruff format, pytest et pip-audit sont séparés, ce qui rend chaque échec attribuable sans ouvrir le log. Le smoke test Docker utilise une boucle bornée (15 × 2s) avec nettoyage garanti et affichage des logs en cas d'échec. Stratégie de pinning : version tags + Dependabot (voir `.github/dependabot.yml`).
+Chaque responsabilité Python dispose de son propre job : Ruff lint, Ruff format, pytest et pip-audit sont séparés, ce qui rend chaque échec attribuable sans ouvrir le log. Le smoke test Docker utilise une boucle bornée (15 tentatives, max ~75s : 3s timeout curl + 2s sleep par tentative) avec trap EXIT garantissant le nettoyage et affichage des logs en cas d'échec. Stratégie de pinning : version tags + Dependabot (voir `.github/dependabot.yml`).
 
 ## CI-001 — Donner des noms stables et explicites aux checks
 
