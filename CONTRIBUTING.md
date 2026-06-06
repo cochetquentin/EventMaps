@@ -1,5 +1,22 @@
 # Contributing to EventMaps
 
+## Gel de stabilisation (début : 6 juin 2026 — fin : définie lors de STAB-004)
+
+Le dépôt est en phase de **stabilisation**. Seules les contributions suivantes sont acceptées :
+
+| Type autorisé | Exemples |
+|---|---|
+| `fix` | Correction de bug |
+| `test` | Ajout ou correction de tests |
+| `refactor` | Refactoring sans changement de comportement |
+| `chore` | Outillage, dépendances, CI |
+| `docs` | Documentation uniquement |
+| `ci` | Pipelines GitHub Actions |
+
+**`feat` est bloqué** : aucune nouvelle fonctionnalité produit ne sera mergée pendant cette période.
+
+Les demandes produit reçues pendant le gel doivent être étiquetées `product-backlog` et reportées après la revue de sortie de stabilisation (STAB-004).
+
 ## Prérequis
 
 - **Python 3.13+** géré par [uv](https://docs.astral.sh/uv/)

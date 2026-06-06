@@ -15,13 +15,13 @@
 
 ## STAB-001 — Geler les évolutions produit
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P0**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/76
 
 **Objectif.** Empêcher de nouvelles fonctionnalités de déplacer la cible pendant la stabilisation.
 
-**Actions.** Définir une date de début/fin, n'autoriser que les corrections, la dette technique, les tests, la documentation et l'exploitation ; étiqueter ou repousser les demandes produit.
+**Actions.** Définir une date de début et une condition de sortie, n'autoriser que les corrections, la dette technique, les tests, la documentation et l'exploitation ; étiqueter ou repousser les demandes produit. La date de fin sera déterminée lors de la revue STAB-004.
 
 **Critères d'acceptation.** La règle est visible dans le processus de contribution et les PR actives sont classées selon cette règle.
 
@@ -30,7 +30,7 @@
 - **Statut : À faire**
 - **Priorité : P0**
 - **Dépendances :** CI-001, CI-002
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/48
 
 **Objectif.** Faire de la baseline de qualité une règle de merge explicite.
 
@@ -38,9 +38,9 @@
 
 ## STAB-003 — Créer un tableau de suivi à partir de cette roadmap
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/76
 
 **Objectif.** Rendre l'avancement visible sans dupliquer le détail des tâches.
 
@@ -53,7 +53,7 @@
 - **Statut : À faire**
 - **Priorité : P1**
 - **Dépendances :** toutes les autres tâches P0/P1 de la roadmap de stabilisation
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/53
 
 **Objectif.** Décider explicitement si la base est assez saine pour reprendre les évolutions.
 
@@ -63,6 +63,6 @@
 
 - **Statut : Terminé**
 - **Priorité : P0**
-- **Suivi :** cette roadmap
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/77
 
 **Résultat.** L'audit monolithique précédent a été remplacé par des documents thématiques et des tâches indépendantes avec statuts, priorités et critères d'acceptation.

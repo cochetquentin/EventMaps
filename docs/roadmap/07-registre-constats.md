@@ -59,7 +59,7 @@ Lorsqu'un constat classé terminé s'avère encore reproductible, il doit être 
 - **Statut : À faire**
 - **Priorité : P1**
 - **Origine :** BUG-006
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/72
 
 **Problème.** `TokyoCheapo.get_event_links()` accepte encore largement les URLs sous `/events/`; une page de taxonomie ou de navigation peut donc provoquer des téléchargements inutiles et des événements ignorés.
 
@@ -81,7 +81,7 @@ Lorsqu'un constat classé terminé s'avère encore reproductible, il doit être 
 - **Statut : À faire**
 - **Priorité : P1**
 - **Origine :** SEC-004
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/73
 
 **Problème.** Le wildcard reste la valeur par défaut ; un warning existe avec un token, mais la posture de production dépend encore d'une configuration manuelle facile à oublier.
 
@@ -145,7 +145,7 @@ Lorsqu'un constat classé terminé s'avère encore reproductible, il doit être 
 - **Statut : À faire**
 - **Priorité : P1**
 - **Origine :** SEC-001
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/74
 
 **Problème.** La protection Bearer est disponible, mais l'absence de token laisse encore l'endpoint public par défaut. Ce comportement peut être volontaire en développement, mais il ne constitue pas une posture de production sûre sans décision explicite.
 
@@ -156,7 +156,7 @@ Lorsqu'un constat classé terminé s'avère encore reproductible, il doit être 
 - **Statut : À faire**
 - **Priorité : P1**
 - **Origine :** ARCH-006
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/75
 
 **Problème.** La CLI et `POST /scrape` acceptent actuellement n'importe quelle valeur `region` et `HanabiWalker` l'interpole dans l'URL de listing. L'ancien audit prévoyait une configuration `allowed_hanabi_regions`, qui n'a pas été implémentée.
 

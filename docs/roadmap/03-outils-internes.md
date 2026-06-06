@@ -13,7 +13,7 @@
 
 - **Statut : Terminé**
 - **Priorité : P0**
-- **Suivi :** déjà effectif sur la branche auditée
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/78
 
 **Résultat.** Le fichier local n'est ni versionné ni requis par le fonctionnement de l'application. Son entrée `.gitignore` est appropriée.
 
@@ -21,7 +21,7 @@
 
 - **Statut : À faire**
 - **Priorité : P0**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/51
 
 **Contrainte impérative.** `/handle-codex-review` doit continuer à fonctionner sans validation manuelle pour chaque sous-commande.
 
@@ -34,7 +34,7 @@
 - **Statut : À faire**
 - **Priorité : P1**
 - **Dépendances :** TOOL-002
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/62
 
 **Actions.** Remplacer la majorité du document de commande par un script/module versionné ; isoler l'accès GitHub, la sélection des remarques, l'anti-boucle et le résumé ; utiliser des structures de données plutôt que des variables shell interpolées.
 
@@ -45,7 +45,7 @@
 - **Statut : À faire**
 - **Priorité : P1**
 - **Dépendances :** TOOL-003
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/63
 
 **Actions.** Refuser proprement un working tree sale ou utiliser une stratégie Git sûre et documentée ; éviter de reconstruire des listes de fichiers avec `awk` ; rendre commit, push et relance Codex explicitement conditionnels au succès des tests et à la présence d'un diff.
 
