@@ -6,7 +6,7 @@ Cette roadmap transforme l'audit du dépôt en tâches indépendantes, priorisé
 
 - Une tâche est l'unité de travail : elle possède un identifiant stable, un statut, une priorité, un résultat attendu et des critères d'acceptation.
 - Statuts autorisés : **À faire**, **En cours**, **Terminé**.
-- Lorsqu'une tâche démarre, remplacer son statut par **En cours** dans son fichier. Lorsqu'elle est validée, passer à **Terminé** et ajouter le lien de la PR ou du commit dans la ligne `Suivi`.
+- Lorsqu'une tâche démarre, remplacer son statut par **En cours** dans son fichier. Lorsqu'elle est validée, passer à **Terminé** et ajouter le lien de la PR ou du commit dans la ligne `Suivi`. L'index ne duplique volontairement pas les compteurs de statuts : les fichiers thématiques sont la source d'autorité.
 - Une PR de stabilisation devrait traiter une seule tâche, ou un petit groupe explicitement indiqué comme lié.
 - Les constats datés décrivent l'état observé le **6 juin 2026** ; ils doivent être réévalués si le dépôt évolue.
 
@@ -21,24 +21,30 @@ Cette roadmap transforme l'audit du dépôt en tâches indépendantes, priorisé
 
 ## Vue d'ensemble
 
-| Domaine | Document | Tâches à faire | En cours | Terminées |
-|---|---|---:|---:|---:|
-| Pilotage | [Plan d'exécution](00-plan-execution.md) | 4 | 0 | 1 |
-| CI/CD | [CI/CD et contrôles qualité](01-ci-cd.md) | 5 | 0 | 0 |
-| Tests | [Fixtures et stratégie de test](02-fixtures-tests.md) | 7 | 0 | 0 |
-| Outils internes | [Configuration locale et review Codex](03-outils-internes.md) | 4 | 0 | 1 |
-| Structure | [Arborescence et maintenabilité](04-arborescence.md) | 6 | 0 | 0 |
-| Documentation | [Documentation](05-documentation.md) | 5 | 0 | 0 |
-| GitHub | [Branches et gouvernance Git](06-git-gouvernance.md) | 4 | 0 | 0 |
+| Domaine | Document | Périmètre |
+|---|---|---|
+| Pilotage | [Plan d'exécution](00-plan-execution.md) | Gel, baseline, suivi et sortie de stabilisation |
+| CI/CD | [CI/CD et contrôles qualité](01-ci-cd.md) | Checks, sécurité du workflow et smoke test |
+| Tests | [Fixtures et stratégie de test](02-fixtures-tests.md) | Corpus HTML réels et contrats des scrapers |
+| Outils internes | [Configuration locale et review Codex](03-outils-internes.md) | Permissions locales et automatisation de review |
+| Structure | [Arborescence et maintenabilité](04-arborescence.md) | Nettoyage et frontières internes |
+| Documentation | [Documentation](05-documentation.md) | README, architecture et documentation agent |
+| GitHub | [Branches et gouvernance Git](06-git-gouvernance.md) | Inventaire, suppression et stratégie de branches |
+| Constats hérités | [Registre des constats hérités](07-registre-constats.md) | Traçabilité de tous les constats non terminés de l'ancien audit |
 
-## Ordre recommandé
+## Ordre recommandé compatible avec les dépendances
 
-1. **Geler les fonctionnalités et établir la baseline** : [STAB-001 à STAB-003](00-plan-execution.md).
-2. **Rendre les contrôles fiables et lisibles** : [CI-001 à CI-005](01-ci-cd.md).
-3. **Sécuriser le contrat des scrapers avec des pages réelles** : [TEST-001 à TEST-007](02-fixtures-tests.md).
-4. **Simplifier l'automatisation de review sans réintroduire de validations manuelles** : [TOOL-002 à TOOL-005](03-outils-internes.md).
-5. **Nettoyer l'arborescence et remettre la documentation en cohérence** : [TREE-001 à TREE-006](04-arborescence.md), puis [DOC-001 à DOC-005](05-documentation.md).
-6. **Finaliser la gouvernance GitHub et clôturer la stabilisation** : [GIT-001 à GIT-004](06-git-gouvernance.md), puis STAB-004.
+Chaque ligne ne doit démarrer qu'après les dépendances déclarées dans les tâches concernées.
+
+1. **Démarrer la stabilisation** : STAB-001 et STAB-003. STAB-005 est déjà terminé.
+2. **Stabiliser les noms des checks** : CI-001 et CI-002.
+3. **Configurer la protection de branche** : STAB-002, désormais débloqué par CI-001 et CI-002 ; poursuivre avec CI-003 à CI-005.
+4. **Renforcer les contrats des scrapers** : TEST-001 à TEST-007 dans l'ordre de leurs dépendances.
+5. **Simplifier le cœur de l'automatisation de review** : TOOL-002 à TOOL-004.
+6. **Traiter la structure, la documentation et les constats hérités** : TREE-001 à TREE-006, DOC-001 à DOC-004, et les tâches actives de [LEGACY-001 à LEGACY-009](07-registre-constats.md), selon leurs priorités.
+7. **Finaliser la documentation de l'outil** : TOOL-005, uniquement après TOOL-003 et DOC-003 ; puis DOC-005.
+8. **Nettoyer et gouverner les branches** : GIT-001 et GIT-002 ; GIT-003 après CI-001 et STAB-002 ; enfin GIT-004.
+9. **Clôturer la stabilisation** : STAB-004 après résolution ou acceptation explicite de toutes les tâches P0/P1.
 
 ## Constats majeurs de l'audit
 

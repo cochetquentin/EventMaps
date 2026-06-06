@@ -30,7 +30,7 @@ Constats précis :
 - **Priorité : P2**
 - **Suivi :** à renseigner
 
-**Actions.** Distinguer clairement développement local, scraping CLI, serveur API/UI et Docker ; documenter les prérequis Node pour les tests frontend et les implications d'un endpoint `/scrape` public lorsque le token est vide.
+**Actions.** Distinguer clairement développement local, scraping CLI, serveur API/UI et Docker ; documenter les prérequis Node pour les tests frontend, les implications d'un endpoint `/scrape` public lorsque le token est vide, et l'usage non sensible de `localStorage` pour les favoris.
 
 **Critères d'acceptation.** Un nouveau contributeur peut installer, lancer et tester le projet sans chercher des étapes dans plusieurs fichiers.
 
