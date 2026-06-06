@@ -6,8 +6,8 @@ on:
       - main
 
 jobs:
-  test:
-    name: Tests
+  python-lint:
+    name: Python / Lint
     runs-on: ubuntu-latest
 
     steps:
@@ -18,12 +18,11 @@ jobs:
           python-version: "3.13"
 
       - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
 
       - name: Installer les dépendances
         run: uv sync --all-groups --locked
-
-      - name: Audit des dépendances
-        run: uv run --locked pip-audit
 
       - name: Lint (Ruff)
         run: uv run --locked ruff check .
@@ -31,11 +30,50 @@ jobs:
       - name: Format (Ruff)
         run: uv run --locked ruff format --check .
 
+  python-tests:
+    name: Python / Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Installer les dépendances
+        run: uv sync --all-groups --locked
+
       - name: Lancer les tests
         run: uv run --locked python -m pytest --cov=. --cov-fail-under=80 tests/ -v
 
-  test-frontend:
-    name: Tests Frontend (Vitest)
+  python-security:
+    name: Python / Security
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Installer les dépendances
+        run: uv sync --all-groups --locked
+
+      - name: Audit des dépendances
+        run: uv run --locked pip-audit
+
+  frontend-tests:
+    name: Frontend / Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -53,7 +91,7 @@ jobs:
         run: npm test
 
   docker-build:
-    name: Docker Build & Smoke Test
+    name: Docker / Build and smoke test
     runs-on: ubuntu-latest
 
     steps:

@@ -10,7 +10,7 @@ Le nom de workflow n'est donc pas actuellement dupliqué sous `Test`. En revanch
 
 ## CI-001 — Donner des noms stables et explicites aux checks
 
-- **Statut : À faire**
+- **Statut : ✅ Done**
 - **Priorité : P0**
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/49
 
@@ -20,7 +20,7 @@ Le nom de workflow n'est donc pas actuellement dupliqué sous `Test`. En revanch
 
 ## CI-002 — Séparer qualité Python, tests Python et audit de dépendances
 
-- **Statut : À faire**
+- **Statut : ✅ Done**
 - **Priorité : P1**
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/54
 
