@@ -86,23 +86,44 @@ Procédure pour renouveler une capture : voir TEST-007.
 
 ---
 
-## 3. Nommage des fichiers
+## 3. Arborescence et nommage des fichiers
 
-Convention : `{source}_{type}[_{variante}].html`
+Les fixtures sont organisées en sous-répertoires selon la convention `{source}/{category}/` :
+
+```
+tests/fixtures/
+├── tc/
+│   ├── real/
+│   └── synthetic/
+├── hanabi/
+│   ├── real/
+│   └── synthetic/
+└── tot/
+    ├── real/
+    └── synthetic/
+```
+
+Le nom du fichier (basename) suit la convention `{type}[_{variante}].html` — le préfixe source
+est omis car la source est encodée dans le répertoire parent.
 
 | Segment | Valeurs autorisées | Exemple |
 |---|---|---|
-| `source` | `tc` (Tokyo Cheapo), `hanabi` (Hanabi Walker), `tot` (Time Out Tokyo) | `tc` |
-| `type` | `listing`, `event`, `map`, `fragment` | `event` |
+| `source` (répertoire) | `tc` (Tokyo Cheapo), `hanabi` (Hanabi Walker), `tot` (Time Out Tokyo) | `tc/synthetic/` |
+| `category` (répertoire) | `real`, `synthetic` | `synthetic/` |
+| `type` (basename) | `listing`, `event`, `map`, `fragment` | `event` |
 | `variante` (optionnelle) | descriptif court en snake_case | `no_description`, `multi_location` |
 
-Exemples valides : `tc_event_full.html`, `hanabi_event_map.html`, `tot_event_no_jsonld.html`.
+Exemples valides : `tc/synthetic/event_full.html`, `hanabi/synthetic/event_map.html`,
+`tot/synthetic/event_no_jsonld.html`.
+
+Le champ `file` dans `MANIFEST.yml` est le chemin relatif depuis `tests/fixtures/`,
+par exemple `tc/synthetic/listing.html`.
 
 ---
 
 ## 4. Référence au manifeste
 
-Chaque fichier `.html` dans ce répertoire doit avoir une entrée dans `MANIFEST.yml`.  
+Chaque fichier `.html` dans ce répertoire (y compris les sous-répertoires) doit avoir une entrée dans `MANIFEST.yml`.  
 Le manifeste doit contenir au minimum : `file`, `category`, `source`, `captured_at`, `url`, `purpose`.
 
 Un test de conformité (`pytest_sessionstart` dans `tests/conftest.py`) échoue si un `.html` est

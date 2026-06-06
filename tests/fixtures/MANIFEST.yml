@@ -72,8 +72,7 @@ fixtures:
       Fragment page détail Hanabi Walker — tableau s_table avec champs
       japonais (nom, dates, horaires, prix, lieu). Premier onglet d'un événement.
     tests_consuming:
-      - test_hanabi_walker.py::test_scrape_event_data_fixture
-      - test_hanabi_walker.py::test_scrape_event_full_fixture
+      - test_hanabi_walker.py::test_parse_event_table_from_fixture
 
   - file: hanabi/synthetic/event_map.html
     category: synthetic
@@ -85,7 +84,7 @@ fixtures:
       Coordonnées GPS extraites du paramètre q= de l'URL iframe.
       Utilisé avec hanabi/synthetic/event_data.html pour assembler un Event complet.
     tests_consuming:
-      - test_hanabi_walker.py::test_scrape_event_full_fixture
+      - test_hanabi_walker.py::test_parse_coordinates_from_fixture
 
   # ── Time Out Tokyo ───────────────────────────────────────────────────────────
 
@@ -100,7 +99,7 @@ fixtures:
       le DOM complet (371 Ko).
     anonymized: false  # tokens côté client à examiner — voir TEST-005
     tests_consuming:
-      - test_timeout_tokyo.py::test_get_event_links_from_fixture
+      - test_timeout_tokyo.py::test_get_event_links_extracts_and_deduplicates
 
   - file: tot/real/event_full.html
     category: real
@@ -113,9 +112,9 @@ fixtures:
       Cas nominal du parseur ToT.
     anonymized: false  # tokens côté client à examiner — voir TEST-005
     tests_consuming:
-      - test_timeout_tokyo.py::test_scrape_event_full_fixture
-      - test_timeout_tokyo.py::test_scrape_event_returns_event_instance
-      - test_timeout_tokyo.py::test_scrape_event_location_fields
+      - test_timeout_tokyo.py::test_parse_json_ld_finds_theater_event
+      - test_timeout_tokyo.py::test_is_news_article_false_for_event
+      - test_timeout_tokyo.py::test_scrape_event_full_from_fixture
 
   - file: tot/real/event_news_article.html
     category: real
@@ -127,8 +126,9 @@ fixtures:
       NewsArticle). Vérifie que le parseur rejette les pages non-événement.
     anonymized: false  # tokens côté client à examiner — voir TEST-005
     tests_consuming:
-      - test_timeout_tokyo.py::test_scrape_event_news_article_returns_none
-      - test_timeout_tokyo.py::test_parse_event_page_news_article_returns_none
+      - test_timeout_tokyo.py::test_parse_json_ld_returns_none_for_news_article
+      - test_timeout_tokyo.py::test_is_news_article_true
+      - test_timeout_tokyo.py::test_scrape_event_raises_on_news_article
 
   - file: tot/synthetic/event_no_jsonld.html
     category: synthetic
@@ -139,4 +139,4 @@ fixtures:
       Page Time Out Tokyo sans bloc JSON-LD (page venue/restaurant).
       Couvre le rejet du parseur quand le JSON-LD est absent.
     tests_consuming:
-      - test_timeout_tokyo.py::test_scrape_event_no_jsonld_returns_none
+      - test_timeout_tokyo.py::test_scrape_event_raises_without_json_ld
