@@ -6,21 +6,41 @@ Règles appliquées automatiquement à chaque session/test :
 """
 from __future__ import annotations
 
+import unittest.mock
 from pathlib import Path
 
 import pytest
+import requests
 import yaml
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 MANIFEST_PATH = FIXTURES_DIR / "MANIFEST.yml"
 VALID_CATEGORIES = {"real", "synthetic"}
+REQUIRED_KEYS = {"file", "category", "source", "captured_at", "url", "purpose"}
+
+
+# ── Blocage réseau — installé à l'import du module ───────────────────────────
+# Protège la phase de collection, les fixtures session/module-scoped et chaque
+# test sans exception (contrairement à une fixture function-scoped).
+
+
+def _network_blocked(self: object, *args: object, **kwargs: object) -> None:  # type: ignore[override]
+    raise RuntimeError(
+        "Appel réseau live interdit pendant les tests (POLICY.md §2). "
+        "Utiliser des fixtures HTML statiques dans tests/fixtures/ "
+        "et mocker les appels HTTP (unittest.mock ou monkeypatch)."
+    )
+
+
+_network_patcher = unittest.mock.patch.object(requests.Session, "send", _network_blocked)
+_network_patcher.start()
 
 
 # ── Conformité du manifeste ───────────────────────────────────────────────────
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:
-    """Vérifie que chaque .html de fixtures/ est déclaré dans MANIFEST.yml."""
+    """Vérifie la conformité de MANIFEST.yml à chaque session pytest."""
     if not MANIFEST_PATH.exists():
         pytest.fail(
             f"{MANIFEST_PATH} manquant — voir tests/fixtures/POLICY.md",
@@ -32,18 +52,51 @@ def pytest_sessionstart(session: pytest.Session) -> None:
 
     entries = manifest.get("fixtures", []) or []
 
-    # Vérifier les catégories
+    # Détecter les entrées dupliquées
+    files_list = [entry.get("file", "") for entry in entries]
+    duplicates = {f for f in files_list if files_list.count(f) > 1}
+    if duplicates:
+        pytest.fail(
+            f"MANIFEST.yml contient des déclarations dupliquées : {sorted(duplicates)}\n"
+            "Chaque fixture ne doit apparaître qu'une seule fois.",
+            pytrace=False,
+        )
+
     for entry in entries:
-        cat = entry.get("category")
-        if cat not in VALID_CATEGORIES:
+        filename = entry.get("file", "<unknown>")
+
+        # Vérifier les champs requis
+        missing = REQUIRED_KEYS - entry.keys()
+        if missing:
             pytest.fail(
-                f"MANIFEST.yml : entrée '{entry.get('file')}' a une catégorie invalide "
-                f"'{cat}'. Valeurs autorisées : {VALID_CATEGORIES}",
+                f"MANIFEST.yml : entrée '{filename}' manque les champs requis : {sorted(missing)}\n"
+                "Champs attendus : file, category, source, captured_at, url, purpose.",
                 pytrace=False,
             )
 
+        # Vérifier la catégorie
+        cat = entry.get("category")
+        if cat not in VALID_CATEGORIES:
+            pytest.fail(
+                f"MANIFEST.yml : entrée '{filename}' a une catégorie invalide '{cat}'. "
+                f"Valeurs autorisées : {sorted(VALID_CATEGORIES)}",
+                pytrace=False,
+            )
+
+        # Contraintes par catégorie
+        if cat == "real" and not entry.get("captured_at"):
+            pytest.fail(
+                f"MANIFEST.yml : fixture réelle '{filename}' doit avoir 'captured_at' "
+                "au format ISO 8601 (YYYY-MM-DD).",
+                pytrace=False,
+            )
+
+    # Comparaison bidirectionnelle : glob récursif pour couvrir les sous-répertoires futurs
     declared = {entry["file"] for entry in entries}
-    on_disk = {p.name for p in FIXTURES_DIR.glob("*.html")}
+    on_disk = {
+        str(p.relative_to(FIXTURES_DIR)).replace("\\", "/")
+        for p in FIXTURES_DIR.rglob("*.html")
+    }
 
     undeclared = on_disk - declared
     if undeclared:
@@ -53,26 +106,10 @@ def pytest_sessionstart(session: pytest.Session) -> None:
             pytrace=False,
         )
 
-
-# ── Blocage réseau ────────────────────────────────────────────────────────────
-
-
-@pytest.fixture(autouse=True)
-def no_live_network(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Bloque les appels HTTP live via requests pendant chaque test.
-
-    Patche requests.Session.send (couche inférieure commune à get/post/etc.)
-    pour lever une RuntimeError explicite si un test tente un appel réseau réel.
-    Les tests existants mockent déjà session.get — ce blocage est une filet de
-    sécurité, pas un changement de comportement pour les tests bien écrits.
-    """
-    import requests
-
-    def _blocked(self: object, *args: object, **kwargs: object) -> None:
-        raise RuntimeError(
-            "Appel réseau live interdit pendant les tests (POLICY.md §2). "
-            "Utiliser des fixtures HTML statiques dans tests/fixtures/ "
-            "et mocker les appels HTTP (unittest.mock ou monkeypatch)."
+    orphaned = declared - on_disk
+    if orphaned:
+        pytest.fail(
+            f"MANIFEST.yml contient des entrées sans fichier correspondant : {sorted(orphaned)}\n"
+            "Supprimer l'entrée ou restaurer le fichier HTML manquant.",
+            pytrace=False,
         )
-
-    monkeypatch.setattr(requests.Session, "send", _blocked)
