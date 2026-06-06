@@ -30,7 +30,8 @@ Cette roadmap transforme l'audit du dépôt en tâches indépendantes, priorisé
 | Structure | [Arborescence et maintenabilité](04-arborescence.md) | Nettoyage et frontières internes |
 | Documentation | [Documentation](05-documentation.md) | README, architecture et documentation agent |
 | GitHub | [Branches et gouvernance Git](06-git-gouvernance.md) | Inventaire, suppression et stratégie de branches |
-| Constats hérités | [Registre des constats hérités](07-registre-constats.md) | Traçabilité de tous les constats non terminés de l'ancien audit |
+| Constats hérités | [Registre des constats hérités](07-registre-constats.md) | Traçabilité de tous les constats techniques non terminés de l'ancien audit |
+| Backlog produit différé | [Archive du backlog produit](08-backlog-produit-differe.md) | Décisions produit conservées hors stabilisation |
 
 ## Ordre recommandé compatible avec les dépendances
 
@@ -41,10 +42,10 @@ Chaque ligne ne doit démarrer qu'après les dépendances déclarées dans les t
 3. **Configurer la protection de branche** : STAB-002, désormais débloqué par CI-001 et CI-002 ; poursuivre avec CI-003 à CI-005.
 4. **Renforcer les contrats des scrapers** : TEST-001 à TEST-007 dans l'ordre de leurs dépendances.
 5. **Simplifier le cœur de l'automatisation de review** : TOOL-002 à TOOL-004.
-6. **Traiter la structure, la documentation et les constats hérités** : TREE-001 à TREE-006, DOC-001 à DOC-004, et les tâches actives de [LEGACY-001 à LEGACY-009](07-registre-constats.md), selon leurs priorités.
+6. **Traiter la structure, la documentation et les constats hérités** : TREE-001 à TREE-006, DOC-001 à DOC-004, et les tâches actives de [LEGACY-001 à LEGACY-010](07-registre-constats.md), selon leurs priorités.
 7. **Finaliser la documentation de l'outil** : TOOL-005, uniquement après TOOL-003 et DOC-003 ; puis DOC-005.
 8. **Nettoyer et gouverner les branches** : GIT-001 et GIT-002 ; GIT-003 après CI-001 et STAB-002 ; enfin GIT-004.
-9. **Clôturer la stabilisation** : STAB-004 après résolution ou acceptation explicite de toutes les tâches P0/P1.
+9. **Clôturer la stabilisation** : STAB-004 après résolution ou acceptation explicite de toutes les autres tâches P0/P1.
 
 ## Constats majeurs de l'audit
 
@@ -54,5 +55,5 @@ Chaque ligne ne doit démarrer qu'après les dépendances déclarées dans les t
 - `.claude/settings.local.json` n'est plus versionné et est ignoré. Sa dernière version historique contenait des permissions ponctuelles et obsolètes ; elle ne doit pas être restaurée telle quelle.
 - `/handle-codex-review` est décrit par un document de 201 lignes qui confie une orchestration complexe et un rollback fragile à l'agent. Une commande testable doit remplacer cette logique textuelle.
 - Le README annonce encore `247 tests Python`, alors que la baseline en exécute 309. `docs/ARCHITECTURE.md` ne documente pas tous les endpoints actuels, notamment les exports ICS.
-- L'ancien `REPO_ROADMAP_AUDIT.md` monolithique, long de 1 328 lignes et partiellement obsolète, a été remplacé par le présent ensemble modulaire.
+- L'ancien `REPO_ROADMAP_AUDIT.md` monolithique, long de 1 328 lignes et partiellement obsolète, a été remplacé par le présent ensemble modulaire ; ses propositions produit non terminées sont conservées dans une archive différée, hors du périmètre de stabilisation.
 - L'audit des branches GitHub n'a pas pu être réalisé depuis cette copie : aucun remote Git n'est configuré, aucune référence distante n'est disponible et `gh` n'est pas installé.

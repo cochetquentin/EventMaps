@@ -27,7 +27,7 @@
 
 **Décision recommandée.** Autoriser une seule commande de haut niveau, versionnée et testée, plutôt qu'une longue liste de commandes shell générales ou destructrices. Garder les secrets et préférences propres au poste dans `settings.local.json`.
 
-**Critères d'acceptation.** Une installation neuve peut exécuter le cycle de review sans prompts répétitifs ; les permissions ne contiennent ni chemins personnels, ni suppressions ponctuelles, ni jokers plus larges que nécessaire.
+**Critères d'acceptation.** La politique distingue les permissions partagées des préférences locales ; elle définit la commande de haut niveau qui pourra être autorisée après TOOL-003 ; la proposition ne contient ni chemins personnels, ni suppressions ponctuelles, ni jokers plus larges que nécessaire.
 
 ## TOOL-003 — Extraire l'orchestration de review dans un programme testable
 
@@ -38,7 +38,7 @@
 
 **Actions.** Remplacer la majorité du document de commande par un script/module versionné ; isoler l'accès GitHub, la sélection des remarques, l'anti-boucle et le résumé ; utiliser des structures de données plutôt que des variables shell interpolées.
 
-**Critères d'acceptation.** Le fichier de commande devient un point d'entrée court ; la logique de décision possède des tests sans appel GitHub réel ; les erreurs sont explicites et n'entraînent ni push ni commentaire involontaire.
+**Critères d'acceptation.** Le fichier de commande devient un point d'entrée court ; la logique de décision possède des tests sans appel GitHub réel ; les erreurs sont explicites et n'entraînent ni push ni commentaire involontaire ; une installation neuve peut autoriser cette seule commande de haut niveau et exécuter le cycle sans prompts répétitifs.
 
 ## TOOL-004 — Simplifier la stratégie de modification, commit et rollback
 

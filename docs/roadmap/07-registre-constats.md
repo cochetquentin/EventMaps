@@ -4,7 +4,7 @@
 
 ## Objectif du registre
 
-Ce registre empêche la suppression de `REPO_ROADMAP_AUDIT.md` de faire disparaître des problèmes connus. Il reprend **tous les constats qui n'étaient pas marqués terminés** dans cet ancien audit et leur attribue une disposition vérifiable :
+Ce registre empêche la suppression de `REPO_ROADMAP_AUDIT.md` de faire disparaître des problèmes techniques connus. Il reprend **tous les constats BUG, SEC, ARCH, TEST, DOC et CLEAN qui n'étaient pas marqués terminés** dans cet ancien audit et leur attribue une disposition vérifiable. Les propositions `FEAT` sont conservées séparément dans l'[archive du backlog produit différé](08-backlog-produit-differe.md), car elles sont hors du périmètre de stabilisation :
 
 - **Terminé avant cette roadmap** : le code ou la documentation actuelle contient déjà la correction attendue ;
 - **Couvert** : une tâche active de la roadmap modulaire reprend explicitement le travail ;
@@ -32,7 +32,7 @@ Lorsqu'un constat classé terminé s'avère encore reproductible, il doit être 
 | ARCH-001 | Terminé avant cette roadmap | Les attributs par source sont modélisés par des modèles Pydantic dédiés. |
 | ARCH-003 | **Actif** | [LEGACY-004](#legacy-004--réduire-le-couplage-entre-rendu-html-et-données) ; TREE-003 ne couvre que l'extraction du CSS. |
 | ARCH-005 | Terminé avant cette roadmap | La génération d'identifiant vit dans `models/identity.py`, hors de la couche DB. |
-| ARCH-006 | Terminé avant cette roadmap | Les limites de pages, timeouts, retries et seuil d'erreur sont centralisés dans `config.py`. |
+| ARCH-006 | **Actif** | [LEGACY-010](#legacy-010--décider-et-valider-la-politique-des-régions-hanabi) ; les réglages réseau sont centralisés, mais pas la politique des régions autorisées. |
 | ARCH-007 | **Actif** | [LEGACY-005](#legacy-005--définir-un-socle-dobservabilité) |
 | ARCH-008 | **Actif** | [LEGACY-006](#legacy-006--stabiliser-le-contrat-api-consommé-par-le-frontend) |
 | TEST-002 | Terminé avant cette roadmap | Les filtres de plage de dates sont couverts côté API et frontend. |
@@ -150,3 +150,16 @@ Lorsqu'un constat classé terminé s'avère encore reproductible, il doit être 
 **Problème.** La protection Bearer est disponible, mais l'absence de token laisse encore l'endpoint public par défaut. Ce comportement peut être volontaire en développement, mais il ne constitue pas une posture de production sûre sans décision explicite.
 
 **Critères d'acceptation.** Le comportement par défaut et les environnements supportés sont décidés ; un déploiement de production ne peut pas exposer involontairement le déclenchement du scraping ; l'UI, `/scrape/config`, les tests et la documentation restent cohérents avec la décision.
+
+## LEGACY-010 — Décider et valider la politique des régions Hanabi
+
+- **Statut : À faire**
+- **Priorité : P1**
+- **Origine :** ARCH-006
+- **Suivi :** à renseigner
+
+**Problème.** La CLI et `POST /scrape` acceptent actuellement n'importe quelle valeur `region` et `HanabiWalker` l'interpole dans l'URL de listing. L'ancien audit prévoyait une configuration `allowed_hanabi_regions`, qui n'a pas été implémentée.
+
+**Décision attendue.** Choisir explicitement entre une liste de régions supportées et validées, ou le support assumé de codes arbitraires respectant un format sûr.
+
+**Critères d'acceptation.** La politique est centralisée, appliquée de façon cohérente par la CLI et l'API, testée pour les valeurs valides et invalides, et documentée sans bloquer l'ajout futur d'une région légitime.

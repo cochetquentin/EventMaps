@@ -52,12 +52,12 @@
 
 - **Statut : À faire**
 - **Priorité : P1**
-- **Dépendances :** toutes les tâches P0/P1
+- **Dépendances :** toutes les autres tâches P0/P1 de la roadmap de stabilisation
 - **Suivi :** à renseigner
 
 **Objectif.** Décider explicitement si la base est assez saine pour reprendre les évolutions.
 
-**Critères d'acceptation.** Tous les P0/P1 sont terminés ou acceptés comme risques résiduels documentés ; CI verte ; tests des scrapers basés sur des fixtures réelles ; documentation vérifiée ; branches nettoyées.
+**Critères d'acceptation.** Toutes les autres tâches P0/P1 sont terminées ou acceptées comme risques résiduels documentés ; CI verte ; tests des scrapers basés sur des fixtures réelles ; documentation vérifiée ; branches nettoyées.
 
 ## STAB-005 — Produire l'audit modulaire initial
 
