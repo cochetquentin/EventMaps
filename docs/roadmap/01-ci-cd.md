@@ -4,9 +4,9 @@
 
 ## État observé
 
-Le dépôt possède un unique workflow `.github/workflows/ci.yml`, nommé `CI`, déclenché uniquement sur les pull requests vers `main`. Trois jobs sont exposés : `Tests`, `Tests Frontend (Vitest)` et `Docker Build & Smoke Test`.
+Le dépôt possède un unique workflow `.github/workflows/ci.yml`, nommé `CI`, déclenché uniquement sur les pull requests vers `main`. Six jobs sont exposés : `Python / Lint`, `Python / Format`, `Python / Tests`, `Python / Security`, `Frontend / Tests` et `Docker / Build and smoke test`.
 
-Le nom de workflow n'est donc pas actuellement dupliqué sous `Test`. En revanche, le job backend `Tests` exécute quatre responsabilités distinctes : `pip-audit`, Ruff lint, Ruff format et pytest. Un échec est identifiable au niveau de l'étape, mais le check GitHub et les règles de protection restent génériques. Le smoke test Docker ne garantit pas l'arrêt du conteneur si `curl` échoue.
+Chaque responsabilité Python dispose de son propre job : Ruff lint, Ruff format, pytest et pip-audit sont séparés, ce qui rend chaque échec attribuable sans ouvrir le log. Le smoke test Docker ne garantit pas l'arrêt du conteneur si `curl` échoue.
 
 ## CI-001 — Donner des noms stables et explicites aux checks
 
