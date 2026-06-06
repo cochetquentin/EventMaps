@@ -27,6 +27,24 @@ jobs:
       - name: Lint (Ruff)
         run: uv run --locked ruff check .
 
+  python-format:
+    name: Python / Format
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Installer les dépendances
+        run: uv sync --all-groups --locked
+
       - name: Format (Ruff)
         run: uv run --locked ruff format --check .
 
