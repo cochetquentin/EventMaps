@@ -110,7 +110,7 @@ def test_listing_paths_one_page():
 
 
 def test_get_event_links_extracts_and_deduplicates(tot, monkeypatch):
-    html_bytes = (FIXTURES_DIR / "tot_listing.html").read_bytes()
+    html_bytes = (FIXTURES_DIR / "tot/real/listing.html").read_bytes()
 
     def fake_fetch(url, session, timeout):
         import requests
@@ -175,7 +175,7 @@ def test_parse_zone_location_returns_none_when_zones_empty(tot):
 
 def test_parse_json_ld_finds_theater_event(tot):
     """Real fixture uses Review wrapping a TheaterEvent in itemReviewed."""
-    html_bytes = (FIXTURES_DIR / "tot_event_full.html").read_bytes()
+    html_bytes = (FIXTURES_DIR / "tot/real/event_full.html").read_bytes()
     soup = BeautifulSoup(html_bytes, "html.parser")
     ld = tot._parse_json_ld(soup)
     assert ld is not None
@@ -202,7 +202,7 @@ def test_parse_json_ld_finds_event_inside_review_wrapper(tot):
 
 
 def test_parse_json_ld_returns_none_for_news_article(tot):
-    html_bytes = (FIXTURES_DIR / "tot_event_news_article.html").read_bytes()
+    html_bytes = (FIXTURES_DIR / "tot/real/event_news_article.html").read_bytes()
     soup = BeautifulSoup(html_bytes, "html.parser")
     ld = tot._parse_json_ld(soup)
     assert ld is None  # NewsArticle is not an Event type
@@ -214,13 +214,13 @@ def test_parse_json_ld_returns_none_when_no_script(tot):
 
 
 def test_is_news_article_true(tot):
-    html_bytes = (FIXTURES_DIR / "tot_event_news_article.html").read_bytes()
+    html_bytes = (FIXTURES_DIR / "tot/real/event_news_article.html").read_bytes()
     soup = BeautifulSoup(html_bytes, "html.parser")
     assert tot._is_news_article(soup) is True
 
 
 def test_is_news_article_false_for_event(tot):
-    html_bytes = (FIXTURES_DIR / "tot_event_full.html").read_bytes()
+    html_bytes = (FIXTURES_DIR / "tot/real/event_full.html").read_bytes()
     soup = BeautifulSoup(html_bytes, "html.parser")
     assert tot._is_news_article(soup) is False
 
@@ -229,7 +229,7 @@ def test_is_news_article_false_for_event(tot):
 
 
 def test_scrape_event_full_from_fixture(tot, monkeypatch):
-    html_bytes = (FIXTURES_DIR / "tot_event_full.html").read_bytes()
+    html_bytes = (FIXTURES_DIR / "tot/real/event_full.html").read_bytes()
     soup = BeautifulSoup(html_bytes, "html.parser")
     monkeypatch.setattr(tot, "get_event_page", lambda url: soup)
 
@@ -250,7 +250,7 @@ def test_scrape_event_full_from_fixture(tot, monkeypatch):
 
 def test_scrape_event_raises_without_json_ld(tot, monkeypatch):
     """Any page without Event JSON-LD is rejected (venue/restaurant pages)."""
-    html_bytes = (FIXTURES_DIR / "tot_event_no_jsonld.html").read_bytes()
+    html_bytes = (FIXTURES_DIR / "tot/synthetic/event_no_jsonld.html").read_bytes()
     soup = BeautifulSoup(html_bytes, "html.parser")
     monkeypatch.setattr(tot, "get_event_page", lambda url: soup)
 
@@ -259,7 +259,7 @@ def test_scrape_event_raises_without_json_ld(tot, monkeypatch):
 
 
 def test_scrape_event_raises_on_news_article(tot, monkeypatch):
-    html_bytes = (FIXTURES_DIR / "tot_event_news_article.html").read_bytes()
+    html_bytes = (FIXTURES_DIR / "tot/real/event_news_article.html").read_bytes()
     soup = BeautifulSoup(html_bytes, "html.parser")
     monkeypatch.setattr(tot, "get_event_page", lambda url: soup)
 

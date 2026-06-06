@@ -5,7 +5,7 @@ fixtures:
 
   # ── Tokyo Cheapo ─────────────────────────────────────────────────────────────
 
-  - file: tc_listing.html
+  - file: tc/synthetic/listing.html
     category: synthetic
     source: tc
     captured_at: null
@@ -13,8 +13,10 @@ fixtures:
     purpose: >
       Listing minimal Tokyo Cheapo avec 2 event-cards filtrables.
       Couvre le parsing de la grille et l'extraction des URLs d'événements.
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_get_event_links_from_fixture
 
-  - file: tc_event_full.html
+  - file: tc/synthetic/event_full.html
     category: synthetic
     source: tc
     captured_at: null
@@ -22,8 +24,10 @@ fixtures:
     purpose: >
       Page événement Tokyo Cheapo complète : titre, dates, horaires, prix,
       description et localisation JSON Apple Maps. Cas nominal du parseur.
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_scrape_event_full_fixture
 
-  - file: tc_event_no_description.html
+  - file: tc/synthetic/event_no_description.html
     category: synthetic
     source: tc
     captured_at: null
@@ -31,8 +35,10 @@ fixtures:
     purpose: >
       Régression BUG-005 — page événement sans div.entry-content__text.
       Vérifie que l'absence de description ne lève pas d'exception.
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_scrape_event_no_description_returns_empty_string
 
-  - file: tc_event_multi_location.html
+  - file: tc/synthetic/event_multi_location.html
     category: synthetic
     source: tc
     captured_at: null
@@ -40,10 +46,12 @@ fixtures:
     purpose: >
       Page événement avec plusieurs lieux dans le JSON Apple Maps (tableau
       "locations"). Couvre la création de plusieurs Event pour un même listing.
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_scrape_event_multi_location_fixture
 
   # ── Hanabi Walker ────────────────────────────────────────────────────────────
 
-  - file: hanabi_listing.html
+  - file: hanabi/synthetic/listing.html
     category: synthetic
     source: hanabi
     captured_at: null
@@ -52,8 +60,10 @@ fixtures:
       Listing minimal hanabi.walkerplus.com avec 3 liens de détail
       (/detail/ar0300eXXX/) et 1 lien pager ignoré. Couvre le filtrage
       des liens et l'extraction des URLs de détail.
+    tests_consuming:
+      - test_hanabi_walker.py::test_get_event_links_from_fixture
 
-  - file: hanabi_event_data.html
+  - file: hanabi/synthetic/event_data.html
     category: synthetic
     source: hanabi
     captured_at: null
@@ -61,8 +71,11 @@ fixtures:
     purpose: >
       Fragment page détail Hanabi Walker — tableau s_table avec champs
       japonais (nom, dates, horaires, prix, lieu). Premier onglet d'un événement.
+    tests_consuming:
+      - test_hanabi_walker.py::test_scrape_event_data_fixture
+      - test_hanabi_walker.py::test_scrape_event_full_fixture
 
-  - file: hanabi_event_map.html
+  - file: hanabi/synthetic/event_map.html
     category: synthetic
     source: hanabi
     captured_at: null
@@ -70,11 +83,13 @@ fixtures:
     purpose: >
       Fragment page Hanabi Walker — onglet carte avec iframe Google Maps.
       Coordonnées GPS extraites du paramètre q= de l'URL iframe.
-      Utilisé avec hanabi_event_data.html pour assembler un Event complet.
+      Utilisé avec hanabi/synthetic/event_data.html pour assembler un Event complet.
+    tests_consuming:
+      - test_hanabi_walker.py::test_scrape_event_full_fixture
 
   # ── Time Out Tokyo ───────────────────────────────────────────────────────────
 
-  - file: tot_listing.html
+  - file: tot/real/listing.html
     category: real
     source: tot
     captured_at: "2026-06-06"
@@ -84,8 +99,10 @@ fixtures:
       Couvre l'extraction et la déduplication des liens d'événements depuis
       le DOM complet (371 Ko).
     anonymized: false  # tokens côté client à examiner — voir TEST-005
+    tests_consuming:
+      - test_timeout_tokyo.py::test_get_event_links_from_fixture
 
-  - file: tot_event_full.html
+  - file: tot/real/event_full.html
     category: real
     source: tot
     captured_at: "2026-06-06"
@@ -95,8 +112,12 @@ fixtures:
       wrappé en Review.itemReviewed, données NextJS et digitalData.
       Cas nominal du parseur ToT.
     anonymized: false  # tokens côté client à examiner — voir TEST-005
+    tests_consuming:
+      - test_timeout_tokyo.py::test_scrape_event_full_fixture
+      - test_timeout_tokyo.py::test_scrape_event_returns_event_instance
+      - test_timeout_tokyo.py::test_scrape_event_location_fields
 
-  - file: tot_event_news_article.html
+  - file: tot/real/event_news_article.html
     category: real
     source: tot
     captured_at: "2026-06-06"
@@ -105,8 +126,11 @@ fixtures:
       Capture réelle d'un article de news Time Out Tokyo (JSON-LD type
       NewsArticle). Vérifie que le parseur rejette les pages non-événement.
     anonymized: false  # tokens côté client à examiner — voir TEST-005
+    tests_consuming:
+      - test_timeout_tokyo.py::test_scrape_event_news_article_returns_none
+      - test_timeout_tokyo.py::test_parse_event_page_news_article_returns_none
 
-  - file: tot_event_no_jsonld.html
+  - file: tot/synthetic/event_no_jsonld.html
     category: synthetic
     source: tot
     captured_at: null
@@ -114,3 +138,5 @@ fixtures:
     purpose: >
       Page Time Out Tokyo sans bloc JSON-LD (page venue/restaurant).
       Couvre le rejet du parseur quand le JSON-LD est absent.
+    tests_consuming:
+      - test_timeout_tokyo.py::test_scrape_event_no_jsonld_returns_none

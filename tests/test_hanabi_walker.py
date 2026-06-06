@@ -445,7 +445,7 @@ def _load_fixture(name: str) -> BeautifulSoup:
 
 def test_get_event_links_from_fixture(hw):
     # Simuler la réponse HTTP avec le contenu de la fixture
-    with open(os.path.join(FIXTURES_DIR, "hanabi_listing.html"), "rb") as f:
+    with open(os.path.join(FIXTURES_DIR, "hanabi/synthetic/listing.html"), "rb") as f:
         content = f.read()
 
     page1 = MagicMock()
@@ -474,7 +474,7 @@ def test_get_event_links_from_fixture(hw):
 
 
 def test_parse_event_table_from_fixture(hw):
-    soup = _load_fixture("hanabi_event_data.html")
+    soup = _load_fixture("hanabi/synthetic/event_data.html")
     result = hw.parse_event_table(soup)
 
     assert result["title"] == "第54回 真岡市夏祭大花火大会"
@@ -491,7 +491,7 @@ def test_parse_event_table_from_fixture(hw):
 
 
 def test_parse_coordinates_from_fixture(hw):
-    soup = _load_fixture("hanabi_event_map.html")
+    soup = _load_fixture("hanabi/synthetic/event_map.html")
     lat, lng = hw.parse_coordinates(soup)
 
     assert lat == pytest.approx(36.439054)
