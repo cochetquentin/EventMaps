@@ -7,7 +7,6 @@ import { renderMarkers } from './markers.js';
 import { buildPills } from './filters.js';
 import {
   fetchEventsByBbox,
-  buildIcsUrl,
   setBboxFetchEnabled,
   bboxFetchEnabled,
   fetchDebounceTimer,
@@ -16,6 +15,7 @@ import {
 import { setupGeolocation, cancelGeolocation } from './geolocation.js';
 import { initDrawer } from './drawer.js';
 import { updateURL, restoreFromURL } from './share.js';
+import { downloadICS } from './ics-export.js';
 
 // ── Map init ──────────────────────────────────────────────────────────────
 const map = L.map('map').setView([35.68, 139.69], 11);
@@ -204,7 +204,7 @@ document.getElementById('copy-link-btn').addEventListener('click', () => {
 
 // ── Export ICS button ─────────────────────────────────────────────────────
 document.getElementById('export-ics-btn').addEventListener('click', () => {
-  window.location.href = buildIcsUrl();
+  downloadICS();
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────

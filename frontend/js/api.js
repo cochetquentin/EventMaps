@@ -1,5 +1,5 @@
 import { map, setAllEvents } from './state.js';
-import { buildPills, getActivePills } from './filters.js';
+import { buildPills } from './filters.js';
 import { renderMarkers } from './markers.js';
 import { updateURL } from './share.js';
 
@@ -9,33 +9,6 @@ let bboxFetchController = null;
 
 export function setBboxFetchEnabled(v) { bboxFetchEnabled = v; }
 export function setFetchDebounceTimer(v) { fetchDebounceTimer = v; }
-
-export function buildIcsUrl() {
-  const params = new URLSearchParams();
-  const fromS = document.getElementById('filter-date-from').value;
-  if (fromS) params.set('start_from', fromS);
-  const toS = document.getElementById('filter-date-to').value;
-  if (toS) params.set('start_to', toS);
-  const q = document.getElementById('search-input')?.value.trim();
-  if (q) params.set('q', q);
-  // Include current map viewport as bbox (mirrors fetchEventsByBbox logic)
-  if (map) {
-    const b = map.getBounds(), sw = b.getSouthWest(), ne = b.getNorthEast();
-    const minLon = Math.max(-180, sw.lng), maxLon = Math.min(180, ne.lng);
-    const minLat = Math.max(-90, sw.lat), maxLat = Math.min(90, ne.lat);
-    if (minLon < maxLon && minLat < maxLat) {
-      params.set('bbox', `${minLon},${minLat},${maxLon},${maxLat}`);
-    }
-  }
-  // Source filter derived from active pills
-  const active = getActivePills();
-  const hanabiActive = active.has('hanabi');
-  const tcActive = [...active].some(p => p !== 'hanabi');
-  if (hanabiActive && !tcActive) params.set('source', 'hanabi');
-  else if (!hanabiActive && tcActive) params.set('source', 'tc');
-  const qs = params.toString();
-  return `/events.ics${qs ? `?${qs}` : ''}`;
-}
 
 export async function fetchEventsByBbox({ category = null } = {}) {
   if (bboxFetchController) bboxFetchController.abort();
