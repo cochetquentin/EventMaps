@@ -3,8 +3,8 @@
 Strategy:
 - Listing pages are server-side rendered (SSR) with an initial batch of event links.
 - Detail pages expose structured JSON-LD metadata (Event/TheaterEvent/MusicEvent/…).
-- GPS coordinates are not available in the HTML → latitude/longitude are always None.
-  Events appear in the list view but not on the map.
+- GPS coordinates are extracted from the ``data-zone-location-info`` JSON attribute
+  found on ``div[data-component="maps"]`` elements when present.
 """
 
 from __future__ import annotations
@@ -180,6 +180,25 @@ class TimeoutTokyo(BaseScraper):
         response = self._retrying(_fetch, url, self.session, self._timeout)
         return BeautifulSoup(response.content, "html.parser")
 
+    def _parse_zone_location(self, soup: BeautifulSoup) -> tuple[float | None, float | None]:
+        """Extract GPS coordinates from the data-zone-location-info attribute.
+
+        Returns (latitude, longitude) or (None, None) if not found.
+        """
+        div = soup.find("div", attrs={"data-component": "maps", "data-zone-location-info": True})
+        if not div:
+            return None, None
+        try:
+            data = json.loads(div["data-zone-location-info"])
+            zones = data.get("zones") or []
+            if zones:
+                lat = float(zones[0]["latitude"])
+                lng = float(zones[0]["longitude"])
+                return lat, lng
+        except (KeyError, ValueError, TypeError, json.JSONDecodeError):
+            pass
+        return None, None
+
     def _parse_json_ld(self, soup: BeautifulSoup) -> dict | None:
         """Return the first Event-type JSON-LD object found in the page, or None."""
         for item in _parse_ld_json_blocks(soup):
@@ -235,6 +254,7 @@ class TimeoutTokyo(BaseScraper):
             raise ValueError(f"Page is a news article, not an event: {url}")
 
         ld = self._parse_json_ld(soup)
+        latitude, longitude = self._parse_zone_location(soup)
 
         if ld is None:
             # HTML fallback: at minimum require a title
@@ -253,6 +273,8 @@ class TimeoutTokyo(BaseScraper):
                 "categories": [],
                 "description": None,
                 "image_url": None,
+                "latitude": latitude,
+                "longitude": longitude,
             }
 
         # ── Title ──────────────────────────────────────────────────────────────
@@ -359,6 +381,8 @@ class TimeoutTokyo(BaseScraper):
             "categories": categories,
             "description": ld.get("description") or None,
             "image_url": image_url,
+            "latitude": latitude,
+            "longitude": longitude,
         }
 
     def scrape_all(self, max_pages: int | None = None) -> tuple[list[dict], dict]:
@@ -420,8 +444,8 @@ class TimeoutTokyo(BaseScraper):
                     end_date=end_date,
                     times=e.get("times") or None,
                     venue=e.get("venue_name") or None,
-                    latitude=None,  # Time Out Tokyo does not provide GPS coordinates
-                    longitude=None,
+                    latitude=e.get("latitude"),
+                    longitude=e.get("longitude"),
                     price=e.get("price") or None,
                     attributes=TimeoutTokyoAttributes(
                         categories=e.get("categories") or [],

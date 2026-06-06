@@ -124,6 +124,40 @@ def test_get_event_links_extracts_and_deduplicates(tot, monkeypatch):
     assert not any("things-to-do-this-week" in link for link in links)
 
 
+# ── _parse_zone_location ──────────────────────────────────────────────────────
+
+
+def test_parse_zone_location_extracts_coords(tot):
+    html = """
+    <html><body>
+    <div data-component="maps" data-zone-location-info="{&quot;address1&quot;:&quot;1-2 Ueno Koen&quot;,&quot;zones&quot;:[{&quot;latitude&quot;:35.7134,&quot;longitude&quot;:139.7716,&quot;name&quot;:&quot;Ueno Museum&quot;}]}"></div>
+    </body></html>
+    """
+    soup = make_soup(html)
+    lat, lng = tot._parse_zone_location(soup)
+    assert lat == pytest.approx(35.7134)
+    assert lng == pytest.approx(139.7716)
+
+
+def test_parse_zone_location_returns_none_when_absent(tot):
+    soup = make_soup("<html><body><p>no map here</p></body></html>")
+    lat, lng = tot._parse_zone_location(soup)
+    assert lat is None
+    assert lng is None
+
+
+def test_parse_zone_location_returns_none_when_zones_empty(tot):
+    html = """
+    <html><body>
+    <div data-component="maps" data-zone-location-info="{&quot;zones&quot;:[]}"></div>
+    </body></html>
+    """
+    soup = make_soup(html)
+    lat, lng = tot._parse_zone_location(soup)
+    assert lat is None
+    assert lng is None
+
+
 # ── _parse_json_ld ────────────────────────────────────────────────────────────
 
 
@@ -180,6 +214,8 @@ def test_scrape_event_full_from_fixture(tot, monkeypatch):
     assert "art" in result["categories"] or "culture" in result["categories"]
     assert result["image_url"] is not None
     assert result["description"] is not None
+    assert result["latitude"] == pytest.approx(35.713395)
+    assert result["longitude"] == pytest.approx(139.771584)
 
 
 def test_scrape_event_html_fallback(tot, monkeypatch):
@@ -270,6 +306,8 @@ def test_scrape_returns_events_and_report(tot, monkeypatch):
             "categories": ["art", "culture"],
             "description": "A great art show.",
             "image_url": "https://media.timeout.com/img/event-a.jpg",
+            "latitude": 35.7134,
+            "longitude": 139.7716,
         }
     ]
     counts = {"links_seen": 1, "events_ok": 1, "errors": []}
@@ -283,8 +321,8 @@ def test_scrape_returns_events_and_report(tot, monkeypatch):
     assert ev.title == "Event A"
     assert ev.start_date is not None
     assert ev.end_date is not None
-    assert ev.latitude is None
-    assert ev.longitude is None
+    assert ev.latitude == pytest.approx(35.7134)
+    assert ev.longitude == pytest.approx(139.7716)
     assert ev.price == "¥1,500"
     assert ev.venue == "Tokyo Museum"
     assert ev.attributes.venue_name == "Tokyo Museum"
