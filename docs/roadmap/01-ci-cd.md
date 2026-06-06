@@ -4,9 +4,9 @@
 
 ## État observé
 
-Le dépôt possède un unique workflow `.github/workflows/ci.yml`, nommé `CI`, déclenché uniquement sur les pull requests vers `main`. Six jobs sont exposés : `Python / Lint`, `Python / Format`, `Python / Tests`, `Python / Security`, `Frontend / Tests` et `Docker / Build and smoke test`.
+Le dépôt possède un unique workflow `.github/workflows/ci.yml`, nommé `CI`, déclenché sur les pull requests vers `main`, les push vers `main` et manuellement. Six jobs sont exposés : `Python / Lint`, `Python / Format`, `Python / Tests`, `Python / Security`, `Frontend / Tests` et `Docker / Build and smoke test`.
 
-Chaque responsabilité Python dispose de son propre job : Ruff lint, Ruff format, pytest et pip-audit sont séparés, ce qui rend chaque échec attribuable sans ouvrir le log. Le smoke test Docker ne garantit pas l'arrêt du conteneur si `curl` échoue.
+Chaque responsabilité Python dispose de son propre job : Ruff lint, Ruff format, pytest et pip-audit sont séparés, ce qui rend chaque échec attribuable sans ouvrir le log. Le smoke test Docker utilise une boucle bornée (15 tentatives, max ~75s : 3s timeout curl + 2s sleep par tentative) avec trap EXIT garantissant le nettoyage et affichage des logs en cas d'échec. Stratégie de pinning : version tags + Dependabot (voir `.github/dependabot.yml`).
 
 ## CI-001 — Donner des noms stables et explicites aux checks
 
@@ -32,7 +32,7 @@ Chaque responsabilité Python dispose de son propre job : Ruff lint, Ruff format
 
 ## CI-003 — Durcir le workflow GitHub Actions
 
-- **Statut : À faire**
+- **Statut : ✅ Done**
 - **Priorité : P1**
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/55
 
@@ -42,7 +42,7 @@ Chaque responsabilité Python dispose de son propre job : Ruff lint, Ruff format
 
 ## CI-004 — Fiabiliser le smoke test Docker
 
-- **Statut : À faire**
+- **Statut : ✅ Done**
 - **Priorité : P1**
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/56
 
@@ -52,9 +52,16 @@ Chaque responsabilité Python dispose de son propre job : Ruff lint, Ruff format
 
 ## CI-005 — Définir les déclencheurs hors pull request
 
-- **Statut : À faire**
+- **Statut : ✅ Done**
 - **Priorité : P2**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/57
+
+**Décision retenue.** Trois déclencheurs :
+- `pull_request` vers `main` — vérification avant merge
+- `push` vers `main` — signal de santé après merge
+- `workflow_dispatch` — exécution manuelle pour déboguer ou valider une branche
+
+Pas de `schedule` : l'audit pip-audit peut échouer sur des dépendances réseau sans action possible, générant du bruit inutile.
 
 **Actions.** Décider si la CI doit aussi tourner sur push vers `main`, manuellement, et/ou selon un calendrier pour détecter les dérives externes des dépendances et du build Docker.
 

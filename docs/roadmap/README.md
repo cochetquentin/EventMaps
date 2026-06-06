@@ -39,7 +39,7 @@ Chaque ligne ne doit démarrer qu'après les dépendances déclarées dans les t
 
 1. **Démarrer la stabilisation** : STAB-001 et STAB-003. STAB-005 est déjà terminé.
 2. **Stabiliser les noms des checks** : CI-001 et CI-002.
-3. **Configurer la protection de branche** : STAB-002 ✅ terminé ; **poursuivre avec CI-003 à CI-005**.
+3. **Configurer la protection de branche** : STAB-002 ✅ terminé. **CI-003, CI-004 et CI-005 ✅ terminés** ; poursuivre avec **TEST-001 à TEST-007**.
 4. **Renforcer les contrats des scrapers** : TEST-001 à TEST-007 dans l'ordre de leurs dépendances.
 5. **Simplifier le cœur de l'automatisation de review** : TOOL-002 à TOOL-004.
 6. **Traiter la structure, la documentation et les constats hérités** : TREE-001 à TREE-006, DOC-001 à DOC-004, et les tâches actives de [LEGACY-001 à LEGACY-011](07-registre-constats.md), selon leurs priorités.
