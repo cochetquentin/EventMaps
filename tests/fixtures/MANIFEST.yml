@@ -100,7 +100,7 @@ fixtures:
     category: real
     source: tot
     captured_at: "2026-06-05"
-    url: null  # URL canonique à confirmer — voir TEST-005
+    url: "https://www.timeout.com/tokyo/news/the-worlds-largest-projection-mapping-show-is-now-held-in-shinjuku-every-night-022724"
     purpose: >
       Capture réelle d'un article de news Time Out Tokyo (JSON-LD type
       NewsArticle). Vérifie que le parseur rejette les pages non-événement.

@@ -7,6 +7,7 @@ Règles appliquées automatiquement à chaque session/test :
 
 from __future__ import annotations
 
+import re
 import unittest.mock
 from pathlib import Path
 
@@ -84,13 +85,38 @@ def pytest_sessionstart(session: pytest.Session) -> None:
                 pytrace=False,
             )
 
+        # Vérifier les valeurs non-nulles obligatoires pour tous
+        for field in ("source", "purpose"):
+            if not entry.get(field):
+                pytest.fail(
+                    f"MANIFEST.yml : entrée '{filename}' a le champ '{field}' vide ou null. "
+                    "Ce champ est obligatoire pour toutes les catégories.",
+                    pytrace=False,
+                )
+
         # Contraintes par catégorie
-        if cat == "real" and not entry.get("captured_at"):
-            pytest.fail(
-                f"MANIFEST.yml : fixture réelle '{filename}' doit avoir 'captured_at' "
-                "au format ISO 8601 (YYYY-MM-DD).",
-                pytrace=False,
-            )
+        if cat == "real":
+            captured_at = entry.get("captured_at")
+            if not captured_at:
+                pytest.fail(
+                    f"MANIFEST.yml : fixture réelle '{filename}' doit avoir 'captured_at' "
+                    "au format YYYY-MM-DD.",
+                    pytrace=False,
+                )
+            if not re.fullmatch(
+                r"\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])", str(captured_at)
+            ):
+                pytest.fail(
+                    f"MANIFEST.yml : fixture réelle '{filename}' — 'captured_at' doit "
+                    f"respecter le format YYYY-MM-DD (valeur : '{captured_at}').",
+                    pytrace=False,
+                )
+            if not entry.get("url"):
+                pytest.fail(
+                    f"MANIFEST.yml : fixture réelle '{filename}' doit avoir 'url' non-null "
+                    "(URL canonique de la page capturée).",
+                    pytrace=False,
+                )
 
     # Comparaison bidirectionnelle : glob récursif pour couvrir les sous-répertoires futurs
     declared = {entry["file"] for entry in entries}
