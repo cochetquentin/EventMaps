@@ -64,7 +64,7 @@ uv run uvicorn api.app:app --reload
 ```
 
 Affiche tous les événements géolocalisés sur une carte OpenStreetMap :
-- **Bleu** → Tokyo Cheapo · **Orange** → Hanabi · **Vert** → TimeoutTokyo
+- **Bleu** → Tokyo Cheapo · **Orange** → Hanabi · **Rouge** → TimeoutTokyo
 - Clustering automatique des marqueurs proches
 - Popup au clic : titre, date, lieu, prix / feux d'artifice, lien
 - Filtres par source et par date (sidebar gauche)
