@@ -4,6 +4,7 @@ Règles appliquées automatiquement à chaque session/test :
 - Aucun appel HTTP live via requests (POLICY.md §2 Tests réseau live)
 - Chaque fixture HTML doit être déclarée dans MANIFEST.yml (POLICY.md §4)
 """
+
 from __future__ import annotations
 
 import unittest.mock
@@ -94,8 +95,7 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     # Comparaison bidirectionnelle : glob récursif pour couvrir les sous-répertoires futurs
     declared = {entry["file"] for entry in entries}
     on_disk = {
-        str(p.relative_to(FIXTURES_DIR)).replace("\\", "/")
-        for p in FIXTURES_DIR.rglob("*.html")
+        str(p.relative_to(FIXTURES_DIR)).replace("\\", "/") for p in FIXTURES_DIR.rglob("*.html")
     }
 
     undeclared = on_disk - declared
