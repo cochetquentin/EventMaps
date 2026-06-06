@@ -6,6 +6,7 @@ import sys
 from db.store import EventStore
 from models.event import Event
 from scrapers.hanabi_walker import HanabiWalker
+from scrapers.timeout_tokyo import TimeoutTokyo
 from scrapers.tokyo_cheapo import TokyoCheapo
 
 logger = logging.getLogger(__name__)
@@ -85,9 +86,27 @@ def cmd_hanabi(args):
         _write_events_csv(events)
 
 
+def cmd_tot(args):
+    events, report = TimeoutTokyo().scrape()
+    logger.info(
+        "Time Out Tokyo: %d ok, %d skipped, %d errors (of %d links)",
+        report.events_ok,
+        report.events_skipped,
+        len(report.errors),
+        report.links_seen,
+    )
+    if args.output == "db":
+        with EventStore(args.db) as store:
+            store.upsert_events(events)
+        logger.info("Time Out Tokyo: %d rows → %s", len(events), args.db)
+    else:
+        _write_events_csv(events)
+
+
 def cmd_all(args):
     tc_events, tc_report = TokyoCheapo().scrape()
     hanabi_events, hanabi_report = HanabiWalker(region=args.region).scrape()
+    tot_events, tot_report = TimeoutTokyo().scrape()
     logger.info(
         "Tokyo Cheapo: %d ok, %d skipped, %d errors (of %d links)",
         tc_report.events_ok,
@@ -102,13 +121,27 @@ def cmd_all(args):
         len(hanabi_report.errors),
         hanabi_report.links_seen,
     )
+    logger.info(
+        "Time Out Tokyo: %d ok, %d skipped, %d errors (of %d links)",
+        tot_report.events_ok,
+        tot_report.events_skipped,
+        len(tot_report.errors),
+        tot_report.links_seen,
+    )
     if args.output == "db":
         with EventStore(args.db) as store:
             store.upsert_events(tc_events)
             store.upsert_events(hanabi_events)
-        logger.info("Stored %d + %d rows in %s", len(tc_events), len(hanabi_events), args.db)
+            store.upsert_events(tot_events)
+        logger.info(
+            "Stored %d + %d + %d rows in %s",
+            len(tc_events),
+            len(hanabi_events),
+            len(tot_events),
+            args.db,
+        )
     else:
-        _write_events_csv(tc_events + hanabi_events)
+        _write_events_csv(tc_events + hanabi_events + tot_events)
 
 
 def main():
@@ -123,6 +156,8 @@ def main():
     p_hanabi = sub.add_parser("hanabi", help="Scrape Hanabi Walker")
     p_hanabi.add_argument("--region", default="ar0300", metavar="CODE")
 
+    sub.add_parser("tot", help="Scrape Time Out Tokyo")
+
     p_all = sub.add_parser("all", help="Scrape all sources")
     p_all.add_argument("--region", default="ar0300", metavar="CODE")
 
@@ -135,6 +170,8 @@ def main():
         cmd_tc(args)
     elif args.source == "hanabi":
         cmd_hanabi(args)
+    elif args.source == "tot":
+        cmd_tot(args)
     elif args.source == "all":
         cmd_all(args)
 

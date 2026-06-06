@@ -1,5 +1,5 @@
 /* global L */
-import { iconTC, iconHanabi } from './config.js';
+import { iconTC, iconHanabi, iconTot } from './config.js';
 
 const FAV_KEY = 'eventmaps_favorites';
 
@@ -21,6 +21,11 @@ export function getIcon(ev, fav) {
     return fav
       ? L.divIcon({ html: '<div class="m-tc m-fav"></div>',     className: '', iconSize: [16,16], iconAnchor: [8,8],   popupAnchor: [0,-12] })
       : iconTC;
+  }
+  if (ev.source === 'tot') {
+    return fav
+      ? L.divIcon({ html: '<div class="m-tot m-fav"></div>',    className: '', iconSize: [16,16], iconAnchor: [8,8],   popupAnchor: [0,-12] })
+      : iconTot;
   }
   return fav
     ? L.divIcon({ html: '<div class="m-hanabi m-fav"></div>', className: '', iconSize: [20,20], iconAnchor: [10,10], popupAnchor: [0,-14] })

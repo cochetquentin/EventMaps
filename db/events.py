@@ -63,7 +63,13 @@ class EventsRepository:
             params.append(_today_jst())
         if bbox:
             min_lon, min_lat, max_lon, max_lat = bbox
-            clauses.append("latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?")
+            # Time Out Tokyo events without coordinates are always included so
+            # they appear in the list view regardless of the map viewport.
+            # All other sources must fall inside the bbox.
+            clauses.append(
+                "((source = 'tot' AND latitude IS NULL)"
+                " OR (latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?))"
+            )
             params.extend([min_lat, max_lat, min_lon, max_lon])
         if q:
             # Recherche sur titre, venue, location_name et access.

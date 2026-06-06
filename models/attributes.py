@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TokyoCheapoAttributes(BaseModel):
@@ -30,3 +30,13 @@ class HanabiWalkerAttributes(BaseModel):
     official_x: str | None = None
     contact: str | None = None
     contact2: str | None = None
+
+
+class TimeoutTokyoAttributes(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    categories: list[str] = Field(default_factory=list)
+    venue_name: str | None = None
+    venue_address: str | None = None
+    image_url: str | None = None
+    description: str | None = None

@@ -28,6 +28,7 @@ export function buildPills() {
   container.appendChild(favPill);
 
   addPill(container, 'hanabi', '🎆 Hanabi', true);
+  addPill(container, 'tot', '🗼 Time Out', true);
 
   const catCounts = {};
   allEvents.forEach(ev => {

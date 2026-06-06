@@ -15,6 +15,8 @@ function makeCard(ev, inProximity, cardsRow) {
   const attrs = ev.attributes || {};
   const sub = ev.source === 'tc'
     ? [escapeHtml(attrs.location_name), escapeHtml(ev.price)].filter(Boolean).join(' · ')
+    : ev.source === 'tot'
+    ? [escapeHtml(attrs.venue_name), escapeHtml(ev.price)].filter(Boolean).join(' · ')
     : [escapeHtml(ev.venue), escapeHtml(attrs.fireworks_count)].filter(Boolean).join(' · ');
 
   const distBadge = (inProximity && ev.latitude != null && ev.longitude != null)
@@ -48,7 +50,9 @@ function makeCard(ev, inProximity, cardsRow) {
   });
 
   card.addEventListener('click', () => {
-    map.setView([ev.latitude, ev.longitude], 15, { animate: true });
+    if (ev.latitude != null && ev.longitude != null) {
+      map.setView([ev.latitude, ev.longitude], 15, { animate: true });
+    }
     const m = markerMap.get(ev.id);
     if (m) setTimeout(() => m.openPopup(), 350);
     document.querySelectorAll('.event-card').forEach(c => c.classList.remove('highlighted'));
@@ -98,6 +102,9 @@ export function buildEventList(events) {
     if (ev.source === 'hanabi') {
       key = 'hanabi';
       if (!groups.has(key)) groups.set(key, { label: '🎆 Hanabi', events: [] });
+    } else if (ev.source === 'tot') {
+      key = 'tot';
+      if (!groups.has(key)) groups.set(key, { label: '🗼 Time Out', events: [] });
     } else {
       const cats = ((ev.attributes || {}).categories || []).filter(c => !TC_EXCLUDED_CATS.includes(c));
       key = cats[0] || 'other';
