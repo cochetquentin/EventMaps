@@ -304,6 +304,51 @@ def test_ical_hanabi_has_location(client):
     assert "LOCATION" in resp.text
 
 
+# --- GET /events.ics (liste filtrée) ---
+
+
+def test_export_ics_returns_vcalendar(client):
+    make_tc()
+    make_hanabi()
+    resp = client.get("/events.ics")
+    assert resp.status_code == 200
+    assert "text/calendar" in resp.headers["content-type"]
+    body = resp.text
+    assert "BEGIN:VCALENDAR" in body
+    assert body.count("BEGIN:VEVENT") == 2
+    assert "END:VCALENDAR" in body
+
+
+def test_export_ics_filter_source(client):
+    make_tc()
+    make_hanabi()
+    resp = client.get("/events.ics?source=tc")
+    assert resp.status_code == 200
+    assert resp.text.count("BEGIN:VEVENT") == 1
+    assert "SUMMARY:Foo Festival" in resp.text
+
+
+def test_export_ics_filter_q(client):
+    make_tc()
+    make_hanabi()
+    resp = client.get("/events.ics?q=Sumida")
+    assert resp.status_code == 200
+    assert resp.text.count("BEGIN:VEVENT") == 1
+    assert "SUMMARY:Sumida Fireworks" in resp.text
+
+
+def test_export_ics_content_disposition(client):
+    resp = client.get("/events.ics")
+    assert resp.status_code == 200
+    assert resp.headers["content-disposition"] == 'attachment; filename="events.ics"'
+
+
+def test_export_ics_empty_result(client):
+    resp = client.get("/events.ics?q=nonexistentxyz")
+    assert resp.status_code == 204
+    assert resp.content == b""
+
+
 # --- Bbox filter ---
 
 

@@ -15,6 +15,7 @@ import {
 import { setupGeolocation, cancelGeolocation } from './geolocation.js';
 import { initDrawer } from './drawer.js';
 import { updateURL, restoreFromURL } from './share.js';
+import { downloadICS } from './ics-export.js';
 
 // ── Map init ──────────────────────────────────────────────────────────────
 const map = L.map('map').setView([35.68, 139.69], 11);
@@ -199,6 +200,11 @@ document.getElementById('copy-link-btn').addEventListener('click', () => {
   } else {
     onFailure();
   }
+});
+
+// ── Export ICS button ─────────────────────────────────────────────────────
+document.getElementById('export-ics-btn').addEventListener('click', () => {
+  downloadICS();
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────
