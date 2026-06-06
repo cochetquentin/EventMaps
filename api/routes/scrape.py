@@ -37,11 +37,16 @@ def _is_stale(job: dict) -> bool:
         return True
 
 
-def _do_scrape(source: str, region: str) -> None:
+def _do_scrape(job_id: int, source: str, region: str) -> None:
     from scrapers.base import ScrapeReport
 
+    # Log immediately so that a job created in the handler but whose background
+    # task never starts (process crash between response and task execution) can be
+    # distinguished from an in-progress job in server logs.  The stale-timeout
+    # mechanism in trigger_scrape will fail such orphaned jobs automatically.
+    logger.info("scrape_start source=%s job_id=%d", source, job_id)
+
     with EventStore(settings.db_path) as store:
-        job_id = store.start_job(source)
         try:
             events = []
             reports: list[ScrapeReport] = []
@@ -202,15 +207,24 @@ async def trigger_scrape(
                     logger.warning("Cleared stale scrape job %s (source=%s)", j["id"], s)
                 else:
                     running.append(s)
-    if running:
-        return {"status": "already_running", "running_sources": running}
-    background_tasks.add_task(_do_scrape, source, region)
-    return {"status": "started"}
+        if running:
+            return {"status": "already_running", "running_sources": running}
+        job_id = store.start_job(source)
+    background_tasks.add_task(_do_scrape, job_id, source, region)
+    return {"status": "started", "job_id": job_id}
 
 
 @router.get("/status")
-def scrape_status(source: str | None = Query(None)):
+def scrape_status(
+    source: str | None = Query(None),
+    job_id: int | None = Query(None),
+):
     with EventStore(settings.db_path) as store:
+        if job_id is not None:
+            job = store.get_job_by_id(job_id)
+            if job is None:
+                raise HTTPException(status_code=404, detail="Job not found")
+            return job
         last = store.get_last_job(source)
     if last is None:
         return {"status": "never_run"}

@@ -280,6 +280,23 @@ def test_get_last_job_by_source(tmp_path):
     assert last_hanabi["source"] == "hanabi"
 
 
+def test_get_job_by_id(tmp_path):
+    db = str(tmp_path / "events.db")
+    with EventStore(db) as store:
+        job_id = store.start_job("tc")
+        job = store.get_job_by_id(job_id)
+    assert job is not None
+    assert job["id"] == job_id
+    assert job["source"] == "tc"
+    assert job["status"] == "running"
+
+
+def test_get_job_by_id_not_found(tmp_path):
+    db = str(tmp_path / "events.db")
+    with EventStore(db) as store:
+        assert store.get_job_by_id(99999) is None
+
+
 # --- Context manager ---
 
 

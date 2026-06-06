@@ -20,8 +20,15 @@ def db(tmp_path, monkeypatch):
     return db_path
 
 
+def _reset_limiter():
+    from api.limiter import limiter
+
+    limiter._limiter.storage.reset()
+
+
 @pytest.fixture()
 def client(db):
+    _reset_limiter()
     return TestClient(app)
 
 
@@ -30,6 +37,7 @@ def client_with_token(db, monkeypatch):
     import config
 
     monkeypatch.setattr(config.settings, "scrape_token", "secret")
+    _reset_limiter()
     return TestClient(app)
 
 
@@ -55,7 +63,11 @@ def test_scrape_without_token_config_succeeds(client):
     with patch("api.routes.scrape._do_scrape"):
         resp = client.post("/scrape")
     assert resp.status_code == 200
-    assert resp.json()["status"] in ("started", "already_running")
+    body = resp.json()
+    assert body["status"] in ("started", "already_running")
+    if body["status"] == "started":
+        assert isinstance(body.get("job_id"), int)
+        assert body["job_id"] > 0
 
 
 # ── POST /scrape — mode avec token requis ────────────────────────────────────
@@ -89,3 +101,54 @@ def test_scrape_with_correct_token_succeeds(client_with_token):
 def test_scrape_status_public_without_token(client_with_token):
     resp = client_with_token.get("/scrape/status")
     assert resp.status_code == 200
+
+
+# ── POST /scrape retourne job_id ──────────────────────────────────────────────
+
+
+def test_trigger_scrape_returns_job_id(client):
+    with patch("api.routes.scrape._do_scrape"):
+        resp = client.post("/scrape")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "started"
+    assert isinstance(body["job_id"], int)
+    assert body["job_id"] > 0
+
+
+# ── GET /scrape/status?job_id= ────────────────────────────────────────────────
+
+
+def test_scrape_status_by_job_id(client):
+    with patch("api.routes.scrape._do_scrape"):
+        post_resp = client.post("/scrape")
+    job_id = post_resp.json()["job_id"]
+    resp = client.get(f"/scrape/status?job_id={job_id}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == job_id
+    assert body["status"] == "running"
+
+
+def test_scrape_status_job_id_not_found(client):
+    resp = client.get("/scrape/status?job_id=99999")
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Job not found"
+
+
+def test_scrape_status_no_job_id_backwards_compat(client):
+    with patch("api.routes.scrape._do_scrape"):
+        client.post("/scrape")
+    resp = client.get("/scrape/status")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "running"
+
+
+def test_scrape_status_job_id_overrides_source(client):
+    with patch("api.routes.scrape._do_scrape"):
+        post_resp = client.post("/scrape?source=tc")
+    job_id = post_resp.json()["job_id"]
+    # Passer une source différente ne doit pas affecter le résultat quand job_id est fourni
+    resp = client.get(f"/scrape/status?job_id={job_id}&source=hanabi")
+    assert resp.status_code == 200
+    assert resp.json()["id"] == job_id

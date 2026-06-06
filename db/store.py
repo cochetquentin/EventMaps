@@ -67,5 +67,8 @@ class EventStore:
     def fail_job(self, job_id: int, error: str, **kwargs) -> None:
         return self._jobs.fail_job(job_id, error, **kwargs)
 
+    def get_job_by_id(self, job_id: int) -> dict | None:
+        return self._jobs.get_job_by_id(job_id)
+
     def get_last_job(self, source: str | None = None) -> dict | None:
         return self._jobs.get_last_job(source)

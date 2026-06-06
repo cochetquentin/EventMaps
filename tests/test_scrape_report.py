@@ -140,6 +140,11 @@ def test_tokyo_cheapo_scrape_returns_tuple():
 # ── _do_scrape error threshold ───────────────────────────────────────────────
 
 
+def _start_job(db_path, source):
+    with EventStore(db_path) as store:
+        return store.start_job(source)
+
+
 def _make_event():
     return Event(
         id=_make_id(["https://example.com", ""]),
@@ -169,8 +174,9 @@ def test_do_scrape_fails_job_on_high_error_rate(tmp_path, monkeypatch):
         errors=[{"url": f"url{i}", "reason": "fail"} for i in range(8)],
     )
 
+    job_id = _start_job(db_path, "tc")
     with patch.object(TokyoCheapo, "scrape", return_value=([_make_event()], bad_report)):
-        scrape_module._do_scrape("tc", "ar0300")
+        scrape_module._do_scrape(job_id, "tc", "ar0300")
 
     with EventStore(db_path) as store:
         job = store.get_last_job("tc")
@@ -198,8 +204,9 @@ def test_do_scrape_finishes_job_on_low_error_rate(tmp_path, monkeypatch):
         errors=[{"url": "url_bad", "reason": "fail"}],
     )
 
+    job_id = _start_job(db_path, "tc")
     with patch.object(TokyoCheapo, "scrape", return_value=([_make_event()], good_report)):
-        scrape_module._do_scrape("tc", "ar0300")
+        scrape_module._do_scrape(job_id, "tc", "ar0300")
 
     with EventStore(db_path) as store:
         job = store.get_last_job("tc")
@@ -222,8 +229,9 @@ def test_do_scrape_zero_links_does_not_fail(tmp_path, monkeypatch):
 
     empty_report = ScrapeReport(source="tc", links_seen=0, events_ok=0)
 
+    job_id = _start_job(db_path, "tc")
     with patch.object(TokyoCheapo, "scrape", return_value=([], empty_report)):
-        scrape_module._do_scrape("tc", "ar0300")
+        scrape_module._do_scrape(job_id, "tc", "ar0300")
 
     with EventStore(db_path) as store:
         job = store.get_last_job("tc")
@@ -249,8 +257,9 @@ def test_do_scrape_persists_metrics_on_failed_job(tmp_path, monkeypatch):
         errors=[{"url": f"url{i}", "reason": "fail"} for i in range(8)],
     )
 
+    job_id = _start_job(db_path, "tc")
     with patch.object(TokyoCheapo, "scrape", return_value=([_make_event()], bad_report)):
-        scrape_module._do_scrape("tc", "ar0300")
+        scrape_module._do_scrape(job_id, "tc", "ar0300")
 
     with EventStore(db_path) as store:
         job = store.get_last_job("tc")
@@ -281,12 +290,13 @@ def test_do_scrape_all_fails_if_one_source_broken(tmp_path, monkeypatch):
     )
 
     tot_report = ScrapeReport(source="tot", links_seen=0, events_ok=0)
+    job_id = _start_job(db_path, "all")
     with (
         patch.object(TokyoCheapo, "scrape", return_value=([_make_event()], tc_report)),
         patch.object(HanabiWalker, "scrape", return_value=([], hanabi_report)),
         patch.object(TimeoutTokyo, "scrape", return_value=([], tot_report)),
     ):
-        scrape_module._do_scrape("all", "ar0300")
+        scrape_module._do_scrape(job_id, "all", "ar0300")
 
     with EventStore(db_path) as store:
         job = store.get_last_job("all")
@@ -316,8 +326,9 @@ def test_scrape_status_exposes_metric_columns(tmp_path, monkeypatch):
         events_ok=5,
     )
 
+    job_id = _start_job(db_path, "tc")
     with patch.object(TokyoCheapo, "scrape", return_value=([_make_event()], good_report)):
-        scrape_module._do_scrape("tc", "ar0300")
+        scrape_module._do_scrape(job_id, "tc", "ar0300")
 
     client = TestClient(app)
     resp = client.get("/scrape/status?source=tc")
