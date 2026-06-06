@@ -27,14 +27,27 @@
 
 ## STAB-002 — Définir les checks obligatoires de la branche principale
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P0**
 - **Dépendances :** CI-001, CI-002
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/48
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/80
 
 **Objectif.** Faire de la baseline de qualité une règle de merge explicite.
 
 **Critères d'acceptation.** Les noms définitifs des checks sont documentés ; la protection de branche les exige ; aucun nom de check générique ou instable n'est requis.
+
+**Checks obligatoires configurés sur `main` :**
+
+| Contexte GitHub | Job |
+|---|---|
+| `Python / Lint` | `python-lint` |
+| `Python / Format` | `python-format` |
+| `Python / Tests` | `python-tests` |
+| `Python / Security` | `python-security` |
+| `Frontend / Tests` | `frontend-tests` |
+| `Docker / Build and smoke test` | `docker-build` |
+
+Configuration : `strict: true` (branche doit être à jour), `enforce_admins: true` (règle appliquée aux admins).
 
 ## STAB-003 — Créer un tableau de suivi à partir de cette roadmap
 
