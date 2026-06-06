@@ -82,15 +82,20 @@ def test_format_price_other_currency():
 
 
 def test_listing_paths_returns_static_plus_monthly():
-    paths = _listing_paths(n_months=2)
+    paths = _listing_paths(max_pages=4)
     assert "/tokyo/things-to-do/things-to-do-this-week-in-tokyo" in paths
     assert "/tokyo/things-to-do/things-to-do-in-tokyo-this-weekend" in paths
     assert len(paths) == 4  # 2 static + 2 monthly
 
 
-def test_listing_paths_zero_months():
-    paths = _listing_paths(n_months=0)
-    assert len(paths) == 2
+def test_listing_paths_zero_pages():
+    paths = _listing_paths(max_pages=0)
+    assert len(paths) == 0
+
+
+def test_listing_paths_one_page():
+    paths = _listing_paths(max_pages=1)
+    assert len(paths) == 1
     assert "/tokyo/things-to-do/things-to-do-this-week-in-tokyo" in paths
 
 
@@ -236,9 +241,25 @@ def test_scrape_event_full_from_fixture(tot, monkeypatch):
     assert result["longitude"] == pytest.approx(139.750933)
 
 
-def test_scrape_event_html_fallback(tot, monkeypatch):
+def test_scrape_event_html_fallback_raises_without_coords(tot, monkeypatch):
+    """Pages without Event JSON-LD AND without GPS are rejected (unreachable via API)."""
     html_bytes = (FIXTURES_DIR / "tot_event_no_jsonld.html").read_bytes()
     soup = BeautifulSoup(html_bytes, "html.parser")
+    monkeypatch.setattr(tot, "get_event_page", lambda url: soup)
+
+    with pytest.raises(ValueError, match="unreachable"):
+        tot.scrape_event("https://www.timeout.com/tokyo/shopping/oi-racecourse-flea-market")
+
+
+def test_scrape_event_html_fallback_with_coords(tot, monkeypatch):
+    """Pages without Event JSON-LD are accepted when GPS coordinates are present."""
+    html = """
+    <html><body>
+      <h1>Oi Racecourse Tokyo City Flea Market</h1>
+      <div data-component="maps" data-zone-location-info="{&quot;zones&quot;:[{&quot;latitude&quot;:35.598,&quot;longitude&quot;:139.737,&quot;name&quot;:&quot;Oi Racecourse&quot;}]}"></div>
+    </body></html>
+    """
+    soup = BeautifulSoup(html, "html.parser")
     monkeypatch.setattr(tot, "get_event_page", lambda url: soup)
 
     result = tot.scrape_event("https://www.timeout.com/tokyo/shopping/oi-racecourse-flea-market")
@@ -246,6 +267,7 @@ def test_scrape_event_html_fallback(tot, monkeypatch):
     assert result["title"] == "Oi Racecourse Tokyo City Flea Market"
     assert result["start_date"] is None
     assert result["price"] is None
+    assert result["latitude"] == pytest.approx(35.598)
 
 
 def test_scrape_event_raises_on_news_article(tot, monkeypatch):
@@ -451,7 +473,8 @@ def test_scrape_event_date_parsing_from_iso8601(tot, monkeypatch):
     assert result["start_date"] == "2026-08-10"
     # end_date should be None because same day as start_date
     assert result["end_date"] is None
-    assert result["times"] == "19:30"
+    # Same-day end time is appended: "19:30-22:00"
+    assert result["times"] == "19:30-22:00"
 
 
 def test_scrape_event_end_date_different_day(tot, monkeypatch):

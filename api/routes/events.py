@@ -124,7 +124,7 @@ def _build_calendar(events: list[Event]) -> "Calendar":
 
 @router.get("", response_model=list[Event])
 def list_events(
-    source: Literal["tc", "hanabi"] | None = Query(None),
+    source: Literal["tc", "hanabi", "tot"] | None = Query(None),
     date: DateType | None = Query(None, description="YYYY-MM-DD overlap filter"),
     bbox: str | None = Query(None, description="min_lon,min_lat,max_lon,max_lat"),
     start_from: DateType | None = Query(
@@ -164,7 +164,7 @@ _ICS_MAX = 5000
 
 @router.get(".ics")
 def export_events_ical(
-    source: Literal["tc", "hanabi"] | None = Query(None),
+    source: Literal["tc", "hanabi", "tot"] | None = Query(None),
     date: DateType | None = Query(None, description="YYYY-MM-DD overlap filter"),
     bbox: str | None = Query(None, description="min_lon,min_lat,max_lon,max_lat"),
     start_from: DateType | None = Query(None),

@@ -25,7 +25,9 @@ export function openDrawer(ev) {
   panel.querySelector('.drawer-source-bar').className =
     `drawer-source-bar ${ev.source}`;
   panel.querySelector('.drawer-source-label').textContent =
-    ev.source === 'tc' ? 'Tokyo Cheapo' : '🎆 Hanabi';
+    ev.source === 'tc' ? 'Tokyo Cheapo'
+    : ev.source === 'tot' ? '🗼 Time Out Tokyo'
+    : '🎆 Hanabi';
   panel.querySelector('.drawer-title').textContent = ev.title || '';
 
   // Meta lines — textContent uniquement (pas d'innerHTML avec données utilisateur)

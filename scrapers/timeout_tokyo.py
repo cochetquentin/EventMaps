@@ -98,14 +98,24 @@ def _fetch(url: str, session: requests.Session, timeout: int = 10) -> requests.R
     return response
 
 
-def _listing_paths(n_months: int = 2) -> list[str]:
-    """Return listing page paths: static weekly/weekend pages + dynamic monthly pages."""
-    paths = [
-        "/tokyo/things-to-do/things-to-do-this-week-in-tokyo",
-        "/tokyo/things-to-do/things-to-do-in-tokyo-this-weekend",
-    ]
+_STATIC_LISTING_PATHS = [
+    "/tokyo/things-to-do/things-to-do-this-week-in-tokyo",
+    "/tokyo/things-to-do/things-to-do-in-tokyo-this-weekend",
+]
+
+
+def _listing_paths(max_pages: int = 4) -> list[str]:
+    """Return up to *max_pages* listing page paths.
+
+    The two static pages (this-week, this-weekend) are always included first,
+    followed by dynamic monthly pages until the total reaches *max_pages*.
+    ``max_pages=0`` returns an empty list; ``max_pages=1`` returns only the
+    first static page.
+    """
+    paths = _STATIC_LISTING_PATHS[:max_pages]
+    remaining = max_pages - len(paths)
     now = datetime.now(_JST)
-    for i in range(n_months):
+    for i in range(remaining):
         month_idx = (now.month - 1 + i) % 12
         paths.append(f"/tokyo/things-to-do/{_MONTHS_EN[month_idx]}-events-in-tokyo")
     return paths
@@ -210,18 +220,24 @@ class TimeoutTokyo(BaseScraper):
     def _parse_json_ld(self, soup: BeautifulSoup) -> dict | None:
         """Return the first Event-type JSON-LD object found in the page, or None."""
         for item in _parse_ld_json_blocks(soup):
-            if isinstance(item, dict) and item.get("@type") in _EVENT_LD_TYPES:
+            if not isinstance(item, dict):
+                continue
+            ld_type = item.get("@type")
+            types = ld_type if isinstance(ld_type, list) else [ld_type]
+            if any(t in _EVENT_LD_TYPES for t in types):
                 return item
         return None
 
     def _is_news_article(self, soup: BeautifulSoup) -> bool:
-        """Return True if the page's JSON-LD indicates this is a news article."""
+        """Return True if the page has only article JSON-LD and no Event JSON-LD.
+
+        A page with both Event and Article metadata is treated as an event page.
+        """
+        if self._parse_json_ld(soup) is not None:
+            return False
+        _ARTICLE_TYPES = {"NewsArticle", "Article", "BlogPosting"}
         for item in _parse_ld_json_blocks(soup):
-            if isinstance(item, dict) and item.get("@type") in (
-                "NewsArticle",
-                "Article",
-                "BlogPosting",
-            ):
+            if isinstance(item, dict) and item.get("@type") in _ARTICLE_TYPES:
                 return True
         return False
 
@@ -265,10 +281,15 @@ class TimeoutTokyo(BaseScraper):
         latitude, longitude = self._parse_zone_location(soup)
 
         if ld is None:
-            # HTML fallback: at minimum require a title
+            # HTML fallback: require at minimum a title AND either a date or GPS
+            # coordinates so the event can actually surface in the API.
             h1 = soup.find("h1")
             if not h1:
                 raise ValueError(f"No JSON-LD event data and no <h1> found at: {url}")
+            if latitude is None:
+                raise ValueError(
+                    f"No Event JSON-LD and no coordinates — page would be unreachable: {url}"
+                )
             return {
                 "url": url,
                 "title": h1.get_text(strip=True),
@@ -310,10 +331,14 @@ class TimeoutTokyo(BaseScraper):
         try:
             raw_end = ld.get("endDate")
             if raw_end:
-                end_date = datetime.fromisoformat(raw_end).date().isoformat()
-                # Don't store same-day end as end_date (single-day event)
+                dt_end = datetime.fromisoformat(raw_end)
+                end_date = dt_end.date().isoformat()
+                # Don't store same-day end as end_date (single-day event),
+                # but append the end time to times so "19:30-22:00" is preserved.
                 if end_date == start_date:
                     end_date = None
+                    if times and (dt_end.hour != 0 or dt_end.minute != 0):
+                        times = f"{times}-{dt_end.strftime('%H:%M')}"
         except (ValueError, TypeError):
             pass
 

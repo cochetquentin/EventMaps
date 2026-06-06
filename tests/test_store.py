@@ -549,14 +549,19 @@ def test_bbox_filters_by_coords(tmp_path):
     assert results[0].source == "tc"
 
 
-def test_bbox_excludes_null_coords(tmp_path):
+def test_bbox_includes_null_coords(tmp_path):
+    """Events without coordinates are always included in bbox searches.
+
+    They cannot be placed on a map but should still appear in the list view
+    (e.g. tot events that lack GPS coordinates).
+    """
     db = str(tmp_path / "events.db")
     no_coords = make_tc(latitude=None, longitude=None)
     bbox = (139.0, 35.0, 140.0, 36.0)
     with EventStore(db) as store:
         store.upsert_events([no_coords])
         results = store.get_events(bbox=bbox, upcoming=False)
-    assert len(results) == 0
+    assert len(results) == 1
 
 
 def test_no_bbox_includes_null_coords(tmp_path):

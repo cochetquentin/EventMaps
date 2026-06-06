@@ -63,7 +63,11 @@ class EventsRepository:
             params.append(_today_jst())
         if bbox:
             min_lon, min_lat, max_lon, max_lat = bbox
-            clauses.append("latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?")
+            # Include events without coordinates (e.g. tot source) alongside
+            # those that fall within the bbox so they always appear in the list.
+            clauses.append(
+                "(latitude IS NULL OR (latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?))"
+            )
             params.extend([min_lat, max_lat, min_lon, max_lon])
         if q:
             # Recherche sur titre, venue, location_name et access.
