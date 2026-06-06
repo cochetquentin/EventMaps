@@ -82,7 +82,7 @@ GET  /                              → UI carte (Leaflet.js)
 GET  /events                        → liste des événements (filtres, pagination)
 GET  /events/{id}                   → détail d'un événement
 GET  /events/{id}.ics               → export iCal d'un événement
-GET  /events.ics                    → export iCal de tous les événements (mêmes filtres que /events)
+GET  /events.ics                    → export iCal des événements filtrés (max 5 000 ; tronqué via headers si dépassé)
 POST /scrape                        → déclenche un job de scraping (async)
 GET  /scrape/status                 → état du dernier job (filtrable par source ou job_id)
 GET  /scrape/config                 → indique si /scrape est public (sans token)
@@ -99,7 +99,7 @@ GET  /docs                          → Swagger UI
 | `bbox` | `min_lon,min_lat,max_lon,max_lat` | Filtre géographique |
 | `start_from` | `YYYY-MM-DD` | Borne inférieure de chevauchement : inclut les événements dont `COALESCE(end_date, start_date) >= start_from` |
 | `start_to` | `YYYY-MM-DD` | Borne haute sur `start_date` |
-| `q` | `string` | Recherche textuelle (titre, lieu, description) |
+| `q` | `string` | Recherche textuelle (titre, lieu, access) |
 | `category` | `string` | Filtre par catégorie (Tokyo Cheapo) |
 | `limit` | `int` 1–500 (défaut 100) | Pagination |
 | `offset` | `int` (défaut 0) | Pagination |
@@ -150,7 +150,7 @@ Les événements sont stockés dans `data/events.db` (SQLite) avec un hash SHA-2
 |---|---|---|
 | `events` (TC) | tokyocheapo.com | `url` + `location_name` |
 | `events` (Hanabi) | hanabi.walkerplus.com | `url` + `date` |
-| `events` (TOT) | timeout.com/tokyo | `url` + `start_date` |
+| `events` (TOT) | timeout.com/tokyo | `url` |
 | `scrape_jobs` | — | suivi des jobs de scraping |
 
 ## Modèles de données
