@@ -135,7 +135,11 @@ def _format_price(price: float, currency: str = "JPY") -> str:
 
 
 def _parse_ld_json_blocks(soup: BeautifulSoup) -> list[dict]:
-    """Parse all JSON-LD script blocks in the page and return them as dicts."""
+    """Parse all JSON-LD script blocks in the page and return them as dicts.
+
+    Also exposes ``itemReviewed`` nested objects so that Time Out Tokyo's
+    ``Review``-wrapped event data is surfaced alongside top-level entries.
+    """
     items = []
     for script in soup.find_all("script", type="application/ld+json"):
         try:
@@ -147,6 +151,10 @@ def _parse_ld_json_blocks(soup: BeautifulSoup) -> list[dict]:
         elif isinstance(data, dict):
             items.append(data)
             items.extend(data.get("@graph", []))
+            # Time Out Tokyo wraps event data inside a Review's itemReviewed
+            item_reviewed = data.get("itemReviewed")
+            if isinstance(item_reviewed, dict):
+                items.append(item_reviewed)
     return items
 
 
@@ -278,7 +286,10 @@ class TimeoutTokyo(BaseScraper):
             }
 
         # ── Title ──────────────────────────────────────────────────────────────
-        title = ld.get("name", "").strip()
+        # Time Out Tokyo names follow the pattern "Event Name | Venue | Category in Tokyo"
+        # Keep only the first segment (the actual event name).
+        raw_name = ld.get("name", "").strip()
+        title = raw_name.split("|")[0].strip() if raw_name else ""
         if not title:
             raise ValueError(f"No title in JSON-LD at: {url}")
 
@@ -319,7 +330,10 @@ class TimeoutTokyo(BaseScraper):
                 offers.get("priceCurrency") if isinstance(offers, dict) else None
             ) or ld.get("priceCurrency", "JPY")
             if price_val is not None:
-                price = _format_price(float(price_val), str(currency))
+                if isinstance(price_val, str) and price_val.strip().lower() == "free":
+                    price = "Free"
+                else:
+                    price = _format_price(float(price_val), str(currency))
         except (ValueError, TypeError, AttributeError):
             pass
 
