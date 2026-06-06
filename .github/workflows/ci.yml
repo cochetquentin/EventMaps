@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
@@ -138,18 +138,20 @@ jobs:
 
       - name: Smoke test /health
         run: |
-          docker run --rm -d -p 8000:8000 --name eventmaps_test eventmaps:test
+          docker run -d -p 8000:8000 --name eventmaps_test eventmaps:test
           echo "Attente du démarrage du conteneur..."
           for i in $(seq 1 15); do
-            if curl --silent --fail http://localhost:8000/health; then
+            if curl --silent --fail --max-time 3 http://localhost:8000/health; then
               echo "Health check OK après $i tentative(s)"
               docker stop eventmaps_test
+              docker rm eventmaps_test
               exit 0
             fi
             echo "Tentative $i/15 échouée, attente 2s..."
             sleep 2
           done
           echo "❌ /health n'a pas répondu après 30s — logs du conteneur :"
-          docker logs eventmaps_test
+          docker logs eventmaps_test || true
           docker stop eventmaps_test || true
+          docker rm eventmaps_test || true
           exit 1
