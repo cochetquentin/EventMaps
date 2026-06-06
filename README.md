@@ -100,7 +100,7 @@ GET  /docs                          → Swagger UI
 | `start_from` | `YYYY-MM-DD` | Borne inférieure de chevauchement : inclut les événements dont `COALESCE(end_date, start_date) >= start_from` |
 | `start_to` | `YYYY-MM-DD` | Borne haute sur `start_date` |
 | `q` | `string` | Recherche textuelle (titre, lieu, access) |
-| `category` | `string` | Filtre par catégorie (Tokyo Cheapo) |
+| `category` | `string` | Filtre par catégorie (champ `attributes.categories` — compatible TC et TOT) |
 | `limit` | `int` 1–500 (défaut 100) | Pagination |
 | `offset` | `int` (défaut 0) | Pagination |
 
@@ -113,7 +113,11 @@ POST /scrape?source=all&region=ar0300
 Authorization: Bearer <EVENTMAPS_SCRAPE_TOKEN>
 ```
 
-Paramètres : `source` (`tc` | `hanabi` | `tot` | `all`), `region` (code Hanabi Walker). Répond immédiatement `{"status": "started", "job_id": 42}` et exécute le scraping en arrière-plan. Rate limité à 2 req/h. Utiliser `GET /scrape/status?job_id=42` pour suivre le job.
+Paramètres : `source` (`tc` | `hanabi` | `tot` | `all`), `region` (code Hanabi Walker). Rate limité à 2 req/h.
+
+Réponses possibles :
+- `{"status": "started", "job_id": 42}` — job lancé ; utiliser `GET /scrape/status?job_id=42` pour suivre.
+- `{"status": "already_running", "running_sources": ["tc"]}` — un job conflictuel est déjà actif ; pas de `job_id` retourné.
 
 ### Exemple de réponse
 
