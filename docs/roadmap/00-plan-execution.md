@@ -30,7 +30,7 @@
 - **Statut : Terminé**
 - **Priorité : P0**
 - **Dépendances :** CI-001, CI-002
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/48
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/80
 
 **Objectif.** Faire de la baseline de qualité une règle de merge explicite.
 
