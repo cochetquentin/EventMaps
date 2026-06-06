@@ -12,7 +12,7 @@ Le nom de workflow n'est donc pas actuellement dupliqué sous `Test`. En revanch
 
 - **Statut : À faire**
 - **Priorité : P0**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/49
 
 **Actions.** Renommer les jobs selon leur responsabilité, par exemple `Python / Tests`, `Frontend / Tests`, `Docker / Build and smoke test`; éviter `Tests` seul ; documenter les noms retenus avant de configurer la protection de branche.
 
@@ -22,7 +22,7 @@ Le nom de workflow n'est donc pas actuellement dupliqué sous `Test`. En revanch
 
 - **Statut : À faire**
 - **Priorité : P1**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/54
 
 **Décision recommandée.** Garder un seul fichier de workflow tant que le dépôt reste petit, mais séparer les jobs. Plusieurs fichiers n'apporteraient pas encore de gain suffisant et dupliqueraient le setup.
 
@@ -34,7 +34,7 @@ Le nom de workflow n'est donc pas actuellement dupliqué sous `Test`. En revanch
 
 - **Statut : À faire**
 - **Priorité : P1**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/55
 
 **Actions.** Ajouter des permissions minimales explicites (`contents: read`), des `timeout-minutes`, et une concurrence annulant les runs obsolètes d'une même PR. Évaluer le pinning des actions par SHA, en conservant Dependabot pour les mises à jour.
 
@@ -44,7 +44,7 @@ Le nom de workflow n'est donc pas actuellement dupliqué sous `Test`. En revanch
 
 - **Statut : À faire**
 - **Priorité : P1**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/56
 
 **Actions.** Remplacer le `sleep 8` fixe par une boucle bornée ; garantir le nettoyage avec un mécanisme exécuté aussi en cas d'échec ; afficher les logs du conteneur quand `/health` ne répond pas.
 

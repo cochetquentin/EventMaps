@@ -15,9 +15,9 @@
 
 ## STAB-001 — Geler les évolutions produit
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P0**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/47
 
 **Objectif.** Empêcher de nouvelles fonctionnalités de déplacer la cible pendant la stabilisation.
 
@@ -30,7 +30,7 @@
 - **Statut : À faire**
 - **Priorité : P0**
 - **Dépendances :** CI-001, CI-002
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/48
 
 **Objectif.** Faire de la baseline de qualité une règle de merge explicite.
 
@@ -38,9 +38,9 @@
 
 ## STAB-003 — Créer un tableau de suivi à partir de cette roadmap
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/52
 
 **Objectif.** Rendre l'avancement visible sans dupliquer le détail des tâches.
 
@@ -53,7 +53,7 @@
 - **Statut : À faire**
 - **Priorité : P1**
 - **Dépendances :** toutes les autres tâches P0/P1 de la roadmap de stabilisation
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/53
 
 **Objectif.** Décider explicitement si la base est assez saine pour reprendre les évolutions.
 

@@ -12,7 +12,7 @@ L'historique local montre de nombreuses branches de fonctionnalités mergées vi
 
 - **Statut : À faire**
 - **Priorité : P1**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/69
 
 **Actions.** Exporter nom, date du dernier commit, auteur, PR associée, état de merge, protection et divergence avec la branche par défaut ; identifier les branches sans PR et celles déjà mergées.
 
@@ -23,7 +23,7 @@ L'historique local montre de nombreuses branches de fonctionnalités mergées vi
 - **Statut : À faire**
 - **Priorité : P1**
 - **Dépendances :** GIT-001
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/70
 
 **Actions.** Supprimer d'abord les branches entièrement mergées ; obtenir confirmation pour les branches non mergées ; conserver tags/releases et branches protégées.
 
@@ -34,7 +34,7 @@ L'historique local montre de nombreuses branches de fonctionnalités mergées vi
 - **Statut : À faire**
 - **Priorité : P1**
 - **Dépendances :** CI-001, STAB-002
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/71
 
 **Décision recommandée.** Utiliser une branche principale protégée et des branches courtes liées à une issue ; imposer PR + checks ; éviter une branche de développement longue tant qu'elle n'est pas nécessaire.
 

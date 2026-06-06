@@ -18,7 +18,7 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 - **Statut : À faire**
 - **Priorité : P0**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/50
 
 **Actions.** Documenter deux catégories : `real` pour captures réelles de contrat et `synthetic` pour cas unitaires minimaux ; définir les règles de provenance, date de capture, URL source, anonymisation, taille et mise à jour.
 
@@ -29,7 +29,7 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 - **Statut : À faire**
 - **Priorité : P1**
 - **Dépendances :** TEST-001
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/57
 
 **Actions.** Créer une arborescence par source et catégorie, adopter des noms décrivant le cas, et ajouter un manifeste léger contenant URL, date de capture, structure couverte et éventuelles transformations.
 
@@ -40,7 +40,7 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 - **Statut : À faire**
 - **Priorité : P1**
 - **Dépendances :** TEST-001, TEST-002
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/58
 
 **Corpus cible.** Environ cinq pages événement réelles et au moins deux listings : événement complet, sans description, dates floues ou multi-jour, plusieurs lieux, données optionnelles absentes, et variations de listing observées.
 
@@ -51,7 +51,7 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 - **Statut : À faire**
 - **Priorité : P1**
 - **Dépendances :** TEST-001, TEST-002
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/59
 
 **Corpus cible.** Environ cinq événements réels issus de régions et structures différentes, avec leurs pages/fragments nécessaires : date valide, date reportée/annulée, coordonnées présentes/absentes, champs de tableau variables, et listings représentatifs.
 
@@ -62,7 +62,7 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 - **Statut : À faire**
 - **Priorité : P1**
 - **Dépendances :** TEST-001, TEST-002
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/60
 
 **Actions.** Confirmer la provenance des captures existantes, ajouter les métadonnées manquantes et compléter jusqu'à environ cinq pages représentatives : événement JSON-LD, article, données incomplètes, coordonnées absentes et variation de listing.
 
@@ -73,7 +73,7 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 - **Statut : À faire**
 - **Priorité : P1**
 - **Dépendances :** TEST-003, TEST-004, TEST-005
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/61
 
 **Actions.** Pour chaque capture réelle, vérifier les champs essentiels et les erreurs attendues ; tester les taux d'extraction d'un listing et l'absence de perte silencieuse ; conserver séparément les tests unitaires de fonctions de parsing.
 

@@ -18,7 +18,7 @@ Constats précis :
 
 - **Statut : À faire**
 - **Priorité : P1**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/66
 
 **Actions.** Corriger le nombre de tests ou éviter un nombre figé ; vérifier tous les exemples de commandes, sources, endpoints, paramètres, réponses, variables d'environnement et comportement Docker contre le code actuel.
 
@@ -39,7 +39,7 @@ Constats précis :
 - **Statut : À faire**
 - **Priorité : P1**
 - **Dépendances :** TOOL-003
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/67
 
 **Actions.** Conserver uniquement les garde-fous et liens propres à Claude Code ; pointer vers CONTRIBUTING pour les conventions générales et vers l'implémentation testable pour la review Codex.
 
@@ -49,7 +49,7 @@ Constats précis :
 
 - **Statut : À faire**
 - **Priorité : P1**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/68
 
 **Actions.** Comparer les routes, modèles, tables, flux de scrape et réglages avec `docs/ARCHITECTURE.md`; ajouter les exports ICS et le suivi par `job_id`; retirer les descriptions obsolètes.
 

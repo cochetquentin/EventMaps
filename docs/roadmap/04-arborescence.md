@@ -14,7 +14,7 @@ Les répertoires locaux `.venv/` et `node_modules/` sont présents dans la copie
 
 - **Statut : À faire**
 - **Priorité : P1**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/64
 
 **Actions.** Pour chaque fichier racine, confirmer propriétaire, rôle et audience ; supprimer ou déplacer uniquement les éléments sans rôle actuel ; vérifier les fichiers générés et les ignores Git/Docker.
 
@@ -24,7 +24,7 @@ Les répertoires locaux `.venv/` et `node_modules/` sont présents dans la copie
 
 - **Statut : À faire**
 - **Priorité : P1**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/65
 
 **Constat.** `pyproject.toml` contient encore la description générique `Add your description here` et expose le script `scrape = "main:main"` sans que ce contrat soit clairement vérifié dans la documentation.
 
