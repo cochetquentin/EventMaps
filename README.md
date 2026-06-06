@@ -258,4 +258,5 @@ npx vitest run
 ## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture, flux de données, contrat `attributes` par source, schéma DB
+- [docs/roadmap/README.md](docs/roadmap/README.md) — roadmap priorisée de stabilisation et suivi des tâches
 - [CONTRIBUTING.md](CONTRIBUTING.md) — setup, conventions, workflow PR, politique fixtures
