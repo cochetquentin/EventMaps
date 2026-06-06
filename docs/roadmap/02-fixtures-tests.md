@@ -16,7 +16,7 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 ## TEST-001 — Définir la politique de fixtures
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P0**
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/50
 

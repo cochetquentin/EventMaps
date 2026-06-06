@@ -1,0 +1,116 @@
+# Manifeste des fixtures de test — EventMaps
+# Règles : voir POLICY.md
+
+fixtures:
+
+  # ── Tokyo Cheapo ─────────────────────────────────────────────────────────────
+
+  - file: tc_listing.html
+    category: synthetic
+    source: tc
+    captured_at: null
+    url: null
+    purpose: >
+      Listing minimal Tokyo Cheapo avec 2 event-cards filtrables.
+      Couvre le parsing de la grille et l'extraction des URLs d'événements.
+
+  - file: tc_event_full.html
+    category: synthetic
+    source: tc
+    captured_at: null
+    url: null
+    purpose: >
+      Page événement Tokyo Cheapo complète : titre, dates, horaires, prix,
+      description et localisation JSON Apple Maps. Cas nominal du parseur.
+
+  - file: tc_event_no_description.html
+    category: synthetic
+    source: tc
+    captured_at: null
+    url: null
+    purpose: >
+      Régression BUG-005 — page événement sans div.entry-content__text.
+      Vérifie que l'absence de description ne lève pas d'exception.
+
+  - file: tc_event_multi_location.html
+    category: synthetic
+    source: tc
+    captured_at: null
+    url: null
+    purpose: >
+      Page événement avec plusieurs lieux dans le JSON Apple Maps (tableau
+      "locations"). Couvre la création de plusieurs Event pour un même listing.
+
+  # ── Hanabi Walker ────────────────────────────────────────────────────────────
+
+  - file: hanabi_listing.html
+    category: synthetic
+    source: hanabi
+    captured_at: null
+    url: null
+    purpose: >
+      Listing minimal hanabi.walkerplus.com avec 3 liens de détail
+      (/detail/ar0300eXXX/) et 1 lien pager ignoré. Couvre le filtrage
+      des liens et l'extraction des URLs de détail.
+
+  - file: hanabi_event_data.html
+    category: synthetic
+    source: hanabi
+    captured_at: null
+    url: null
+    purpose: >
+      Fragment page détail Hanabi Walker — tableau s_table avec champs
+      japonais (nom, dates, horaires, prix, lieu). Premier onglet d'un événement.
+
+  - file: hanabi_event_map.html
+    category: synthetic
+    source: hanabi
+    captured_at: null
+    url: null
+    purpose: >
+      Fragment page Hanabi Walker — onglet carte avec iframe Google Maps.
+      Coordonnées GPS extraites du paramètre q= de l'URL iframe.
+      Utilisé avec hanabi_event_data.html pour assembler un Event complet.
+
+  # ── Time Out Tokyo ───────────────────────────────────────────────────────────
+
+  - file: tot_listing.html
+    category: real
+    source: tot
+    captured_at: "2026-06-05"
+    url: "https://www.timeout.com/tokyo/things-to-do/things-to-do-this-week-in-tokyo"
+    purpose: >
+      Capture réelle du listing hebdomadaire Time Out Tokyo.
+      Couvre l'extraction et la déduplication des liens d'événements depuis
+      le DOM complet (371 Ko).
+    anonymized: false  # tokens côté client à examiner — voir TEST-005
+
+  - file: tot_event_full.html
+    category: real
+    source: tot
+    captured_at: "2026-06-05"
+    url: "https://www.timeout.com/tokyo/things-to-do/bunkyo-ajisai-matsuri-2015"
+    purpose: >
+      Capture réelle d'un événement Time Out Tokyo avec JSON-LD complet
+      wrappé en Review.itemReviewed, données NextJS et digitalData.
+      Cas nominal du parseur ToT.
+    anonymized: false  # tokens côté client à examiner — voir TEST-005
+
+  - file: tot_event_news_article.html
+    category: real
+    source: tot
+    captured_at: "2026-06-05"
+    url: null  # URL canonique à confirmer — voir TEST-005
+    purpose: >
+      Capture réelle d'un article de news Time Out Tokyo (JSON-LD type
+      NewsArticle). Vérifie que le parseur rejette les pages non-événement.
+    anonymized: false  # tokens côté client à examiner — voir TEST-005
+
+  - file: tot_event_no_jsonld.html
+    category: synthetic
+    source: tot
+    captured_at: null
+    url: null
+    purpose: >
+      Page Time Out Tokyo sans bloc JSON-LD (page venue/restaurant).
+      Couvre le rejet du parseur quand le JSON-LD est absent.
