@@ -40,6 +40,12 @@ def _is_stale(job: dict) -> bool:
 def _do_scrape(job_id: int, source: str, region: str) -> None:
     from scrapers.base import ScrapeReport
 
+    # Log immediately so that a job created in the handler but whose background
+    # task never starts (process crash between response and task execution) can be
+    # distinguished from an in-progress job in server logs.  The stale-timeout
+    # mechanism in trigger_scrape will fail such orphaned jobs automatically.
+    logger.info("scrape_start source=%s job_id=%d", source, job_id)
+
     with EventStore(settings.db_path) as store:
         try:
             events = []

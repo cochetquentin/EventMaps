@@ -154,12 +154,10 @@ async function startScrape() {
     return;
   }
   const data = await res.json();
-  if (data.status === 'already_running') {
-    scrapeBtn.classList.remove('running');
-    return;
-  }
-  const jobId = data.job_id;
-  const statusUrl = jobId != null ? `/scrape/status?job_id=${jobId}` : '/scrape/status';
+  // Si un scrape est déjà en cours, poller le status global pour recharger les events à la fin
+  const statusUrl = data.status === 'already_running' || data.job_id == null
+    ? '/scrape/status'
+    : `/scrape/status?job_id=${data.job_id}`;
   pollInterval = setInterval(async () => {
     const statusRes = await fetch(statusUrl);
     const statusData = await statusRes.json();
