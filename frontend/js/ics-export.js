@@ -32,8 +32,20 @@ function toUtcStamp(d) {
   return d.toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
 }
 
-// Convert an ISO date + "HH:MM" JST string to a UTC Date.
-// Tokyo = UTC+9, no DST — handles midnight wraparound automatically.
+const _HM_RE = /^(\d{1,2}):(\d{2})$/;
+
+// Validate and normalize a "H:MM" or "HH:MM" string.
+// Returns a padded "HH:MM" string, or null if invalid (out of range, unparseable).
+function parseHM(hm) {
+  const m = _HM_RE.exec((hm || '').trim());
+  if (!m) return null;
+  const h = Number(m[1]), mn = Number(m[2]);
+  if (h > 23 || mn > 59) return null;
+  return `${String(h).padStart(2, '0')}:${m[2]}`;
+}
+
+// Convert an ISO date + validated "HH:MM" JST string to a UTC Date.
+// Tokyo = UTC+9, no DST.
 function jstToUtcDate(dateIso, hm) {
   return new Date(`${dateIso}T${hm}:00+09:00`);
 }
@@ -59,17 +71,19 @@ export function downloadICS() {
     lines.push(`DTSTAMP:${stamp}`);
     if (ev.start_date) {
       const endDate = ev.end_date || ev.start_date;
-      // Parse times field: "HH:MM-HH:MM" or "HH:MM"
+      // Parse and validate times field: "HH:MM-HH:MM" or "HH:MM"
       const parts = ev.times ? ev.times.split('-').map(s => s.trim()) : null;
-      const startHM = parts ? parts[0] : null;
-      const endHM = parts && parts.length > 1 ? parts[1] : null;
+      const startHM = parts ? parseHM(parts[0]) : null;
+      const endHM = parts && parts.length > 1 ? parseHM(parts[1]) : null;
       if (startHM) {
-        // Emit UTC datetimes — no VTIMEZONE component needed, handles midnight wraparound
+        // Emit UTC datetimes — no VTIMEZONE component needed
         const startUtc = jstToUtcDate(ev.start_date, startHM);
         lines.push(`DTSTART:${toUtcStamp(startUtc)}`);
-        const endUtc = endHM
+        let endUtc = endHM
           ? jstToUtcDate(endDate, endHM)
           : new Date(startUtc.getTime() + 60 * 60 * 1000); // +1 hour
+        // Overnight range (e.g. 23:00-02:00): advance end by one day
+        if (endHM && endUtc <= startUtc) endUtc = new Date(endUtc.getTime() + 24 * 60 * 60 * 1000);
         lines.push(`DTEND:${toUtcStamp(endUtc)}`);
       } else {
         // Date-only event

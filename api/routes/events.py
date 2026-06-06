@@ -25,9 +25,14 @@ _HM_RE = re.compile(r"^(\d{1,2}):(\d{2})$")
 
 
 def _parse_hm(s: str) -> tuple[int, int] | None:
-    """Parse "HH:MM" → (hours, minutes) or None."""
+    """Parse "HH:MM" → (hours, minutes) or None; rejects out-of-range values."""
     m = _HM_RE.match(s.strip())
-    return (int(m.group(1)), int(m.group(2))) if m else None
+    if not m:
+        return None
+    h, mn = int(m.group(1)), int(m.group(2))
+    if not (0 <= h <= 23 and 0 <= mn <= 59):
+        return None
+    return (h, mn)
 
 
 def _parse_bbox(s: str) -> tuple[float, float, float, float]:
@@ -77,6 +82,9 @@ def _build_ics_event(event: Event) -> "ICSEvent":
                     end_hm[1],
                     tzinfo=_JST,
                 ).astimezone(UTC)
+                # Overnight range (e.g. 23:00-02:00): advance end by one day
+                if dtend <= dtstart:
+                    dtend += timedelta(days=1)
             else:
                 dtend = dtstart + timedelta(hours=1)
             ics_event.add("dtend", dtend)
