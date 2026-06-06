@@ -383,6 +383,13 @@ class TimeoutTokyo(BaseScraper):
                 )
             )
 
+        # ── Description ────────────────────────────────────────────────────────
+        description: str | None = ld.get("description") or None
+        if not description:
+            og = soup.find("meta", attrs={"property": "og:description"})
+            if og and og.get("content"):
+                description = og["content"].strip() or None
+
         return {
             "url": url,
             "title": title,
@@ -393,7 +400,7 @@ class TimeoutTokyo(BaseScraper):
             "venue_name": venue_name,
             "venue_address": venue_address,
             "categories": categories,
-            "description": ld.get("description") or None,
+            "description": description,
             "image_url": image_url,
             "latitude": latitude,
             "longitude": longitude,
