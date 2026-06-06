@@ -27,27 +27,15 @@ function escapeICS(str) {
   return (str || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
 }
 
-function addDay(iso) {
-  const d = new Date(iso + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10).replace(/-/g, '');
+// Format a Date object as ICS UTC datetime: YYYYMMDDTHHMMSSZ
+function toUtcStamp(d) {
+  return d.toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
 }
 
-function toHHMMSS(hm) {
-  // "HH:MM" → "HHMMSS"
-  return hm.replace(':', '') + '00';
-}
-
-function addOneHour(hm) {
-  // Return HHMMSS one hour after the given HH:MM string.
-  let [h, m] = hm.split(':').map(Number);
-  h = (h + 1) % 24;
-  return String(h).padStart(2, '0') + String(m).padStart(2, '0') + '00';
-}
-
-function utcStamp() {
-  // DTSTAMP format: YYYYMMDDTHHMMSSZ
-  return new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
+// Convert an ISO date + "HH:MM" JST string to a UTC Date.
+// Tokyo = UTC+9, no DST — handles midnight wraparound automatically.
+function jstToUtcDate(dateIso, hm) {
+  return new Date(`${dateIso}T${hm}:00+09:00`);
 }
 
 export function downloadICS() {
@@ -55,7 +43,7 @@ export function downloadICS() {
   // (pills, categories, favorites, dates) — same as what renderMarkers produces.
   const visible = allEvents.filter(ev => markerMap.has(ev.id));
   if (visible.length === 0) return; // nothing to export
-  const stamp = utcStamp();
+  const stamp = toUtcStamp(new Date());
 
   const lines = [
     'BEGIN:VCALENDAR',
@@ -76,14 +64,19 @@ export function downloadICS() {
       const startHM = parts ? parts[0] : null;
       const endHM = parts && parts.length > 1 ? parts[1] : null;
       if (startHM) {
-        // Emit date-time with Tokyo timezone
-        lines.push(`DTSTART;TZID=Asia/Tokyo:${ev.start_date.replace(/-/g, '')}T${toHHMMSS(startHM)}`);
-        const endTime = endHM ? toHHMMSS(endHM) : addOneHour(startHM);
-        lines.push(`DTEND;TZID=Asia/Tokyo:${endDate.replace(/-/g, '')}T${endTime}`);
+        // Emit UTC datetimes — no VTIMEZONE component needed, handles midnight wraparound
+        const startUtc = jstToUtcDate(ev.start_date, startHM);
+        lines.push(`DTSTART:${toUtcStamp(startUtc)}`);
+        const endUtc = endHM
+          ? jstToUtcDate(endDate, endHM)
+          : new Date(startUtc.getTime() + 60 * 60 * 1000); // +1 hour
+        lines.push(`DTEND:${toUtcStamp(endUtc)}`);
       } else {
         // Date-only event
         lines.push(`DTSTART;VALUE=DATE:${ev.start_date.replace(/-/g, '')}`);
-        lines.push(`DTEND;VALUE=DATE:${addDay(endDate)}`);
+        const d = new Date(endDate + 'T00:00:00Z');
+        d.setUTCDate(d.getUTCDate() + 1);
+        lines.push(`DTEND;VALUE=DATE:${d.toISOString().slice(0, 10).replace(/-/g, '')}`);
       }
     }
     lines.push(fold(`URL:${ev.url}`));
@@ -102,5 +95,6 @@ export function downloadICS() {
   a.href = url;
   a.download = 'events.ics';
   a.click();
-  URL.revokeObjectURL(url);
+  // Delay revocation to ensure the browser has consumed the URL before it is released.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

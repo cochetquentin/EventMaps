@@ -1,4 +1,5 @@
-from datetime import UTC, datetime, timedelta
+import re
+from datetime import UTC, datetime, timedelta, timezone
 from datetime import date as DateType
 from typing import Literal
 
@@ -18,6 +19,15 @@ except ImportError:
     _ICAL_AVAILABLE = False
 
 router = APIRouter()
+
+_JST = timezone(timedelta(hours=9))
+_HM_RE = re.compile(r"^(\d{1,2}):(\d{2})$")
+
+
+def _parse_hm(s: str) -> tuple[int, int] | None:
+    """Parse "HH:MM" → (hours, minutes) or None."""
+    m = _HM_RE.match(s.strip())
+    return (int(m.group(1)), int(m.group(2))) if m else None
 
 
 def _parse_bbox(s: str) -> tuple[float, float, float, float]:
@@ -43,10 +53,37 @@ def _build_ics_event(event: Event) -> "ICSEvent":
     ics_event.add("uid", f"{event.id}@eventmaps")
     ics_event.add("dtstamp", datetime.now(UTC))
     if event.start_date:
-        ics_event.add("dtstart", event.start_date)
-    end = event.end_date or event.start_date
-    if end:
-        ics_event.add("dtend", end + timedelta(days=1))
+        times_parts = [p.strip() for p in event.times.split("-")] if event.times else []
+        start_hm = _parse_hm(times_parts[0]) if times_parts else None
+        end_hm = _parse_hm(times_parts[1]) if len(times_parts) > 1 else None
+        if start_hm:
+            # Convert JST to UTC for universal compatibility (no VTIMEZONE needed)
+            dtstart = datetime(
+                event.start_date.year,
+                event.start_date.month,
+                event.start_date.day,
+                start_hm[0],
+                start_hm[1],
+                tzinfo=_JST,
+            ).astimezone(UTC)
+            ics_event.add("dtstart", dtstart)
+            end_date = event.end_date or event.start_date
+            if end_hm:
+                dtend = datetime(
+                    end_date.year,
+                    end_date.month,
+                    end_date.day,
+                    end_hm[0],
+                    end_hm[1],
+                    tzinfo=_JST,
+                ).astimezone(UTC)
+            else:
+                dtend = dtstart + timedelta(hours=1)
+            ics_event.add("dtend", dtend)
+        else:
+            ics_event.add("dtstart", event.start_date)
+            end = event.end_date or event.start_date
+            ics_event.add("dtend", end + timedelta(days=1))
     ics_event.add("url", event.url)
     location = event.venue or getattr(event.attributes, "location_name", None)
     if location:
@@ -145,7 +182,20 @@ def export_events_ical(
                 break
             offset += _ICS_PAGE
         else:
-            truncated = True
+            # Cap reached: probe one more event to confirm actual truncation
+            probe = store.get_events(
+                source=source,
+                date=date_str,
+                bbox=parsed_bbox,
+                upcoming=upcoming,
+                start_from=start_from_str,
+                start_to=start_to_str,
+                limit=1,
+                offset=_ICS_MAX,
+                q=q or None,
+                category=category or None,
+            )
+            truncated = bool(probe)
     if not all_events:
         return Response(status_code=204)
     headers: dict[str, str] = {"Content-Disposition": 'attachment; filename="events.ics"'}
