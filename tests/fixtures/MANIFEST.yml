@@ -140,3 +140,27 @@ fixtures:
       Couvre le rejet du parseur quand le JSON-LD est absent.
     tests_consuming:
       - test_timeout_tokyo.py::test_scrape_event_raises_without_json_ld
+
+  - file: tot/synthetic/event_no_coordinates.html
+    category: synthetic
+    source: tot
+    captured_at: null
+    url: null
+    purpose: >
+      Événement Time Out Tokyo avec JSON-LD valide (nom, dates, lieu, prix)
+      mais sans div data-zone-location-info. Vérifie que latitude et longitude
+      retournent None quand les coordonnées géographiques sont absentes.
+    tests_consuming:
+      - test_timeout_tokyo.py::test_scrape_event_no_coordinates_returns_none
+
+  - file: tot/synthetic/event_incomplete_data.html
+    category: synthetic
+    source: tot
+    captured_at: null
+    url: null
+    purpose: >
+      Événement Time Out Tokyo avec JSON-LD contenant uniquement le champ name.
+      Vérifie la gestion gracieuse de tous les champs optionnels absents
+      (start_date, end_date, times, price, venue, coordinates, image).
+    tests_consuming:
+      - test_timeout_tokyo.py::test_scrape_event_incomplete_data_returns_none_fields
