@@ -38,6 +38,7 @@
       --border: rgba(15,23,42,0.08);
       --tc:     #2563eb;
       --hanabi: #f97316;
+      --tot:    #e8222e;
       --accent: #e11d48;
     }
 
@@ -478,6 +479,7 @@
 
     .card-dot.tc     { background: var(--tc); }
     .card-dot.hanabi { background: var(--hanabi); }
+    .card-dot.tot    { background: var(--tot); }
 
     .card-title {
       font-size: 12.5px;
@@ -531,6 +533,14 @@
     @keyframes hpulse {
       0%, 100% { transform: scale(1); box-shadow: 0 0 0 5px rgba(249,115,22,0.15), 0 0 16px rgba(249,115,22,0.55); }
       50%       { transform: scale(1.12); box-shadow: 0 0 0 8px rgba(249,115,22,0.10), 0 0 24px rgba(249,115,22,0.70); }
+    }
+
+    .m-tot {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--tot);
+      border: 3px solid white;
+      box-shadow: 0 2px 8px rgba(232,34,46,0.45);
     }
 
     /* ── Clusters ── */

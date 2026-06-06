@@ -19,7 +19,11 @@ export function renderMarkers() {
   const visible = [];
 
   allEvents.forEach(ev => {
-    if (!ev.latitude || !ev.longitude) return;
+    const hasCoords = ev.latitude != null && ev.longitude != null;
+    // Events without coordinates only appear in the list (not the map).
+    // Currently only Time Out Tokyo events lack coordinates.
+    if (!hasCoords && ev.source !== 'tot') return;
+
     if (showOnlyFavorites && !favs.has(ev.id)) return;
 
     const evStart = ev.start_date || ev.date;
@@ -29,6 +33,8 @@ export function renderMarkers() {
 
     if (ev.source === 'hanabi') {
       if (!active.has('hanabi')) return;
+    } else if (ev.source === 'tot') {
+      if (!active.has('tot')) return;
     } else {
       const cats = ((ev.attributes || {}).categories || []).filter(c => !TC_EXCLUDED_CATS.includes(c));
       const onlyFW = TC_EXCLUDED_CATS.every(c => ((ev.attributes || {}).categories || []).includes(c)) && cats.length === 0;
@@ -36,21 +42,25 @@ export function renderMarkers() {
       if (cats.length > 0 && !cats.some(c => active.has(c))) return;
     }
 
-    const icon   = getIcon(ev, favs.has(ev.id));
-    const marker = L.marker([ev.latitude, ev.longitude], { icon });
-    marker.bindPopup(buildPopup(ev), { maxWidth: 300, minWidth: 280 });
-    marker.on('click', () => openDrawer(ev));
-    clusterGroup.addLayer(marker);
-    markerMap.set(ev.id, marker);
+    if (hasCoords) {
+      const icon   = getIcon(ev, favs.has(ev.id));
+      const marker = L.marker([ev.latitude, ev.longitude], { icon });
+      marker.bindPopup(buildPopup(ev), { maxWidth: 300, minWidth: 280 });
+      marker.on('click', () => openDrawer(ev));
+      clusterGroup.addLayer(marker);
+      markerMap.set(ev.id, marker);
+    }
     visible.push(ev);
   });
 
   const tc     = visible.filter(e => e.source === 'tc').length;
   const hanabi = visible.filter(e => e.source === 'hanabi').length;
+  const tot    = visible.filter(e => e.source === 'tot').length;
   document.getElementById('stats').innerHTML =
     `<strong>${visible.length}</strong> événement${visible.length !== 1 ? 's' : ''} &nbsp;·&nbsp; ` +
     `<span style="color:var(--tc)">●</span> ${tc} &nbsp;` +
-    `<span style="color:var(--hanabi)">●</span> ${hanabi}`;
+    `<span style="color:var(--hanabi)">●</span> ${hanabi}` +
+    (tot ? ` &nbsp;<span style="color:var(--tot)">●</span> ${tot}` : '');
 
   buildEventList(visible);
 }

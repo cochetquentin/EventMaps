@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     scrape_request_timeout_seconds: int = 10
     scrape_max_pages_tc: int = 10
     scrape_max_pages_hanabi: int = 20
+    scrape_max_listing_pages_tot: int = 4  # number of listing pages to scrape for Time Out Tokyo
     scrape_retry_attempts: int = 3
     scrape_retry_wait_min: int = 2
     scrape_retry_wait_max: int = 10
