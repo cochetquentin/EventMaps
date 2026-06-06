@@ -101,6 +101,9 @@ def list_events(
         )
 
 
+_ICS_PAGE = 500
+
+
 @router.get(".ics")
 def export_events_ical(
     source: Literal["tc", "hanabi"] | None = Query(None),
@@ -108,8 +111,6 @@ def export_events_ical(
     bbox: str | None = Query(None, description="min_lon,min_lat,max_lon,max_lat"),
     start_from: DateType | None = Query(None),
     start_to: DateType | None = Query(None),
-    limit: int = Query(500, ge=1, le=500),
-    offset: int = Query(0, ge=0),
     q: str | None = Query(None),
     category: str | None = Query(None),
 ):
@@ -120,20 +121,27 @@ def export_events_ical(
     start_to_str = start_to.isoformat() if start_to else None
     upcoming = date_str is None and start_from_str is None and start_to_str is None
     parsed_bbox = _parse_bbox(bbox) if bbox else None
+    all_events: list[Event] = []
+    offset = 0
     with EventStore(settings.db_path) as store:
-        events = store.get_events(
-            source=source,
-            date=date_str,
-            bbox=parsed_bbox,
-            upcoming=upcoming,
-            start_from=start_from_str,
-            start_to=start_to_str,
-            limit=limit,
-            offset=offset,
-            q=q or None,
-            category=category or None,
-        )
-    cal = _build_calendar(events)
+        while True:
+            page = store.get_events(
+                source=source,
+                date=date_str,
+                bbox=parsed_bbox,
+                upcoming=upcoming,
+                start_from=start_from_str,
+                start_to=start_to_str,
+                limit=_ICS_PAGE,
+                offset=offset,
+                q=q or None,
+                category=category or None,
+            )
+            all_events.extend(page)
+            if len(page) < _ICS_PAGE:
+                break
+            offset += _ICS_PAGE
+    cal = _build_calendar(all_events)
     return Response(
         content=cal.to_ical(),
         media_type="text/calendar; charset=utf-8",
