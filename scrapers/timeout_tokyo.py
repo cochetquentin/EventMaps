@@ -81,6 +81,11 @@ _EXCLUDE_HREF_PREFIXES = (
     "/tokyo/things-to-do/best-",
     "/tokyo/things-to-do/free-",
     "/tokyo/travel/",
+    "/tokyo/restaurants/",
+    "/tokyo/bars-and-clubs/",
+    "/tokyo/hotels/",
+    "/tokyo/shopping/",
+    "/tokyo/nightlife/",
 )
 
 
@@ -165,14 +170,21 @@ def _parse_ld_json_blocks(soup: BeautifulSoup) -> list[dict]:
             raw.append(data)
             raw.extend(data.get("@graph", []))
 
-    # Second pass: expand itemReviewed from every collected dict
+    # Second pass: expand itemReviewed from every collected dict.
+    # Merge parent-level metadata (e.g. keywords) into the child so that
+    # Review-wrapped events inherit the outer object's classification.
     items: list = []
     for entry in raw:
         items.append(entry)
         if isinstance(entry, dict):
             item_reviewed = entry.get("itemReviewed")
             if isinstance(item_reviewed, dict):
-                items.append(item_reviewed)
+                # Shallow-copy to avoid mutating the parsed object
+                merged = dict(item_reviewed)
+                for key in ("keywords",):
+                    if key not in merged and key in entry:
+                        merged[key] = entry[key]
+                items.append(merged)
     return items
 
 
@@ -289,47 +301,11 @@ class TimeoutTokyo(BaseScraper):
         latitude, longitude = self._parse_zone_location(soup)
 
         if ld is None:
-            # HTML fallback: require a title, GPS coordinates, AND a parseable date.
-            # Without all three the event cannot surface via the API (date filter)
-            # or on the map (coords), and accepting any h1+coords would incorrectly
-            # treat venue/restaurant pages as events.
-            h1 = soup.find("h1")
-            if not h1:
-                raise ValueError(f"No JSON-LD event data and no <h1> found at: {url}")
-            if latitude is None:
-                raise ValueError(
-                    f"No Event JSON-LD and no coordinates — page would be unreachable: {url}"
-                )
-            # Require at least one parseable date from <time datetime="…">
-            fallback_date: str | None = None
-            for time_el in soup.find_all("time", attrs={"datetime": True}):
-                try:
-                    dt = datetime.fromisoformat(time_el["datetime"])
-                    if dt.tzinfo is not None:
-                        dt = dt.astimezone(_JST)
-                    fallback_date = dt.date().isoformat()
-                    break
-                except (ValueError, TypeError):
-                    continue
-            if fallback_date is None:
-                raise ValueError(
-                    f"No Event JSON-LD and no extractable date — likely a venue page: {url}"
-                )
-            return {
-                "url": url,
-                "title": h1.get_text(strip=True),
-                "start_date": fallback_date,
-                "end_date": None,
-                "times": None,
-                "price": None,
-                "venue_name": None,
-                "venue_address": None,
-                "categories": [],
-                "description": None,
-                "image_url": None,
-                "latitude": latitude,
-                "longitude": longitude,
-            }
+            # All legitimate Time Out event pages expose Event JSON-LD (wrapped in
+            # a Review's itemReviewed or directly).  Pages without it are venue,
+            # restaurant, or other non-event pages — reject them to avoid storing
+            # bogus events and inflating error counts.
+            raise ValueError(f"No Event JSON-LD found at: {url}")
 
         # ── Title ──────────────────────────────────────────────────────────────
         # Time Out Tokyo names follow the pattern "Event Name | Venue | Category in Tokyo"

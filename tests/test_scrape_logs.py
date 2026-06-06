@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from scrapers.base import ScrapeReport
 from scrapers.hanabi_walker import HanabiWalker
+from scrapers.timeout_tokyo import TimeoutTokyo
 from scrapers.tokyo_cheapo import TokyoCheapo
 
 
@@ -63,10 +64,12 @@ def test_job_id_consistent_across_log_lines(tmp_path, monkeypatch, caplog):
     monkeypatch.setattr(config.settings, "db_path", str(tmp_path / "events.db"))
     tc_report = _make_report("tc")
     hw_report = _make_report("hanabi")
+    tot_report = _make_report("tot")
 
     with (
         patch.object(TokyoCheapo, "scrape", return_value=([], tc_report)),
         patch.object(HanabiWalker, "scrape", return_value=([], hw_report)),
+        patch.object(TimeoutTokyo, "scrape", return_value=([], tot_report)),
     ):
         with caplog.at_level("INFO", logger="api.routes.scrape"):
             m._do_scrape("all", "ar0300")

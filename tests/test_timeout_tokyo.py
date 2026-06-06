@@ -33,8 +33,15 @@ def make_soup(html: str) -> BeautifulSoup:
 
 def test_is_event_href_valid():
     assert _is_event_href("/tokyo/art/grand-van-gogh-exhibition") is True
-    assert _is_event_href("/tokyo/shopping/oi-racecourse-flea-market") is True
+    assert _is_event_href("/tokyo/things-to-do/hanabi-matsuri") is True
     assert _is_event_href("/tokyo/music/summer-sonic-2026") is True
+
+
+def test_is_event_href_excludes_non_event_categories():
+    assert _is_event_href("/tokyo/restaurants/some-ramen-place") is False
+    assert _is_event_href("/tokyo/bars-and-clubs/some-bar") is False
+    assert _is_event_href("/tokyo/hotels/some-hotel") is False
+    assert _is_event_href("/tokyo/shopping/some-store") is False
 
 
 def test_is_event_href_excludes_news():
@@ -241,49 +248,14 @@ def test_scrape_event_full_from_fixture(tot, monkeypatch):
     assert result["longitude"] == pytest.approx(139.750933)
 
 
-def test_scrape_event_html_fallback_raises_without_coords(tot, monkeypatch):
-    """Pages without Event JSON-LD AND without GPS are rejected (unreachable via API)."""
+def test_scrape_event_raises_without_json_ld(tot, monkeypatch):
+    """Any page without Event JSON-LD is rejected (venue/restaurant pages)."""
     html_bytes = (FIXTURES_DIR / "tot_event_no_jsonld.html").read_bytes()
     soup = BeautifulSoup(html_bytes, "html.parser")
     monkeypatch.setattr(tot, "get_event_page", lambda url: soup)
 
-    with pytest.raises(ValueError, match="unreachable"):
-        tot.scrape_event("https://www.timeout.com/tokyo/shopping/oi-racecourse-flea-market")
-
-
-def test_scrape_event_html_fallback_with_coords_and_date(tot, monkeypatch):
-    """Pages without Event JSON-LD are accepted when GPS coords AND a date are present."""
-    html = """
-    <html><body>
-      <h1>Oi Racecourse Tokyo City Flea Market</h1>
-      <time datetime="2026-09-21T09:00:00+09:00">Until September 21, 2026</time>
-      <div data-component="maps" data-zone-location-info="{&quot;zones&quot;:[{&quot;latitude&quot;:35.598,&quot;longitude&quot;:139.737,&quot;name&quot;:&quot;Oi Racecourse&quot;}]}"></div>
-    </body></html>
-    """
-    soup = BeautifulSoup(html, "html.parser")
-    monkeypatch.setattr(tot, "get_event_page", lambda url: soup)
-
-    result = tot.scrape_event("https://www.timeout.com/tokyo/shopping/oi-racecourse-flea-market")
-
-    assert result["title"] == "Oi Racecourse Tokyo City Flea Market"
-    assert result["start_date"] == "2026-09-21"
-    assert result["price"] is None
-    assert result["latitude"] == pytest.approx(35.598)
-
-
-def test_scrape_event_html_fallback_raises_without_date(tot, monkeypatch):
-    """Pages without Event JSON-LD AND without a parseable date are rejected (venue pages)."""
-    html = """
-    <html><body>
-      <h1>Some Tokyo Venue</h1>
-      <div data-component="maps" data-zone-location-info="{&quot;zones&quot;:[{&quot;latitude&quot;:35.6,&quot;longitude&quot;:139.7,&quot;name&quot;:&quot;Venue&quot;}]}"></div>
-    </body></html>
-    """
-    soup = BeautifulSoup(html, "html.parser")
-    monkeypatch.setattr(tot, "get_event_page", lambda url: soup)
-
-    with pytest.raises(ValueError, match="venue page"):
-        tot.scrape_event("https://www.timeout.com/tokyo/restaurants/some-venue")
+    with pytest.raises(ValueError, match="No Event JSON-LD"):
+        tot.scrape_event("https://www.timeout.com/tokyo/things-to-do/oi-racecourse-flea-market")
 
 
 def test_scrape_event_raises_on_news_article(tot, monkeypatch):

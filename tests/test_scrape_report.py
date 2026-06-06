@@ -9,6 +9,7 @@ from db.store import EventStore, _make_id
 from models.event import Event
 from scrapers.base import ScrapeReport
 from scrapers.hanabi_walker import HanabiWalker
+from scrapers.timeout_tokyo import TimeoutTokyo
 from scrapers.tokyo_cheapo import TokyoCheapo
 
 # ── ScrapeReport unit tests ──────────────────────────────────────────────────
@@ -279,9 +280,11 @@ def test_do_scrape_all_fails_if_one_source_broken(tmp_path, monkeypatch):
         errors=[{"url": f"/detail/{i}/", "reason": "fail"} for i in range(10)],
     )
 
+    tot_report = ScrapeReport(source="tot", links_seen=0, events_ok=0)
     with (
         patch.object(TokyoCheapo, "scrape", return_value=([_make_event()], tc_report)),
         patch.object(HanabiWalker, "scrape", return_value=([], hanabi_report)),
+        patch.object(TimeoutTokyo, "scrape", return_value=([], tot_report)),
     ):
         scrape_module._do_scrape("all", "ar0300")
 
