@@ -1,5 +1,5 @@
+from datetime import UTC, datetime, timedelta
 from datetime import date as DateType
-from datetime import timedelta
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
@@ -41,6 +41,7 @@ def _build_ics_event(event: Event) -> "ICSEvent":
     ics_event = ICSEvent()
     ics_event.add("summary", event.title)
     ics_event.add("uid", f"{event.id}@eventmaps")
+    ics_event.add("dtstamp", datetime.now(UTC))
     if event.start_date:
         ics_event.add("dtstart", event.start_date)
     end = event.end_date or event.start_date
@@ -123,6 +124,7 @@ def export_events_ical(
     upcoming = date_str is None and start_from_str is None and start_to_str is None
     parsed_bbox = _parse_bbox(bbox) if bbox else None
     all_events: list[Event] = []
+    truncated = False
     offset = 0
     with EventStore(settings.db_path) as store:
         while len(all_events) < _ICS_MAX:
@@ -142,11 +144,19 @@ def export_events_ical(
             if len(page) < _ICS_PAGE:
                 break
             offset += _ICS_PAGE
+        else:
+            truncated = True
+    if not all_events:
+        return Response(status_code=204)
+    headers: dict[str, str] = {"Content-Disposition": 'attachment; filename="events.ics"'}
+    if truncated:
+        headers["X-ICS-Truncated"] = "true"
+        headers["X-ICS-Events-Returned"] = str(len(all_events))
     cal = _build_calendar(all_events)
     return Response(
         content=cal.to_ical(),
         media_type="text/calendar; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="events.ics"'},
+        headers=headers,
     )
 
 

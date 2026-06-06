@@ -33,6 +33,18 @@ function addDay(iso) {
   return d.toISOString().slice(0, 10).replace(/-/g, '');
 }
 
+function toHHMMSS(hm) {
+  // "HH:MM" → "HHMMSS"
+  return hm.replace(':', '') + '00';
+}
+
+function addOneHour(hm) {
+  // Return HHMMSS one hour after the given HH:MM string.
+  let [h, m] = hm.split(':').map(Number);
+  h = (h + 1) % 24;
+  return String(h).padStart(2, '0') + String(m).padStart(2, '0') + '00';
+}
+
 function utcStamp() {
   // DTSTAMP format: YYYYMMDDTHHMMSSZ
   return new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
@@ -42,6 +54,7 @@ export function downloadICS() {
   // markerMap reflects exactly the events currently visible after all filters
   // (pills, categories, favorites, dates) — same as what renderMarkers produces.
   const visible = allEvents.filter(ev => markerMap.has(ev.id));
+  if (visible.length === 0) return; // nothing to export
   const stamp = utcStamp();
 
   const lines = [
@@ -57,9 +70,21 @@ export function downloadICS() {
     lines.push(`UID:${ev.id}@eventmaps`);
     lines.push(`DTSTAMP:${stamp}`);
     if (ev.start_date) {
-      lines.push(`DTSTART;VALUE=DATE:${ev.start_date.replace(/-/g, '')}`);
-      const end = ev.end_date || ev.start_date;
-      lines.push(`DTEND;VALUE=DATE:${addDay(end)}`);
+      const endDate = ev.end_date || ev.start_date;
+      // Parse times field: "HH:MM-HH:MM" or "HH:MM"
+      const parts = ev.times ? ev.times.split('-').map(s => s.trim()) : null;
+      const startHM = parts ? parts[0] : null;
+      const endHM = parts && parts.length > 1 ? parts[1] : null;
+      if (startHM) {
+        // Emit date-time with Tokyo timezone
+        lines.push(`DTSTART;TZID=Asia/Tokyo:${ev.start_date.replace(/-/g, '')}T${toHHMMSS(startHM)}`);
+        const endTime = endHM ? toHHMMSS(endHM) : addOneHour(startHM);
+        lines.push(`DTEND;TZID=Asia/Tokyo:${endDate.replace(/-/g, '')}T${endTime}`);
+      } else {
+        // Date-only event
+        lines.push(`DTSTART;VALUE=DATE:${ev.start_date.replace(/-/g, '')}`);
+        lines.push(`DTEND;VALUE=DATE:${addDay(endDate)}`);
+      }
     }
     lines.push(fold(`URL:${ev.url}`));
     const location = ev.venue || ev.attributes?.location_name || null;

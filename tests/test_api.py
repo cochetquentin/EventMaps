@@ -345,9 +345,8 @@ def test_export_ics_content_disposition(client):
 
 def test_export_ics_empty_result(client):
     resp = client.get("/events.ics?q=nonexistentxyz")
-    assert resp.status_code == 200
-    assert "BEGIN:VCALENDAR" in resp.text
-    assert "BEGIN:VEVENT" not in resp.text
+    assert resp.status_code == 204
+    assert resp.content == b""
 
 
 # --- Bbox filter ---
