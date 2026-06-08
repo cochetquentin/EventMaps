@@ -647,8 +647,9 @@ _REAL_HANABI_EVENT_IDS = []
 if os.path.isdir(_REAL_HANABI_DIR):
     _seen = set()
     for _f in sorted(os.listdir(_REAL_HANABI_DIR)):
-        if _f.endswith("-data.html"):
-            _id = _f[len("event-") : -len("-data.html")]
+        # Fichiers event_*.html (data) — les map_*.html sont les fragments carte
+        if _f.startswith("event_") and _f.endswith(".html"):
+            _id = _f[len("event_") : -len(".html")]
             if _id not in _seen:
                 _seen.add(_id)
                 _REAL_HANABI_EVENT_IDS.append(_id)
@@ -656,7 +657,7 @@ if os.path.isdir(_REAL_HANABI_DIR):
 _REAL_HANABI_LISTINGS = []
 if os.path.isdir(_REAL_HANABI_DIR):
     _REAL_HANABI_LISTINGS = sorted(
-        f for f in os.listdir(_REAL_HANABI_DIR) if f.startswith("listing-")
+        f for f in os.listdir(_REAL_HANABI_DIR) if f.startswith("listing_")
     )
 
 
@@ -671,12 +672,26 @@ _HANABI_EVENTS_WITH_COORDS: set[str] = {
 }
 _HANABI_EVENTS_NO_COORDS: set[str] = set()  # à alimenter si fixture coord-absente ajoutée
 
+# IDs avec variantes spécifiques à vérifier (multi-jours, rain_policy, etc.)
+_HANABI_MULTI_DAY: set[str] = {"ar0311e00250"}  # 第78回 小川町七夕まつり : 2 dates consécutives
+
+
+def test_real_corpus_hanabi_is_not_empty() -> None:
+    """Échoue si le corpus réel Hanabi est absent — empêche CI verte sans tests de contrat."""
+    assert len(_REAL_HANABI_EVENT_IDS) > 0, (
+        "Corpus réel Hanabi manquant : aucun event_*.html dans tests/fixtures/hanabi/real/. "
+        "Relancer tools/renew_fixtures.py pour reconstituer le corpus."
+    )
+    assert len(_REAL_HANABI_LISTINGS) > 0, (
+        "Corpus réel Hanabi manquant : aucun listing_*.html dans tests/fixtures/hanabi/real/."
+    )
+
 
 @pytest.mark.parametrize("event_id", _REAL_HANABI_EVENT_IDS)
 def test_real_event_parses_essential_fields(hw, event_id):
     """Chaque paire data+map réelle Hanabi produit titre, dates et URL."""
-    soup_data = _load_fixture(f"hanabi/real/event-{event_id}-data.html")
-    soup_map = _load_fixture(f"hanabi/real/event-{event_id}-map.html")
+    soup_data = _load_fixture(f"hanabi/real/event_{event_id}.html")
+    soup_map = _load_fixture(f"hanabi/real/map_{event_id}.html")
 
     hw.get_data_page = MagicMock(return_value=soup_data)
     hw.get_map_page = MagicMock(return_value=soup_map)
@@ -693,18 +708,30 @@ def test_real_event_parses_essential_fields(hw, event_id):
     elif event_id in _HANABI_EVENTS_NO_COORDS:
         assert result.get("lat") is None, f"[{event_id}] lat attendu null mais présent"
         assert result.get("lng") is None, f"[{event_id}] lng attendu null mais présent"
+    # Assertions de variante : propriétés spécifiques au cas couvert par la fixture
+    if event_id in _HANABI_MULTI_DAY:
+        assert len(result.get("dates", [])) >= 2, (
+            f"[{event_id}] événement multi-jours : attendu ≥ 2 dates mais obtenu {result.get('dates')}"
+        )
 
 
 @pytest.mark.parametrize(
     "listing_file",
     _REAL_HANABI_LISTINGS,
-    ids=lambda f: f.split(".")[0].replace("listing-", "").replace("-1", ""),
+    ids=lambda f: f.split(".")[0].replace("listing_", ""),
 )
-def test_real_listing_extracts_event_links(hw, listing_file):
-    """Chaque listing réel Hanabi retourne au moins 3 liens /detail/."""
+def test_real_listing_extracts_event_links(listing_file):
+    """Chaque listing réel Hanabi retourne au moins 3 liens /detail/ avec le bon scraper régional."""
+    import re as _re
+
     listing_path = os.path.join(_REAL_HANABI_DIR, listing_file)
     with open(listing_path, "rb") as f:
         content = f.read()
+
+    # Extraire la région depuis le nom de fichier (ex: listing_ar0500.html → ar0500)
+    m = _re.match(r"listing_([a-z0-9]+)", listing_file)
+    region = m.group(1) if m else "ar0300"
+    hw_region = HanabiWalker(region=region)
 
     page1 = MagicMock()
     page1.content = content
@@ -716,7 +743,7 @@ def test_real_listing_extracts_event_links(hw, listing_file):
     http_err = _HTTPError(response=MagicMock(status_code=404))
 
     with patch("scrapers.hanabi_walker._fetch", side_effect=[page1, http_err]):
-        links = hw.get_event_links()
+        links = hw_region.get_event_links()
 
     assert len(links) >= 3, f"[{listing_file}] seulement {len(links)} liens extraits"
     assert all("/detail/" in link for link in links), (

@@ -57,6 +57,8 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 **Critères d'acceptation.** Les variantes réellement observées sont couvertes ; les fragments appartenant au même événement sont liés dans le manifeste.
 
+**Note.** La variante coord-absente n'a pas pu être constituée : tous les événements disponibles dans le corpus avaient des coordonnées Google Maps. La structure de test est prête (`_HANABI_EVENTS_NO_COORDS` dans `test_hanabi_walker.py`) pour accueillir cette variante dès qu'une fixture réelle appropriée sera identifiée.
+
 ## TEST-005 — Qualifier et compléter le corpus Time Out Tokyo
 
 - **Statut : Terminé**

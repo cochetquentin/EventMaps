@@ -264,7 +264,7 @@ fixtures:
 
   # ── Tokyo Cheapo — captures réelles (TEST-003) ───────────────────────────────
 
-  - file: tc/real/listing-1.html
+  - file: tc/real/listing_1.html
     category: real
     source: tc
     captured_at: "2026-06-08"
@@ -274,21 +274,23 @@ fixtures:
       Couvre l'extraction de liens d'événements depuis le DOM complet (~220 Ko).
     anonymized: true  # am-api-token remplacé par REDACTED
     tests_consuming:
-      - test_tokyo_cheapo.py::test_real_listing_extracts_event_links[listing-1]
+      - test_tokyo_cheapo.py::test_real_listing_extracts_event_links[listing_1]
+      - test_tokyo_cheapo.py::test_real_listing_pagination
 
-  - file: tc/real/listing-2.html
+  - file: tc/real/listing_2.html
     category: real
     source: tc
     captured_at: "2026-06-08"
     url: "https://tokyocheapo.com/events/this-week/page/2/"
     purpose: >
       Capture réelle de la deuxième page de listing Tokyo Cheapo.
-      Complète la couverture de la pagination.
+      Complète la couverture de la pagination (page 1 → page 2).
     anonymized: true  # am-api-token remplacé par REDACTED
     tests_consuming:
-      - test_tokyo_cheapo.py::test_real_listing_extracts_event_links[listing-2]
+      - test_tokyo_cheapo.py::test_real_listing_extracts_event_links[listing_2]
+      - test_tokyo_cheapo.py::test_real_listing_pagination
 
-  - file: tc/real/event-katsushika-iris-festival.html
+  - file: tc/real/event_katsushika_iris_festival.html
     category: real
     source: tc
     captured_at: "2026-06-08"
@@ -298,9 +300,9 @@ fixtures:
       Couvre la sérialisation multi-lieu sur un événement réel.
     anonymized: true  # am-api-token remplacé par REDACTED
     tests_consuming:
-      - test_tokyo_cheapo.py::test_real_event_parses_title_and_url[event-katsushika-iris-festival]
+      - test_tokyo_cheapo.py::test_real_event_parses_title_and_url[event_katsushika_iris_festival]
 
-  - file: tc/real/event-candlelight-concert-a-collection-of-great-love-songs.html
+  - file: tc/real/event_candlelight_concert.html
     category: real
     source: tc
     captured_at: "2026-06-08"
@@ -310,9 +312,9 @@ fixtures:
       Couvre le cas locations=[] sur un événement réel.
     anonymized: true  # am-api-token remplacé par REDACTED
     tests_consuming:
-      - test_tokyo_cheapo.py::test_real_event_parses_title_and_url[event-candlelight-concert-a-collection-of-great-love-songs]
+      - test_tokyo_cheapo.py::test_real_event_parses_title_and_url[event_candlelight_concert]
 
-  - file: tc/real/event-dagashiya-conversation-class-learn-japanese-with-retro-candy.html
+  - file: tc/real/event_dagashiya_class.html
     category: real
     source: tc
     captured_at: "2026-06-08"
@@ -322,9 +324,9 @@ fixtures:
       Couvre le parsing de champs texte et de liens externes.
     anonymized: true  # am-api-token remplacé par REDACTED
     tests_consuming:
-      - test_tokyo_cheapo.py::test_real_event_parses_title_and_url[event-dagashiya-conversation-class-learn-japanese-with-retro-candy]
+      - test_tokyo_cheapo.py::test_real_event_parses_title_and_url[event_dagashiya_class]
 
-  - file: tc/real/event-downtown-highball-festival.html
+  - file: tc/real/event_downtown_highball_festival.html
     category: real
     source: tc
     captured_at: "2026-06-08"
@@ -334,9 +336,9 @@ fixtures:
       Couvre le parsing d'une plage de dates sur un événement réel.
     anonymized: true  # am-api-token remplacé par REDACTED
     tests_consuming:
-      - test_tokyo_cheapo.py::test_real_event_parses_title_and_url[event-downtown-highball-festival]
+      - test_tokyo_cheapo.py::test_real_event_parses_title_and_url[event_downtown_highball_festival]
 
-  - file: tc/real/event-torigoe-matsuri.html
+  - file: tc/real/event_torigoe_matsuri.html
     category: real
     source: tc
     captured_at: "2026-06-08"
@@ -346,11 +348,11 @@ fixtures:
       Cas nominal avec titre, date, description et coordonnées.
     anonymized: true  # am-api-token remplacé par REDACTED
     tests_consuming:
-      - test_tokyo_cheapo.py::test_real_event_parses_title_and_url[event-torigoe-matsuri]
+      - test_tokyo_cheapo.py::test_real_event_parses_title_and_url[event_torigoe_matsuri]
 
   # ── Hanabi Walker — captures réelles (TEST-004) ──────────────────────────────
 
-  - file: hanabi/real/listing-ar0300-1.html
+  - file: hanabi/real/listing_ar0300.html
     category: real
     source: hanabi
     captured_at: "2026-06-08"
@@ -362,7 +364,7 @@ fixtures:
     tests_consuming:
       - test_hanabi_walker.py::test_real_listing_extracts_event_links[ar0300]
 
-  - file: hanabi/real/listing-ar0500-1.html
+  - file: hanabi/real/listing_ar0500.html
     category: real
     source: hanabi
     captured_at: "2026-06-08"
@@ -374,7 +376,7 @@ fixtures:
     tests_consuming:
       - test_hanabi_walker.py::test_real_listing_extracts_event_links[ar0500]
 
-  - file: hanabi/real/event-ar0308e00896-data.html
+  - file: hanabi/real/event_ar0308e00896.html
     category: real
     source: hanabi
     captured_at: "2026-06-08"
@@ -383,26 +385,26 @@ fixtures:
       Fragment data réel : 第66回 水戸黄門まつり 水戸偕楽園花火大会 (ar0308, Ibaraki).
       Couvre le parsing d'un tableau s_table réel avec date, horaires et lieu.
     linked_fragments:
-      - hanabi/real/event-ar0308e00896-map.html
+      - hanabi/real/map_ar0308e00896.html
     anonymized: false
     tests_consuming:
       - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0308e00896]
 
-  - file: hanabi/real/event-ar0308e00896-map.html
+  - file: hanabi/real/map_ar0308e00896.html
     category: real
     source: hanabi
     captured_at: "2026-06-08"
     url: "https://hanabi.walkerplus.com/detail/ar0308e00896/map.html"
     purpose: >
       Fragment map réel : carte Google Maps pour ar0308e00896.
-      Utilisé avec event-ar0308e00896-data.html pour assembler l'événement.
+      Utilisé avec event_ar0308e00896.html pour assembler l'événement.
     linked_fragments:
-      - hanabi/real/event-ar0308e00896-data.html
+      - hanabi/real/event_ar0308e00896.html
     anonymized: true  # Google Maps key remplacée par AIzaSyREDACTED
     tests_consuming:
       - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0308e00896]
 
-  - file: hanabi/real/event-ar0311e00250-data.html
+  - file: hanabi/real/event_ar0311e00250.html
     category: real
     source: hanabi
     captured_at: "2026-06-08"
@@ -411,12 +413,12 @@ fixtures:
       Fragment data réel : 第78回 小川町七夕まつり (ar0311, Saitama).
       Couvre un événement multi-jours (2 dates consécutives).
     linked_fragments:
-      - hanabi/real/event-ar0311e00250-map.html
+      - hanabi/real/map_ar0311e00250.html
     anonymized: false
     tests_consuming:
       - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0311e00250]
 
-  - file: hanabi/real/event-ar0311e00250-map.html
+  - file: hanabi/real/map_ar0311e00250.html
     category: real
     source: hanabi
     captured_at: "2026-06-08"
@@ -424,12 +426,12 @@ fixtures:
     purpose: >
       Fragment map réel pour ar0311e00250.
     linked_fragments:
-      - hanabi/real/event-ar0311e00250-data.html
+      - hanabi/real/event_ar0311e00250.html
     anonymized: true  # Google Maps key remplacée par AIzaSyREDACTED
     tests_consuming:
       - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0311e00250]
 
-  - file: hanabi/real/event-ar0313e00858-data.html
+  - file: hanabi/real/event_ar0313e00858.html
     category: real
     source: hanabi
     captured_at: "2026-06-08"
@@ -438,12 +440,12 @@ fixtures:
       Fragment data réel : 第49回 隅田川花火大会 (ar0313, Tokyo).
       Couvre l'un des plus grands festivals du Kantō.
     linked_fragments:
-      - hanabi/real/event-ar0313e00858-map.html
+      - hanabi/real/map_ar0313e00858.html
     anonymized: false
     tests_consuming:
       - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0313e00858]
 
-  - file: hanabi/real/event-ar0313e00858-map.html
+  - file: hanabi/real/map_ar0313e00858.html
     category: real
     source: hanabi
     captured_at: "2026-06-08"
@@ -451,12 +453,12 @@ fixtures:
     purpose: >
       Fragment map réel pour ar0313e00858.
     linked_fragments:
-      - hanabi/real/event-ar0313e00858-data.html
+      - hanabi/real/event_ar0313e00858.html
     anonymized: true  # Google Maps key remplacée par AIzaSyREDACTED
     tests_consuming:
       - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0313e00858]
 
-  - file: hanabi/real/event-ar0516e00063-data.html
+  - file: hanabi/real/event_ar0516e00063.html
     category: real
     source: hanabi
     captured_at: "2026-06-08"
@@ -465,12 +467,12 @@ fixtures:
       Fragment data réel : 水橋橋まつり (ar0516, Toyama — région Kansai).
       Couvre une région différente du Kantō (ar0500).
     linked_fragments:
-      - hanabi/real/event-ar0516e00063-map.html
+      - hanabi/real/map_ar0516e00063.html
     anonymized: false
     tests_consuming:
       - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0516e00063]
 
-  - file: hanabi/real/event-ar0516e00063-map.html
+  - file: hanabi/real/map_ar0516e00063.html
     category: real
     source: hanabi
     captured_at: "2026-06-08"
@@ -478,12 +480,12 @@ fixtures:
     purpose: >
       Fragment map réel pour ar0516e00063.
     linked_fragments:
-      - hanabi/real/event-ar0516e00063-data.html
+      - hanabi/real/event_ar0516e00063.html
     anonymized: true  # Google Maps key remplacée par AIzaSyREDACTED
     tests_consuming:
       - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0516e00063]
 
-  - file: hanabi/real/event-ar0518e00070-data.html
+  - file: hanabi/real/event_ar0518e00070.html
     category: real
     source: hanabi
     captured_at: "2026-06-08"
@@ -492,12 +494,12 @@ fixtures:
       Fragment data réel : 若狭マリンピア2026 (ar0518, Fukui — région Kansai).
       Couvre un festival côtier dans une sous-région peu représentée.
     linked_fragments:
-      - hanabi/real/event-ar0518e00070-map.html
+      - hanabi/real/map_ar0518e00070.html
     anonymized: false
     tests_consuming:
       - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0518e00070]
 
-  - file: hanabi/real/event-ar0518e00070-map.html
+  - file: hanabi/real/map_ar0518e00070.html
     category: real
     source: hanabi
     captured_at: "2026-06-08"
@@ -505,7 +507,7 @@ fixtures:
     purpose: >
       Fragment map réel pour ar0518e00070.
     linked_fragments:
-      - hanabi/real/event-ar0518e00070-data.html
+      - hanabi/real/event_ar0518e00070.html
     anonymized: true  # Google Maps key remplacée par AIzaSyREDACTED
     tests_consuming:
       - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0518e00070]

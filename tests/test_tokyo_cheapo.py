@@ -834,19 +834,32 @@ def test_get_event_links_deduplicates_and_excludes(tc, monkeypatch):
 # ---------------------------------------------------------------------------
 
 _REAL_TC_DIR = FIXTURES_DIR / "tc" / "real"
-_REAL_TC_EVENTS = sorted(_REAL_TC_DIR.glob("event-*.html")) if _REAL_TC_DIR.exists() else []
-_REAL_TC_LISTINGS = sorted(_REAL_TC_DIR.glob("listing-*.html")) if _REAL_TC_DIR.exists() else []
+_REAL_TC_EVENTS = sorted(_REAL_TC_DIR.glob("event_*.html")) if _REAL_TC_DIR.exists() else []
+_REAL_TC_LISTINGS = sorted(_REAL_TC_DIR.glob("listing_*.html")) if _REAL_TC_DIR.exists() else []
 
 # Champs attendus non vides pour chaque fixture réelle (couverture des sélecteurs par cas)
 _TC_FIXTURE_REQUIRED: dict[str, set[str]] = {
-    "event-katsushika-iris-festival": {"start_date", "locations"},
-    "event-candlelight-concert-a-collection-of-great-love-songs": {"start_date"},
-    "event-dagashiya-conversation-class-learn-japanese-with-retro-candy": {"start_date"},
-    "event-downtown-highball-festival": {"start_date"},
-    "event-torigoe-matsuri": {"start_date"},
+    "event_katsushika_iris_festival": {"start_date", "locations"},
+    "event_candlelight_concert": {"start_date"},
+    "event_dagashiya_class": {"start_date"},
+    "event_downtown_highball_festival": {"start_date", "end_date"},
+    "event_torigoe_matsuri": {"start_date"},
 }
 # Fixtures pour lesquelles ≥ 2 lieux sont attendus
-_TC_MULTI_LOCATION: set[str] = {"event-katsushika-iris-festival"}
+_TC_MULTI_LOCATION: set[str] = {"event_katsushika_iris_festival"}
+# Fixtures pour lesquelles locations doit être vide (pas de coordonnées Apple Maps)
+_TC_NO_LOCATION: set[str] = {"event_candlelight_concert"}
+
+
+def test_real_corpus_tc_is_not_empty() -> None:
+    """Échoue si le corpus réel TC est absent — empêche CI verte sans tests de contrat."""
+    assert len(_REAL_TC_EVENTS) > 0, (
+        "Corpus réel TC manquant : aucun event_*.html dans tests/fixtures/tc/real/. "
+        "Relancer tools/renew_fixtures.py pour reconstituer le corpus."
+    )
+    assert len(_REAL_TC_LISTINGS) > 0, (
+        "Corpus réel TC manquant : aucun listing_*.html dans tests/fixtures/tc/real/."
+    )
 
 
 @pytest.mark.parametrize("fixture", _REAL_TC_EVENTS, ids=lambda f: f.stem)
@@ -854,7 +867,7 @@ def test_real_event_parses_title_and_url(tc, monkeypatch, fixture):
     """Chaque capture réelle TC produit au moins un titre et une URL non vides."""
     soup = BeautifulSoup(fixture.read_bytes(), "html.parser")
     monkeypatch.setattr(tc, "get_event_page", lambda url: soup)
-    url = f"https://tokyocheapo.com/events/{fixture.stem.removeprefix('event-')}/"
+    url = f"https://tokyocheapo.com/events/{fixture.stem.removeprefix('event_')}/"
 
     result = tc.scrape_event(url)
 
@@ -875,9 +888,17 @@ def test_real_event_parses_title_and_url(tc, monkeypatch, fixture):
     required = _TC_FIXTURE_REQUIRED.get(fixture.stem, set())
     if "start_date" in required:
         assert result.get("start_date"), f"[{fixture.name}] start_date attendue mais absente"
+    if "end_date" in required:
+        assert result.get("end_date"), (
+            f"[{fixture.name}] end_date attendue (fixture multi-jour) mais absente"
+        )
     if fixture.stem in _TC_MULTI_LOCATION:
         assert len(result.get("locations", [])) >= 2, (
             f"[{fixture.name}] ≥ 2 lieux attendus pour cette fixture multi-lieu"
+        )
+    if fixture.stem in _TC_NO_LOCATION:
+        assert len(result.get("locations", [])) == 0, (
+            f"[{fixture.name}] locations=[] attendu (pas de coordonnées Apple Maps) mais {result.get('locations')}"
         )
 
 
@@ -901,4 +922,34 @@ def test_real_listing_extracts_event_links(tc, monkeypatch, fixture):
     links = tc.get_event_links(max_pages=1)
 
     assert len(links) >= 5, f"[{fixture.name}] seulement {len(links)} liens extraits"
+    assert all(link.startswith("https://tokyocheapo.com/events/") for link in links)
+
+
+def test_real_listing_pagination(tc, monkeypatch):
+    """Les deux pages de listing réelles TC sont parcourues et leurs liens cumulés."""
+    html_1 = (_REAL_TC_DIR / "listing_1.html").read_bytes()
+    html_2 = (_REAL_TC_DIR / "listing_2.html").read_bytes()
+
+    call_count = 0
+
+    def mock_fetch(url, session, timeout=10):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            resp = MagicMock()
+            resp.content = html_1
+            return resp
+        if call_count == 2:
+            resp = MagicMock()
+            resp.content = html_2
+            return resp
+        raise _make_404_http_error()
+
+    monkeypatch.setattr("scrapers.tokyo_cheapo._fetch", mock_fetch)
+    links = tc.get_event_links(max_pages=3)
+
+    assert len(links) >= 10, f"Pagination 2 pages : seulement {len(links)} liens (attendu ≥ 10)"
+    assert call_count == 3, (
+        f"Le scraper devrait faire 3 requêtes (p1, p2, p3→404) mais en a fait {call_count}"
+    )
     assert all(link.startswith("https://tokyocheapo.com/events/") for link in links)
