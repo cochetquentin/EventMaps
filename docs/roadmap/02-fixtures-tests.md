@@ -37,10 +37,10 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 ## TEST-003 — Constituer un corpus réel Tokyo Cheapo
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** TEST-001, TEST-002
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/58
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/91
 
 **Corpus cible.** Environ cinq pages événement réelles et au moins deux listings : événement complet, sans description, dates floues ou multi-jour, plusieurs lieux, données optionnelles absentes, et variations de listing observées.
 
@@ -48,14 +48,16 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 ## TEST-004 — Constituer un corpus réel Hanabi Walker
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** TEST-001, TEST-002
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/59
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/91
 
 **Corpus cible.** Environ cinq événements réels issus de régions et structures différentes, avec leurs pages/fragments nécessaires : date valide, date reportée/annulée, coordonnées présentes/absentes, champs de tableau variables, et listings représentatifs.
 
 **Critères d'acceptation.** Les variantes réellement observées sont couvertes ; les fragments appartenant au même événement sont liés dans le manifeste.
+
+**Note.** La variante coord-absente n'a pas pu être constituée : tous les événements disponibles dans le corpus avaient des coordonnées Google Maps. La structure de test est prête (`_HANABI_EVENTS_NO_COORDS` dans `test_hanabi_walker.py`) pour accueillir cette variante dès qu'une fixture réelle appropriée sera identifiée.
 
 ## TEST-005 — Qualifier et compléter le corpus Time Out Tokyo
 

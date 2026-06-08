@@ -636,3 +636,126 @@ def test_contract_essential_fields_event(hw):
     }
     manquants = {k for k in _EXPECTED_KEYS if not result.get(k)}
     assert not manquants, f"[{f}] champs contractuels absents : {sorted(manquants)}"
+
+
+# ---------------------------------------------------------------------------
+# TEST-004 : corpus réel Hanabi Walker
+# ---------------------------------------------------------------------------
+
+_REAL_HANABI_DIR = os.path.join(os.path.dirname(__file__), "fixtures", "hanabi", "real")
+_REAL_HANABI_EVENT_IDS = []
+if os.path.isdir(_REAL_HANABI_DIR):
+    _seen = set()
+    for _f in sorted(os.listdir(_REAL_HANABI_DIR)):
+        # Fichiers event_*.html (data) — les map_*.html sont les fragments carte
+        if _f.startswith("event_") and _f.endswith(".html"):
+            _id = _f[len("event_") : -len(".html")]
+            if _id not in _seen:
+                _seen.add(_id)
+                _REAL_HANABI_EVENT_IDS.append(_id)
+
+_REAL_HANABI_LISTINGS = []
+if os.path.isdir(_REAL_HANABI_DIR):
+    _REAL_HANABI_LISTINGS = sorted(
+        f for f in os.listdir(_REAL_HANABI_DIR) if f.startswith("listing_")
+    )
+
+
+# IDs des events dont on sait que les coordonnées sont présentes dans la fixture.
+# Ajouter les IDs coord-absents dans _HANABI_EVENTS_NO_COORDS pour couvrir cette variante.
+_HANABI_EVENTS_WITH_COORDS: set[str] = {
+    "ar0308e00896",
+    "ar0311e00250",
+    "ar0313e00858",
+    "ar0516e00063",
+    "ar0518e00070",
+}
+_HANABI_EVENTS_NO_COORDS: set[str] = set()  # à alimenter si fixture coord-absente ajoutée
+
+# IDs avec variantes spécifiques à vérifier (multi-jours, rain_policy, etc.)
+_HANABI_MULTI_DAY: set[str] = {"ar0311e00250"}  # 第78回 小川町七夕まつり : 2 dates consécutives
+
+
+def test_real_corpus_hanabi_is_not_empty() -> None:
+    """Échoue si le corpus réel Hanabi est absent — empêche CI verte sans tests de contrat."""
+    assert len(_REAL_HANABI_EVENT_IDS) > 0, (
+        "Corpus réel Hanabi manquant : aucun event_*.html dans tests/fixtures/hanabi/real/. "
+        "Relancer tools/renew_fixtures.py pour reconstituer le corpus."
+    )
+    assert len(_REAL_HANABI_LISTINGS) > 0, (
+        "Corpus réel Hanabi manquant : aucun listing_*.html dans tests/fixtures/hanabi/real/."
+    )
+
+
+@pytest.mark.parametrize("event_id", _REAL_HANABI_EVENT_IDS)
+def test_real_event_parses_essential_fields(hw, event_id):
+    """Chaque paire data+map réelle Hanabi produit titre, dates et URL."""
+    soup_data = _load_fixture(f"hanabi/real/event_{event_id}.html")
+    soup_map = _load_fixture(f"hanabi/real/map_{event_id}.html")
+
+    hw.get_data_page = MagicMock(return_value=soup_data)
+    hw.get_map_page = MagicMock(return_value=soup_map)
+
+    result = hw.scrape_event(f"/detail/{event_id}/")
+
+    assert result.get("title"), f"[{event_id}] title vide ou absent"
+    assert result.get("dates"), f"[{event_id}] dates vide ou absent"
+    assert result.get("url"), f"[{event_id}] url vide ou absent"
+    # Assertions lat/lng spécifiques à la variante couverte par chaque fixture
+    if event_id in _HANABI_EVENTS_WITH_COORDS:
+        assert result.get("lat") is not None, f"[{event_id}] lat attendu non-null mais absent"
+        assert result.get("lng") is not None, f"[{event_id}] lng attendu non-null mais absent"
+    elif event_id in _HANABI_EVENTS_NO_COORDS:
+        assert result.get("lat") is None, f"[{event_id}] lat attendu null mais présent"
+        assert result.get("lng") is None, f"[{event_id}] lng attendu null mais présent"
+    # Assertions de variante : propriétés spécifiques au cas couvert par la fixture
+    if event_id in _HANABI_MULTI_DAY:
+        assert len(result.get("dates", [])) >= 2, (
+            f"[{event_id}] événement multi-jours : attendu ≥ 2 dates mais obtenu {result.get('dates')}"
+        )
+
+
+@pytest.mark.parametrize(
+    "listing_file",
+    _REAL_HANABI_LISTINGS,
+    ids=lambda f: f.split(".")[0].replace("listing_", ""),
+)
+def test_real_listing_extracts_event_links(listing_file):
+    """Chaque listing réel Hanabi retourne au moins 3 liens /detail/ avec le bon scraper régional."""
+    import re as _re
+
+    listing_path = os.path.join(_REAL_HANABI_DIR, listing_file)
+    with open(listing_path, "rb") as f:
+        content = f.read()
+
+    # Extraire la région depuis le nom de fichier (ex: listing_ar0500.html → ar0500)
+    m = _re.match(r"listing_([a-z0-9]+)", listing_file)
+    region = m.group(1) if m else "ar0300"
+    hw_region = HanabiWalker(region=region)
+
+    from requests import HTTPError as _HTTPError
+
+    http_err = _HTTPError(response=MagicMock(status_code=404))
+    expected_url = f"https://hanabi.walkerplus.com/list/{region}/scheduled/1.html"
+    fetched_urls: list[str] = []
+
+    def mock_fetch(url, session, timeout=10):
+        fetched_urls.append(url)
+        if len(fetched_urls) == 1:
+            resp = MagicMock()
+            resp.content = content
+            resp.raise_for_status = MagicMock()
+            resp.status_code = 200
+            return resp
+        raise http_err
+
+    with patch("scrapers.hanabi_walker._fetch", mock_fetch):
+        links = hw_region.get_event_links()
+
+    assert fetched_urls[0] == expected_url, (
+        f"[{listing_file}] URL demandée {fetched_urls[0]!r} ≠ URL régionale attendue {expected_url!r}"
+    )
+    assert len(links) >= 3, f"[{listing_file}] seulement {len(links)} liens extraits"
+    assert all("/detail/" in link for link in links), (
+        f"[{listing_file}] certains liens ne sont pas des /detail/"
+    )
