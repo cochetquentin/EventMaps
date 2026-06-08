@@ -827,3 +827,49 @@ def test_get_event_links_deduplicates_and_excludes(tc, monkeypatch):
 
     for path in paths:
         assert path not in _EXCLUDE_LINKS
+
+
+# ---------------------------------------------------------------------------
+# TEST-003 : corpus réel Tokyo Cheapo
+# ---------------------------------------------------------------------------
+
+_REAL_TC_DIR = FIXTURES_DIR / "tc" / "real"
+_REAL_TC_EVENTS = sorted(_REAL_TC_DIR.glob("event-*.html")) if _REAL_TC_DIR.exists() else []
+_REAL_TC_LISTINGS = sorted(_REAL_TC_DIR.glob("listing-*.html")) if _REAL_TC_DIR.exists() else []
+
+
+@pytest.mark.parametrize("fixture", _REAL_TC_EVENTS, ids=lambda f: f.stem)
+def test_real_event_parses_title_and_url(tc, monkeypatch, fixture):
+    """Chaque capture réelle TC produit au moins un titre et une URL non vides."""
+    soup = BeautifulSoup(fixture.read_bytes(), "html.parser")
+    monkeypatch.setattr(tc, "get_event_page", lambda url: soup)
+    url = f"https://tokyocheapo.com/events/{fixture.stem.removeprefix('event-')}/"
+
+    result = tc.scrape_event(url)
+
+    assert result.get("title"), f"[{fixture.name}] title vide ou absent"
+    assert result.get("url"), f"[{fixture.name}] url vide ou absent"
+    assert result["url"] == url
+
+
+@pytest.mark.parametrize("fixture", _REAL_TC_LISTINGS, ids=lambda f: f.stem)
+def test_real_listing_extracts_event_links(tc, monkeypatch, fixture):
+    """Chaque page de listing réelle TC retourne au moins 5 liens d'événements."""
+    html_bytes = fixture.read_bytes()
+
+    call_count = 0
+
+    def mock_fetch(url, session, timeout=10):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            resp = MagicMock()
+            resp.content = html_bytes
+            return resp
+        raise _make_404_http_error()
+
+    monkeypatch.setattr("scrapers.tokyo_cheapo._fetch", mock_fetch)
+    links = tc.get_event_links(max_pages=1)
+
+    assert len(links) >= 5, f"[{fixture.name}] seulement {len(links)} liens extraits"
+    assert all(link.startswith("https://tokyocheapo.com/events/") for link in links)

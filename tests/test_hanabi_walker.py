@@ -636,3 +636,75 @@ def test_contract_essential_fields_event(hw):
     }
     manquants = {k for k in _EXPECTED_KEYS if not result.get(k)}
     assert not manquants, f"[{f}] champs contractuels absents : {sorted(manquants)}"
+
+
+# ---------------------------------------------------------------------------
+# TEST-004 : corpus réel Hanabi Walker
+# ---------------------------------------------------------------------------
+
+_REAL_HANABI_DIR = os.path.join(os.path.dirname(__file__), "fixtures", "hanabi", "real")
+_REAL_HANABI_EVENT_IDS = []
+if os.path.isdir(_REAL_HANABI_DIR):
+    _seen = set()
+    for _f in sorted(os.listdir(_REAL_HANABI_DIR)):
+        if _f.endswith("-data.html"):
+            _id = _f[len("event-") : -len("-data.html")]
+            if _id not in _seen:
+                _seen.add(_id)
+                _REAL_HANABI_EVENT_IDS.append(_id)
+
+_REAL_HANABI_LISTINGS = []
+if os.path.isdir(_REAL_HANABI_DIR):
+    _REAL_HANABI_LISTINGS = sorted(
+        f for f in os.listdir(_REAL_HANABI_DIR) if f.startswith("listing-")
+    )
+
+
+@pytest.mark.parametrize("event_id", _REAL_HANABI_EVENT_IDS)
+def test_real_event_parses_essential_fields(hw, event_id):
+    """Chaque paire data+map réelle Hanabi produit titre, dates et coordonnées."""
+    data_path = os.path.join(_REAL_HANABI_DIR, f"event-{event_id}-data.html")
+    map_path = os.path.join(_REAL_HANABI_DIR, f"event-{event_id}-map.html")
+
+    soup_data = _load_fixture(f"hanabi/real/event-{event_id}-data.html")
+    soup_map = _load_fixture(f"hanabi/real/event-{event_id}-map.html")
+
+    hw.get_data_page = MagicMock(return_value=soup_data)
+    hw.get_map_page = MagicMock(return_value=soup_map)
+
+    result = hw.scrape_event(f"/detail/{event_id}/")
+
+    assert result.get("title"), f"[{event_id}] title vide ou absent"
+    assert result.get("dates"), f"[{event_id}] dates vide ou absent"
+    assert result.get("url"), f"[{event_id}] url vide ou absent"
+    assert result.get("lat") is not None, f"[{event_id}] lat absent"
+    assert result.get("lng") is not None, f"[{event_id}] lng absent"
+
+
+@pytest.mark.parametrize(
+    "listing_file",
+    _REAL_HANABI_LISTINGS,
+    ids=lambda f: f.split(".")[0].replace("listing-", "").replace("-1", ""),
+)
+def test_real_listing_extracts_event_links(hw, listing_file):
+    """Chaque listing réel Hanabi retourne au moins 3 liens /detail/."""
+    listing_path = os.path.join(_REAL_HANABI_DIR, listing_file)
+    with open(listing_path, "rb") as f:
+        content = f.read()
+
+    page1 = MagicMock()
+    page1.content = content
+    page1.raise_for_status = MagicMock()
+    page1.status_code = 200
+
+    from requests import HTTPError as _HTTPError
+
+    http_err = _HTTPError(response=MagicMock(status_code=404))
+
+    with patch("scrapers.hanabi_walker._fetch", side_effect=[page1, http_err]):
+        links = hw.get_event_links()
+
+    assert len(links) >= 3, f"[{listing_file}] seulement {len(links)} liens extraits"
+    assert all("/detail/" in link for link in links), (
+        f"[{listing_file}] certains liens ne sont pas des /detail/"
+    )
