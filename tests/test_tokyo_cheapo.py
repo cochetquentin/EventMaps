@@ -775,15 +775,24 @@ def test_contract_essential_fields_event_full(tc, monkeypatch):
     result = tc.scrape_event("https://tokyocheapo.com/events/kawaii-flea-market-2026/")
     f = _FIXTURE_TC_EVENT_FULL
 
-    assert result["title"], f"[{f}] title est vide"
-    assert result["start_date"], f"[{f}] start_date est vide"
-    assert isinstance(result["locations"], list), f"[{f}] locations n'est pas une liste"
-    assert result["locations"], f"[{f}] locations est vide"
-    # Pas de perte silencieuse : au moins 8 champs renseignés sur 12
-    renseignes = [k for k, v in result.items() if v is not None and v != "" and v != []]
-    assert len(renseignes) >= 8, (
-        f"[{f}] trop de champs vides — {len(renseignes)}/{len(result)} renseignés"
-    )
+    # Ensemble fixe de clés contractuelles peuplées par la fixture
+    # (résistant à l'ajout de nouveaux champs optionnels dans le scraper)
+    _EXPECTED_KEYS = {
+        "url",
+        "title",
+        "start_date",
+        "end_date",
+        "start_time",
+        "end_time",
+        "price",
+        "description",
+        "categories",
+        "tags",
+        "official_link",
+        "locations",
+    }
+    manquants = {k for k in _EXPECTED_KEYS if not result.get(k)}
+    assert not manquants, f"[{f}] champs contractuels absents : {sorted(manquants)}"
 
 
 def test_get_event_links_deduplicates_and_excludes(tc, monkeypatch):

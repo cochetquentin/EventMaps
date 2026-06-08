@@ -613,16 +613,26 @@ def test_contract_essential_fields_event(hw):
     result = hw.scrape_event("/detail/ar0300e001/")
     f = _FIXTURE_HW_EVENT_DATA
 
-    assert result["title"], f"[{f}] title est vide"
-    assert result["dates"], f"[{f}] dates est vide"
-    assert result["venue"], f"[{f}] venue est vide"
-    assert result["url"], f"[{f}] url est vide"
-    # Coordonnées GPS depuis l'iframe carte
-    assert result["lat"] is not None, f"[{f}] lat est None"
-    assert result["lng"] is not None, f"[{f}] lng est None"
-    # Pas de perte silencieuse : fixture peuple 19/19 champs, tolérance 2
-    renseignes = [k for k, v in result.items() if v is not None and v != "" and v != []]
-    assert len(renseignes) >= 17, (
-        f"[{f}] trop de champs vides — {len(renseignes)}/{len(result)} renseignés"
-        f" (attendu ≥ 17 sur 19)"
-    )
+    # Ensemble fixe de clés contractuelles attendues dans cette fixture
+    # (résistant à l'ajout de nouveaux champs optionnels)
+    _EXPECTED_KEYS = {
+        "title",
+        "dates",
+        "venue",
+        "url",
+        "lat",
+        "lng",
+        "start_time",
+        "end_time",
+        "fireworks_count",
+        "fireworks_duration",
+        "expected_crowd",
+        "rain_policy",
+        "paid_seating",
+        "food_stalls",
+        "access",
+        "parking",
+        "contact",
+    }
+    manquants = {k for k in _EXPECTED_KEYS if not result.get(k)}
+    assert not manquants, f"[{f}] champs contractuels absents : {sorted(manquants)}"

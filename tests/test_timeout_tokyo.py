@@ -588,13 +588,22 @@ def test_contract_essential_fields_real_event_full(tot, monkeypatch):
     result = tot.scrape_event("https://www.timeout.com/tokyo/art/bunkyo-matsuri")
     f = _FIXTURE_TOT_EVENT_FULL
 
-    assert result["title"], f"[{f}] title est vide"
-    assert result["start_date"], f"[{f}] start_date est vide"
-    assert result["venue_name"], f"[{f}] venue_name est vide"
-    assert result["url"], f"[{f}] url est vide"
-    # Pas de perte silencieuse : fixture réelle peuple 13/13 champs, tolérance 1
-    renseignes = [k for k, v in result.items() if v is not None and v != "" and v != []]
-    assert len(renseignes) >= 12, (
-        f"[{f}] trop de champs vides — {len(renseignes)}/{len(result)} renseignés"
-        f" (attendu ≥ 12 sur 13)"
-    )
+    # Ensemble fixe de clés contractuelles peuplées par la fixture réelle
+    # (résistant à l'ajout de nouveaux champs optionnels dans le scraper)
+    _EXPECTED_KEYS = {
+        "url",
+        "title",
+        "start_date",
+        "end_date",
+        "times",
+        "price",
+        "venue_name",
+        "venue_address",
+        "categories",
+        "description",
+        "image_url",
+        "latitude",
+        "longitude",
+    }
+    manquants = {k for k in _EXPECTED_KEYS if not result.get(k)}
+    assert not manquants, f"[{f}] champs contractuels absents : {sorted(manquants)}"
