@@ -82,7 +82,8 @@ sources tierces.
 Cette règle est renforcée techniquement : `tests/conftest.py` bloque `requests.Session.send`
 pendant chaque test. Tout appel réseau non intercepté lève une `RuntimeError` explicite.
 
-Procédure pour renouveler une capture : voir TEST-007.
+Procédure pour renouveler une capture : utiliser `tools/renew_fixtures.py`
+(`uv run python -m tools.renew_fixtures --help` ou `make renew-fixture`).
 
 ---
 

@@ -49,4 +49,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["api", "db", "models", "scrapers", "config"]
+known-first-party = ["api", "db", "models", "scrapers", "config", "tools"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
