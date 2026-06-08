@@ -617,8 +617,12 @@ def test_contract_essential_fields_event(hw):
     assert result["dates"], f"[{f}] dates est vide"
     assert result["venue"], f"[{f}] venue est vide"
     assert result["url"], f"[{f}] url est vide"
-    # Pas de perte silencieuse : au moins 6 champs renseignés
+    # Coordonnées GPS depuis l'iframe carte
+    assert result["lat"] is not None, f"[{f}] lat est None"
+    assert result["lng"] is not None, f"[{f}] lng est None"
+    # Pas de perte silencieuse : fixture peuple 19/19 champs, tolérance 2
     renseignes = [k for k, v in result.items() if v is not None and v != "" and v != []]
-    assert len(renseignes) >= 6, (
+    assert len(renseignes) >= 17, (
         f"[{f}] trop de champs vides — {len(renseignes)}/{len(result)} renseignés"
+        f" (attendu ≥ 17 sur 19)"
     )

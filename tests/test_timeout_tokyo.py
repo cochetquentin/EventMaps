@@ -566,11 +566,16 @@ def test_contract_listing_rate_real(tot, monkeypatch):
 
     links = tot.get_event_links(max_pages=1)
 
-    # Baseline capturée : 31 liens. Seuil à 25 (≈80%) pour détecter une perte
-    # significative sans bloquer les améliorations marginales du filtre.
+    # Baseline capturée : 31 liens. Bornes [25, 31] :
+    # - borne basse détecte une perte significative de sélecteur
+    # - borne haute détecte une sur-extraction (faux positifs via _is_event_href)
     assert len(links) >= 25, (
         f"[{_FIXTURE_TOT_LISTING}] {len(links)} liens extraits"
-        " — sélecteur probablement cassé (baseline : 31, seuil : 25)"
+        " — sélecteur probablement cassé (baseline : 31, seuil bas : 25)"
+    )
+    assert len(links) <= 31, (
+        f"[{_FIXTURE_TOT_LISTING}] {len(links)} liens extraits"
+        " — sur-extraction détectée (baseline : 31, seuil haut : 31)"
     )
 
 
