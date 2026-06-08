@@ -733,18 +733,28 @@ def test_real_listing_extracts_event_links(listing_file):
     region = m.group(1) if m else "ar0300"
     hw_region = HanabiWalker(region=region)
 
-    page1 = MagicMock()
-    page1.content = content
-    page1.raise_for_status = MagicMock()
-    page1.status_code = 200
-
     from requests import HTTPError as _HTTPError
 
     http_err = _HTTPError(response=MagicMock(status_code=404))
+    expected_url = f"https://hanabi.walkerplus.com/list/{region}/scheduled/1.html"
+    fetched_urls: list[str] = []
 
-    with patch("scrapers.hanabi_walker._fetch", side_effect=[page1, http_err]):
+    def mock_fetch(url, session, timeout=10):
+        fetched_urls.append(url)
+        if len(fetched_urls) == 1:
+            resp = MagicMock()
+            resp.content = content
+            resp.raise_for_status = MagicMock()
+            resp.status_code = 200
+            return resp
+        raise http_err
+
+    with patch("scrapers.hanabi_walker._fetch", mock_fetch):
         links = hw_region.get_event_links()
 
+    assert fetched_urls[0] == expected_url, (
+        f"[{listing_file}] URL demandée {fetched_urls[0]!r} ≠ URL régionale attendue {expected_url!r}"
+    )
     assert len(links) >= 3, f"[{listing_file}] seulement {len(links)} liens extraits"
     assert all("/detail/" in link for link in links), (
         f"[{listing_file}] certains liens ne sont pas des /detail/"

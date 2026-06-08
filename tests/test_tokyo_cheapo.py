@@ -837,6 +837,15 @@ _REAL_TC_DIR = FIXTURES_DIR / "tc" / "real"
 _REAL_TC_EVENTS = sorted(_REAL_TC_DIR.glob("event_*.html")) if _REAL_TC_DIR.exists() else []
 _REAL_TC_LISTINGS = sorted(_REAL_TC_DIR.glob("listing_*.html")) if _REAL_TC_DIR.exists() else []
 
+# URLs canoniques par fixture (issues du MANIFEST) — permet de vérifier la consistance listing→event
+_TC_CANONICAL_URLS: dict[str, str] = {
+    "event_katsushika_iris_festival": "https://tokyocheapo.com/events/katsushika-iris-festival/",
+    "event_candlelight_concert": "https://tokyocheapo.com/events/candlelight-concert-a-collection-of-great-love-songs/",
+    "event_dagashiya_class": "https://tokyocheapo.com/events/dagashiya-conversation-class-learn-japanese-with-retro-candy/",
+    "event_downtown_highball_festival": "https://tokyocheapo.com/events/downtown-highball-festival/",
+    "event_torigoe_matsuri": "https://tokyocheapo.com/events/torigoe-matsuri/",
+}
+
 # Champs attendus non vides pour chaque fixture réelle (couverture des sélecteurs par cas)
 _TC_FIXTURE_REQUIRED: dict[str, set[str]] = {
     "event_katsushika_iris_festival": {"start_date", "locations"},
@@ -867,13 +876,14 @@ def test_real_event_parses_title_and_url(tc, monkeypatch, fixture):
     """Chaque capture réelle TC produit au moins un titre et une URL non vides."""
     soup = BeautifulSoup(fixture.read_bytes(), "html.parser")
     monkeypatch.setattr(tc, "get_event_page", lambda url: soup)
-    url = f"https://tokyocheapo.com/events/{fixture.stem.removeprefix('event_')}/"
+    url = _TC_CANONICAL_URLS[fixture.stem]
 
     result = tc.scrape_event(url)
 
     assert result.get("title"), f"[{fixture.name}] title vide ou absent"
-    assert result.get("url"), f"[{fixture.name}] url vide ou absent"
-    assert result["url"] == url
+    assert result.get("url") == url, (
+        f"[{fixture.name}] url absente ou différente de l'URL canonique"
+    )
     # Assertions de structure : sélecteurs ne doivent pas lever d'exception ni changer de type
     assert isinstance(result.get("description"), str), (
         f"[{fixture.name}] description doit être une str"
@@ -929,17 +939,15 @@ def test_real_listing_pagination(tc, monkeypatch):
     """Les deux pages de listing réelles TC sont parcourues et leurs liens cumulés."""
     html_1 = (_REAL_TC_DIR / "listing_1.html").read_bytes()
     html_2 = (_REAL_TC_DIR / "listing_2.html").read_bytes()
-
-    call_count = 0
+    fetched_urls: list[str] = []
 
     def mock_fetch(url, session, timeout=10):
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
+        fetched_urls.append(url)
+        if "/page/1/" in url:
             resp = MagicMock()
             resp.content = html_1
             return resp
-        if call_count == 2:
+        if "/page/2/" in url:
             resp = MagicMock()
             resp.content = html_2
             return resp
@@ -949,7 +957,9 @@ def test_real_listing_pagination(tc, monkeypatch):
     links = tc.get_event_links(max_pages=3)
 
     assert len(links) >= 10, f"Pagination 2 pages : seulement {len(links)} liens (attendu ≥ 10)"
-    assert call_count == 3, (
-        f"Le scraper devrait faire 3 requêtes (p1, p2, p3→404) mais en a fait {call_count}"
+    assert any("/page/1/" in u for u in fetched_urls), "page 1 (/page/1/) non demandée"
+    assert any("/page/2/" in u for u in fetched_urls), "page 2 (/page/2/) non demandée"
+    assert any("/page/3/" in u for u in fetched_urls), (
+        "page 3 (/page/3/) non demandée (doit déclencher 404)"
     )
     assert all(link.startswith("https://tokyocheapo.com/events/") for link in links)
