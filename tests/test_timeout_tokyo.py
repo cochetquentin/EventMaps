@@ -303,9 +303,12 @@ def test_scrape_event_incomplete_data_returns_none_fields(tot, monkeypatch):
     assert result["times"] is None
     assert result["price"] is None
     assert result["venue_name"] is None
+    assert result["venue_address"] is None
     assert result["latitude"] is None
     assert result["longitude"] is None
     assert result["image_url"] is None
+    assert result["categories"] == []
+    assert result["description"] is None
 
 
 # ── scrape_all ────────────────────────────────────────────────────────────────
