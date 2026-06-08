@@ -49,6 +49,53 @@ fixtures:
     tests_consuming:
       - test_tokyo_cheapo.py::test_scrape_event_multi_location_fixture
 
+  - file: tc/synthetic/event_cross_year.html
+    category: synthetic
+    source: tc
+    captured_at: null
+    url: null
+    purpose: >
+      Page événement Tokyo Cheapo avec deux div.date (Dec 31 + Jan 3).
+      Couvre le parsing cross-year : start → année précédente quand l'événement
+      est dans le futur lointain lors d'un scraping en janvier.
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_scrape_event_cross_year_dates
+
+  - file: tc/synthetic/event_fuzzy_date.html
+    category: synthetic
+    source: tc
+    captured_at: null
+    url: null
+    purpose: >
+      Page événement Tokyo Cheapo avec date floue ("Early July") dans div.date.
+      Couvre _parse_fuzzy_date_range : start=premier du mois, end=10e du mois.
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_scrape_event_fuzzy_date
+
+  - file: tc/synthetic/event_missing_optional.html
+    category: synthetic
+    source: tc
+    captured_at: null
+    url: null
+    purpose: >
+      Page événement Tokyo Cheapo sans div Apple Maps, sans lien externe et sans
+      prix. Vérifie que locations=[], official_link=None et price=None ne lèvent
+      pas d'exception.
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_scrape_event_missing_optional_fields
+
+  - file: tc/synthetic/listing_rich.html
+    category: synthetic
+    source: tc
+    captured_at: null
+    url: null
+    purpose: >
+      Listing Tokyo Cheapo avec 5 liens d'événements uniques, 1 doublon et
+      plusieurs liens de navigation exclus (_EXCLUDE_LINKS). Couvre la
+      déduplication par le set-comprehension du scraper.
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_get_event_links_deduplicates_and_excludes
+
   # ── Hanabi Walker ────────────────────────────────────────────────────────────
 
   - file: hanabi/synthetic/listing.html
@@ -85,6 +132,51 @@ fixtures:
       Utilisé avec hanabi/synthetic/event_data.html pour assembler un Event complet.
     tests_consuming:
       - test_hanabi_walker.py::test_parse_coordinates_from_fixture
+
+  - file: hanabi/synthetic/event_cancelled_data.html
+    category: synthetic
+    source: hanabi
+    captured_at: null
+    url: null
+    purpose: >
+      Tableau s_table Hanabi Walker avec date "中止（荒天のため）" non parseable.
+      Couvre le chemin _extract_dates → [] quand aucun motif de date n'est trouvé.
+    tests_consuming:
+      - test_hanabi_walker.py::test_parse_event_table_cancelled_returns_empty_dates
+
+  - file: hanabi/synthetic/event_no_map.html
+    category: synthetic
+    source: hanabi
+    captured_at: null
+    url: null
+    purpose: >
+      Page carte Hanabi Walker sans div.map_canvas ni iframe. Vérifie que
+      parse_coordinates retourne (None, None) quand la section carte est absente.
+    tests_consuming:
+      - test_hanabi_walker.py::test_parse_coordinates_returns_none_when_no_map
+
+  - file: hanabi/synthetic/event_slash_date_data.html
+    category: synthetic
+    source: hanabi
+    captured_at: null
+    url: null
+    purpose: >
+      Tableau s_table avec date en format slash/pointé "2026年7/15・16～20".
+      Couvre _parse_slash_dates : génère 6 dates du 15 au 20 juillet 2026.
+    tests_consuming:
+      - test_hanabi_walker.py::test_parse_event_table_slash_date
+
+  - file: hanabi/synthetic/listing_rich.html
+    category: synthetic
+    source: hanabi
+    captured_at: null
+    url: null
+    purpose: >
+      Listing Hanabi Walker avec 4 liens /detail/ uniques, 1 doublon et 2 liens
+      de pagination (/list/...). Couvre la déduplication par dict.fromkeys et
+      le filtrage des liens non-/detail/.
+    tests_consuming:
+      - test_hanabi_walker.py::test_get_event_links_deduplicates_from_fixture
 
   # ── Time Out Tokyo ───────────────────────────────────────────────────────────
 

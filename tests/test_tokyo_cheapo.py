@@ -700,3 +700,91 @@ def test_scraper_user_agent_from_settings(monkeypatch):
     monkeypatch.setattr(config, "settings", fake)
     tc2 = TokyoCheapo()
     assert tc2.session.headers["User-Agent"] == "TestBot/9.9"
+
+
+# ---------------------------------------------------------------------------
+# TEST-003 : corpus étendu — fixtures supplémentaires
+# ---------------------------------------------------------------------------
+
+
+def test_scrape_event_cross_year_dates(tc, monkeypatch):
+    """Plage Dec 31 - Jan 3 avec référence en janvier → start décalé à l'année précédente."""
+    html_bytes = (FIXTURES_DIR / "tc/synthetic/event_cross_year.html").read_bytes()
+    soup = BeautifulSoup(html_bytes, "html.parser")
+    monkeypatch.setattr(tc, "get_event_page", lambda url: soup)
+    # Référence : début janvier, l'événement Dec 31 appartient à l'année passée
+    fixed_jst = _date_cls(2026, 1, 5)
+    monkeypatch.setattr("scrapers.tokyo_cheapo._today_jst", lambda: fixed_jst)
+
+    result = tc.scrape_event("https://tokyocheapo.com/events/tokyo-countdown-party/")
+
+    assert result["start_date"] == "2025/12/31"
+    assert result["end_date"] == "2026/01/03"
+    assert result["title"] == "Tokyo Countdown Party"
+    assert result["price"] == "¥2,500"
+    loc = result["locations"][0]
+    assert loc["name"] == "Shibuya Crossing"
+
+
+def test_scrape_event_fuzzy_date(tc, monkeypatch):
+    """Date floue 'Early July' → start=premier juillet, end=10 juillet."""
+    html_bytes = (FIXTURES_DIR / "tc/synthetic/event_fuzzy_date.html").read_bytes()
+    soup = BeautifulSoup(html_bytes, "html.parser")
+    monkeypatch.setattr(tc, "get_event_page", lambda url: soup)
+    fixed_jst = _date_cls(2026, 6, 8)
+    monkeypatch.setattr("scrapers.tokyo_cheapo._today_jst", lambda: fixed_jst)
+
+    result = tc.scrape_event("https://tokyocheapo.com/events/tanabata-ueno/")
+
+    assert result["start_date"] == "2026/07/01"
+    assert result["end_date"] == "2026/07/10"
+    assert result["title"] == "Tanabata Festival Ueno"
+
+
+def test_scrape_event_missing_optional_fields(tc, monkeypatch):
+    """Page sans Apple Maps, sans lien externe et sans prix → valeurs None/vides."""
+    html_bytes = (FIXTURES_DIR / "tc/synthetic/event_missing_optional.html").read_bytes()
+    soup = BeautifulSoup(html_bytes, "html.parser")
+    monkeypatch.setattr(tc, "get_event_page", lambda url: soup)
+    fixed_jst = _date_cls(2026, 6, 8)
+    monkeypatch.setattr("scrapers.tokyo_cheapo._today_jst", lambda: fixed_jst)
+
+    result = tc.scrape_event("https://tokyocheapo.com/events/open-mic-shimokitazawa/")
+
+    assert result["title"] == "Open Mic Night Shimokitazawa"
+    assert result["locations"] == []
+    assert result["official_link"] is None
+    assert result["price"] is None
+
+
+def test_get_event_links_deduplicates_and_excludes(tc, monkeypatch):
+    """Listing avec 5 uniques + 1 doublon + liens exclus → 5 liens retournés."""
+    html_bytes = (FIXTURES_DIR / "tc/synthetic/listing_rich.html").read_bytes()
+
+    def mock_fetch(url, session, timeout=10):
+        resp = MagicMock()
+        resp.content = html_bytes
+        return resp
+
+    # Deuxième appel : 404 pour stopper la pagination
+    call_count = 0
+
+    def mock_fetch_paged(url, session, timeout=10):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            resp = MagicMock()
+            resp.content = html_bytes
+            return resp
+        raise _make_404_http_error()
+
+    monkeypatch.setattr("scrapers.tokyo_cheapo._fetch", mock_fetch_paged)
+    links = tc.get_event_links(max_pages=5)
+
+    assert len(links) == 5
+    assert all(link.startswith("https://tokyocheapo.com/events/") for link in links)
+    # Aucun lien exclu ne doit apparaître
+    paths = [link.replace("https://tokyocheapo.com", "") for link in links]
+    from scrapers.tokyo_cheapo import _EXCLUDE_LINKS
+    for path in paths:
+        assert path not in _EXCLUDE_LINKS
