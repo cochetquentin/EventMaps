@@ -786,5 +786,6 @@ def test_get_event_links_deduplicates_and_excludes(tc, monkeypatch):
     # Aucun lien exclu ne doit apparaître
     paths = [link.replace("https://tokyocheapo.com", "") for link in links]
     from scrapers.tokyo_cheapo import _EXCLUDE_LINKS
+
     for path in paths:
         assert path not in _EXCLUDE_LINKS
