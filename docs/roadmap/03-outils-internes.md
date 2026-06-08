@@ -19,7 +19,7 @@
 
 ## TOOL-002 — Définir une politique minimale de permissions Claude
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P0**
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/51
 
@@ -28,6 +28,8 @@
 **Décision recommandée.** Autoriser une seule commande de haut niveau, versionnée et testée, plutôt qu'une longue liste de commandes shell générales ou destructrices. Garder les secrets et préférences propres au poste dans `settings.local.json`.
 
 **Critères d'acceptation.** La politique distingue les permissions partagées des préférences locales ; elle définit la commande de haut niveau qui pourra être autorisée après TOOL-003 ; la proposition ne contient ni chemins personnels, ni suppressions ponctuelles, ni jokers plus larges que nécessaire.
+
+**Résultat.** `.claude/settings.json` créé et versionné. Politique minimale : uv (run, sync, lock), gh (PR view/list/comment, issue comment, API PR/issues/commits), git (status, log, diff, add, commit, push, stash, checkout, branch, rev-parse). Opérations destructrices (force push, git clean, reset --hard) explicitement refusées. Slot TOOL-003 documenté via clé `_comment_tool003_slot`.
 
 ## TOOL-003 — Extraire l'orchestration de review dans un programme testable
 

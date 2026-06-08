@@ -1,0 +1,37 @@
+{
+  "_comment_tool003_slot": "TOOL-003: une fois scripts/handle_codex_review.py créé, ajouter Bash(uv run --locked python scripts/handle_codex_review.py*) et réduire les règles gh/git ci-dessous",
+  "permissions": {
+    "allow": [
+      "Bash(uv run --locked python -m pytest*)",
+      "Bash(uv run uvicorn*)",
+      "Bash(uv run python*)",
+      "Bash(uv sync*)",
+      "Bash(uv lock*)",
+      "Bash(gh pr view*)",
+      "Bash(gh pr list*)",
+      "Bash(gh pr comment*)",
+      "Bash(gh issue comment*)",
+      "Bash(gh api repos/*/pulls/*/reviews*)",
+      "Bash(gh api repos/*/issues/*/comments*)",
+      "Bash(gh api repos/*/pulls/*/comments*)",
+      "Bash(gh api repos/*/commits/*)",
+      "Bash(gh repo view*)",
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "Bash(git stash*)",
+      "Bash(git checkout*)",
+      "Bash(git branch*)",
+      "Bash(git rev-parse*)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git clean*)",
+      "Bash(git reset --hard*)"
+    ]
+  }
+}
