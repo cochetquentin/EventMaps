@@ -526,3 +526,69 @@ def test_scraper_user_agent_from_settings(monkeypatch):
     monkeypatch.setattr(config, "settings", fake)
     hw2 = HanabiWalker()
     assert hw2.session.headers["User-Agent"] == "HanabiBot/2.0"
+
+
+# ---------------------------------------------------------------------------
+# TEST-004 : corpus étendu — fixtures supplémentaires
+# ---------------------------------------------------------------------------
+
+
+def test_parse_event_table_cancelled_returns_empty_dates(hw):
+    """Date '中止（荒天のため）' → dates=[] (non parseable)."""
+    soup = _load_fixture("hanabi/synthetic/event_cancelled_data.html")
+    result = hw.parse_event_table(soup)
+
+    assert result["title"] == "第30回 東京湾花火大会"
+    assert result["dates"] == []
+
+
+def test_parse_coordinates_returns_none_when_no_map(hw):
+    """Page sans div.map_canvas → parse_coordinates retourne (None, None)."""
+    soup = _load_fixture("hanabi/synthetic/event_no_map.html")
+    lat, lng = hw.parse_coordinates(soup)
+
+    assert lat is None
+    assert lng is None
+
+
+def test_parse_event_table_slash_date(hw):
+    """Date '2026年7/15・16～20' → 6 dates du 15 au 20 juillet 2026."""
+    soup = _load_fixture("hanabi/synthetic/event_slash_date_data.html")
+    result = hw.parse_event_table(soup)
+
+    assert result["title"] == "第62回 隅田川花火大会"
+    expected_dates = [
+        "2026/07/15",
+        "2026/07/16",
+        "2026/07/17",
+        "2026/07/18",
+        "2026/07/19",
+        "2026/07/20",
+    ]
+    assert result["dates"] == expected_dates
+    assert result["paid_seating"] == "あり"
+    assert result["paid_seating_details"] == "桟敷席3万円"
+
+
+def test_get_event_links_deduplicates_from_fixture(hw):
+    """Listing avec 4 liens /detail/ uniques + 1 doublon → 4 liens dédupliqués."""
+    with open(os.path.join(FIXTURES_DIR, "hanabi/synthetic/listing_rich.html"), "rb") as f:
+        content = f.read()
+
+    page1 = MagicMock()
+    page1.content = content
+    page1.raise_for_status = MagicMock()
+    page1.status_code = 200
+
+    from requests import HTTPError
+
+    http_err = HTTPError(response=MagicMock(status_code=404))
+
+    with patch("scrapers.hanabi_walker._fetch", side_effect=[page1, http_err]):
+        links = hw.get_event_links()
+
+    assert len(links) == 4
+    assert "/detail/ar0300e010/" in links
+    assert "/detail/ar0300e011/" in links
+    assert "/detail/ar0300e012/" in links
+    assert "/detail/ar0300e013/" in links
