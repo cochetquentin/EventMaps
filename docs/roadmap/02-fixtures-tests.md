@@ -37,10 +37,10 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 ## TEST-003 — Constituer un corpus réel Tokyo Cheapo
 
-- **Statut : Terminé**
+- **Statut : À faire**
 - **Priorité : P1**
 - **Dépendances :** TEST-001, TEST-002
-- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/87
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/58
 
 **Corpus cible.** Environ cinq pages événement réelles et au moins deux listings : événement complet, sans description, dates floues ou multi-jour, plusieurs lieux, données optionnelles absentes, et variations de listing observées.
 
@@ -48,10 +48,10 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 ## TEST-004 — Constituer un corpus réel Hanabi Walker
 
-- **Statut : Terminé**
+- **Statut : À faire**
 - **Priorité : P1**
 - **Dépendances :** TEST-001, TEST-002
-- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/87
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/59
 
 **Corpus cible.** Environ cinq événements réels issus de régions et structures différentes, avec leurs pages/fragments nécessaires : date valide, date reportée/annulée, coordonnées présentes/absentes, champs de tableau variables, et listings représentatifs.
 
