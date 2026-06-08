@@ -25,8 +25,10 @@ import os
 import re
 import sys
 import time
+import urllib.robotparser
 from datetime import date
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 
@@ -45,6 +47,17 @@ _PII_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
+
+
+def _non_negative_float(value: str) -> float:
+    """Convertit value en float non-négatif pour argparse."""
+    try:
+        f = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{value!r} n'est pas un nombre valide")
+    if f < 0:
+        raise argparse.ArgumentTypeError(f"le délai doit être >= 0, reçu {f}")
+    return f
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -76,9 +89,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--delay",
-        type=float,
+        type=_non_negative_float,
         default=DEFAULT_DELAY,
-        help=f"Délai en secondes après la requête (défaut : {DEFAULT_DELAY}).",
+        help=f"Délai en secondes après la requête, >= 0 (défaut : {DEFAULT_DELAY}).",
     )
     parser.add_argument(
         "--yes",
@@ -119,22 +132,56 @@ def fetch_page(url: str, user_agent: str, timeout: int = 30) -> str:
     return response.text
 
 
+def _fetch_robots(robots_url: str, user_agent: str) -> str:
+    """Récupère le contenu de robots.txt. Retourne '' si inaccessible."""
+    try:
+        resp = requests.get(robots_url, headers={"User-Agent": user_agent}, timeout=10)
+        if resp.status_code == 200:
+            return resp.text
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
+
+def check_robots_allowed(url: str, user_agent: str) -> bool:
+    """Vérifie que robots.txt autorise la capture de cette URL.
+
+    Retourne True si autorisé ou si robots.txt est inaccessible.
+    """
+    parsed = urlparse(url)
+    robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
+    robots_content = _fetch_robots(robots_url, user_agent)
+    if not robots_content:
+        return True  # Pas de robots.txt accessible = autorisation implicite
+    rp = urllib.robotparser.RobotFileParser()
+    rp.parse(robots_content.splitlines())
+    return rp.can_fetch(user_agent, url)
+
+
 # ── Diff ─────────────────────────────────────────────────────────────────────
 
 
 def compute_diff(old_content: str, new_content: str, filename: str) -> str:
-    """Retourne un diff unified entre old et new. Chaîne vide si contenu identique."""
-    old_lines = old_content.splitlines(keepends=False)
-    new_lines = new_content.splitlines(keepends=False)
+    """Retourne un diff unified entre old et new. Chaîne vide si contenu identique.
+
+    Note d'implémentation : splitlines() (sans keepends) + lineterm="" produit
+    des lignes sans terminateur ; "\n".join() les sépare proprement. Cela évite
+    la concaténation silencieuse des lignes de contrôle (---/+++/@@) avec les
+    lignes de contenu qui survenait lorsque les deux sources de terminateurs
+    (keepends et lineterm) étaient incohérentes.
+    """
+    old_lines = old_content.splitlines()
+    new_lines = new_content.splitlines()
     diff_lines = list(
         difflib.unified_diff(
             old_lines,
             new_lines,
             fromfile=f"a/{filename}",
             tofile=f"b/{filename}",
+            lineterm="",
         )
     )
-    return "".join(diff_lines)
+    return "\n".join(diff_lines)
 
 
 def print_diff(diff: str, filename: str) -> None:
@@ -204,31 +251,37 @@ def update_manifest(
     """Met à jour captured_at et url pour fixture_file dans le manifeste.
 
     Utilise une substitution regex chirurgicale pour préserver les commentaires
-    et l'indentation YAML d'origine. La regex est bornée à l'entrée sélectionnée
-    (stop avant le prochain '- file:') pour éviter toute corruption des autres entrées.
+    et l'indentation YAML d'origine.
+
+    Propriétés de la regex :
+    - (?=\\s) après le nom de fichier : ancre exacte (évite le match partiel sur
+      "a.html" quand le manifeste contient "a.html.bak").
+    - (?:(?!- file:).)*? (entry_bound) : borne la correspondance à l'entrée
+      sélectionnée, stop avant le prochain '- file:'.
+    - Gère les scalaires YAML quotés (double/simple), non-quotés et null.
 
     Retourne True si l'entrée a été trouvée et mise à jour, False sinon.
     """
     content = manifest_path.read_text(encoding="utf-8")
 
     escaped = re.escape(fixture_file)
-    # (?:(?!- file:).)* : avance caractère par caractère en s'arrêtant dès que
-    # la séquence '- file:' apparaît, ce qui borne la correspondance à l'entrée
-    # sélectionnée et évite toute corruption des entrées suivantes.
     entry_bound = r"(?:(?!- file:).)*?"
+    # Valeurs YAML valides : double-quoté, simple-quoté, non-quoté, null
+    date_value = r'(?:"[^"]*"|\'[^\']*\'|null|[0-9]{4}-[0-9]{2}-[0-9]{2})'
+    url_value = r'(?:"[^"]*"|\'[^\']*\'|null|https?://\S+)'
 
-    # Remplace captured_at (null ou "YYYY-MM-DD") dans le bloc de cette entrée
+    # Remplace captured_at dans le bloc de cette entrée (ancre exacte après le nom)
     date_pattern = re.compile(
-        rf"(- file: {escaped}{entry_bound}captured_at: )(?:\"[^\"]*\"|null)",
+        rf"(- file: {escaped}(?=\s){entry_bound}captured_at: ){date_value}",
         re.DOTALL,
     )
     new_content, n_date = date_pattern.subn(rf'\g<1>"{new_date}"', content)
     if n_date == 0:
         return False
 
-    # Remplace url (null ou valeur existante) par l'URL canonique fournie
+    # Remplace url (toute forme valide) par l'URL canonique fournie
     url_pattern = re.compile(
-        rf'(- file: {escaped}{entry_bound}url: )(?:"[^"]*"|null)',
+        rf"(- file: {escaped}(?=\s){entry_bound}url: ){url_value}",
         re.DOTALL,
     )
     new_content, _ = url_pattern.subn(rf'\g<1>"{url}"', new_content)
@@ -247,22 +300,26 @@ def main(argv: list[str] | None = None) -> int:
     # Blocage CI
     check_not_ci()
 
-    # Validation : l'output doit être sous {source}/real/ (fixtures réelles uniquement)
-    expected_prefix = f"{args.source}/real/"
-    if not args.output.startswith(expected_prefix):
+    # Validation : résoudre le chemin et vérifier qu'il est sous {source}/real/
+    # Cette vérification couvre à la fois la contrainte de source et les path-traversal
+    # (ex. tot/real/../../tc/synthetic/event.html passe le test prefix mais pas resolve).
+    output_path = FIXTURES_DIR / args.output
+    source_real_dir = (FIXTURES_DIR / args.source / "real").resolve()
+    try:
+        output_path.resolve().relative_to(source_real_dir)
+    except ValueError:
         print(
-            f"ERREUR : --output doit commencer par {expected_prefix!r} pour --source {args.source!r}.",
+            f"ERREUR : {args.output!r} doit résoudre vers un chemin sous "
+            f"{args.source}/real/ (chemin résolu : {output_path.resolve()}).",
             file=sys.stderr,
         )
         return 1
 
-    # Validation du chemin de sortie (anti path-traversal)
-    output_path = FIXTURES_DIR / args.output
-    try:
-        output_path.resolve().relative_to(FIXTURES_DIR.resolve())
-    except ValueError:
+    # Vérification robots.txt
+    if not check_robots_allowed(args.url, args.user_agent):
         print(
-            f"ERREUR : {args.output!r} pointe en dehors de tests/fixtures/.",
+            f"ERREUR : robots.txt interdit la capture de {args.url!r} "
+            f"avec User-Agent {args.user_agent!r}.",
             file=sys.stderr,
         )
         return 1
@@ -276,15 +333,17 @@ def main(argv: list[str] | None = None) -> int:
 
     time.sleep(args.delay)
 
-    # Diff si le fichier existe déjà
+    # Diff — toujours affiché (nouveau fichier compris, comparé à "")
     if output_path.exists():
         old_content = output_path.read_text(encoding="utf-8")
         diff = compute_diff(old_content, new_content, args.output)
         print(f"\n── Diff pour {args.output} ──")
-        print_diff(diff, args.output)
-        print()
     else:
-        print(f"  (nouveau fichier : {args.output})\n")
+        old_content = ""
+        diff = compute_diff(old_content, new_content, args.output)
+        print(f"\n── Nouveau fichier : {args.output} ──")
+    print_diff(diff, args.output)
+    print()
 
     # Détection PII
     pii_hits = scan_pii(new_content)

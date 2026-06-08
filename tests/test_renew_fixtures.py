@@ -5,6 +5,7 @@ Toutes les fonctions réseau sont mockées — aucune requête réelle n'est ém
 
 from __future__ import annotations
 
+import argparse
 import textwrap
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -13,7 +14,10 @@ import pytest
 import requests
 
 from tools.renew_fixtures import (
+    _fetch_robots,
+    _non_negative_float,
     check_not_ci,
+    check_robots_allowed,
     compute_diff,
     fetch_page,
     main,
@@ -118,6 +122,22 @@ class TestParseArgs:
                 ["--source", source, "--url", "https://x.com", "--output", f"{source}/real/x.html"]
             )
             assert args.source == source
+
+    def test_negative_delay_rejected(self):
+        with pytest.raises(SystemExit) as exc_info:
+            parse_args(
+                [
+                    "--source",
+                    "tc",
+                    "--url",
+                    "https://x.com",
+                    "--output",
+                    "tc/real/x.html",
+                    "--delay",
+                    "-1",
+                ]
+            )
+        assert exc_info.value.code == 2
 
 
 # ── TestCheckNotCi ─────────────────────────────────────────────────────────────
@@ -368,6 +388,123 @@ class TestUpdateManifest:
         updated = manifest.read_text(encoding="utf-8")
         assert '"https://new-url.com"' in updated
 
+    def test_updates_unquoted_captured_at(self, tmp_path):
+        """Scalaire YAML non-quoté : captured_at: 2026-06-01 (sans guillemets)."""
+        content = textwrap.dedent("""\
+            fixtures:
+              - file: tot/real/listing.html
+                captured_at: 2026-06-01
+                url: "https://example.com"
+        """)
+        manifest = self._make_manifest(tmp_path, content)
+        result = update_manifest(
+            manifest, "tot/real/listing.html", "2026-06-08", "https://example.com", "tot"
+        )
+        assert result is True
+        updated = manifest.read_text(encoding="utf-8")
+        assert 'captured_at: "2026-06-08"' in updated
+        assert "captured_at: 2026-06-01" not in updated
+
+    def test_updates_unquoted_url(self, tmp_path):
+        """Scalaire YAML non-quoté : url: https://example.com/page (sans guillemets)."""
+        content = textwrap.dedent("""\
+            fixtures:
+              - file: tot/real/listing.html
+                captured_at: "2026-06-06"
+                url: https://old.example.com/page
+        """)
+        manifest = self._make_manifest(tmp_path, content)
+        update_manifest(
+            manifest, "tot/real/listing.html", "2026-06-08", "https://new.example.com/page", "tot"
+        )
+        updated = manifest.read_text(encoding="utf-8")
+        assert '"https://new.example.com/page"' in updated
+        assert "url: https://old.example.com/page" not in updated
+
+    def test_exact_filename_no_partial_match(self, tmp_path):
+        """a.html ne doit pas matcher a.html.bak dans le manifeste."""
+        content = textwrap.dedent("""\
+            fixtures:
+              - file: tot/real/a.html.bak
+                captured_at: "2026-01-01"
+                url: "https://example.com"
+        """)
+        manifest = self._make_manifest(tmp_path, content)
+        result = update_manifest(manifest, "tot/real/a.html", "2026-06-08", "https://x.com", "tot")
+        assert result is False
+        assert manifest.read_text(encoding="utf-8") == content
+
+
+# ── TestNonNegativeFloat ───────────────────────────────────────────────────────
+
+
+class TestNonNegativeFloat:
+    def test_positive_float(self):
+        assert _non_negative_float("2.5") == 2.5
+
+    def test_zero(self):
+        assert _non_negative_float("0") == 0.0
+
+    def test_negative_raises(self):
+        with pytest.raises(argparse.ArgumentTypeError):
+            _non_negative_float("-1")
+
+    def test_negative_float_raises(self):
+        with pytest.raises(argparse.ArgumentTypeError):
+            _non_negative_float("-0.1")
+
+    def test_invalid_string_raises(self):
+        with pytest.raises(argparse.ArgumentTypeError):
+            _non_negative_float("abc")
+
+
+# ── TestCheckRobotsAllowed ─────────────────────────────────────────────────────
+
+
+class TestCheckRobotsAllowed:
+    def _make_robots(self, rules: str) -> str:
+        return rules
+
+    def test_allowed_when_robots_permits(self):
+        robots_txt = "User-agent: *\nAllow: /\n"
+        with patch("tools.renew_fixtures._fetch_robots", return_value=robots_txt):
+            assert check_robots_allowed("https://example.com/page", "Bot/1.0") is True
+
+    def test_denied_when_robots_disallows(self):
+        robots_txt = "User-agent: *\nDisallow: /\n"
+        with patch("tools.renew_fixtures._fetch_robots", return_value=robots_txt):
+            assert check_robots_allowed("https://example.com/page", "Bot/1.0") is False
+
+    def test_allowed_when_robots_inaccessible(self):
+        with patch("tools.renew_fixtures._fetch_robots", return_value=""):
+            assert check_robots_allowed("https://example.com/page", "Bot/1.0") is True
+
+    def test_denied_only_for_matching_user_agent(self):
+        robots_txt = "User-agent: BadBot\nDisallow: /\n"
+        with patch("tools.renew_fixtures._fetch_robots", return_value=robots_txt):
+            assert check_robots_allowed("https://example.com/page", "GoodBot/1.0") is True
+
+    def test_fetch_robots_returns_empty_on_error(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 404
+        mock_resp.text = "Not Found"
+        with patch("tools.renew_fixtures.requests.get", return_value=mock_resp):
+            result = _fetch_robots("https://example.com/robots.txt", "Bot/1.0")
+        assert result == ""
+
+    def test_fetch_robots_returns_content_on_200(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.text = "User-agent: *\nAllow: /\n"
+        with patch("tools.renew_fixtures.requests.get", return_value=mock_resp):
+            result = _fetch_robots("https://example.com/robots.txt", "Bot/1.0")
+        assert "User-agent" in result
+
+    def test_fetch_robots_returns_empty_on_exception(self):
+        with patch("tools.renew_fixtures.requests.get", side_effect=Exception("network error")):
+            result = _fetch_robots("https://example.com/robots.txt", "Bot/1.0")
+        assert result == ""
+
 
 # ── TestFetchPage ──────────────────────────────────────────────────────────────
 
@@ -459,6 +596,7 @@ class TestMain:
         with (
             patch("tools.renew_fixtures.FIXTURES_DIR", tmp_path),
             patch("tools.renew_fixtures.MANIFEST_PATH", tmp_path / "MANIFEST.yml"),
+            patch("tools.renew_fixtures.check_robots_allowed", return_value=True),
             patch("tools.renew_fixtures.fetch_page", return_value="<html>new</html>"),
             patch("tools.renew_fixtures.time.sleep"),
             patch("tools.renew_fixtures.update_manifest", return_value=False),
@@ -491,6 +629,7 @@ class TestMain:
         with (
             patch("tools.renew_fixtures.FIXTURES_DIR", tmp_path),
             patch("tools.renew_fixtures.MANIFEST_PATH", tmp_path / "MANIFEST.yml"),
+            patch("tools.renew_fixtures.check_robots_allowed", return_value=True),
             patch("tools.renew_fixtures.fetch_page", return_value="<html>new</html>"),
             patch("tools.renew_fixtures.time.sleep"),
             patch("tools.renew_fixtures.confirm_write", return_value=False),
@@ -519,6 +658,7 @@ class TestMain:
         with (
             patch("tools.renew_fixtures.FIXTURES_DIR", tmp_path),
             patch("tools.renew_fixtures.MANIFEST_PATH", tmp_path / "MANIFEST.yml"),
+            patch("tools.renew_fixtures.check_robots_allowed", return_value=True),
             patch("tools.renew_fixtures.fetch_page", return_value="<html>yes</html>"),
             patch("tools.renew_fixtures.time.sleep"),
             patch("tools.renew_fixtures.update_manifest", return_value=False),
@@ -553,6 +693,7 @@ class TestMain:
         with (
             patch("tools.renew_fixtures.FIXTURES_DIR", tmp_path),
             patch("tools.renew_fixtures.MANIFEST_PATH", tmp_path / "MANIFEST.yml"),
+            patch("tools.renew_fixtures.check_robots_allowed", return_value=True),
             patch("tools.renew_fixtures.fetch_page", return_value="<html>new</html>"),
             patch("tools.renew_fixtures.time.sleep"),
             patch("tools.renew_fixtures.update_manifest", return_value=False),
@@ -573,6 +714,38 @@ class TestMain:
         captured = capsys.readouterr()
         assert "Diff" in captured.out or "old" in captured.out or "new" in captured.out
 
+    def test_main_shows_diff_for_new_file(self, tmp_path, monkeypatch, capsys):
+        """Un nouveau fichier déclenche aussi l'affichage du diff (comparé à '')."""
+        out_rel = "tot/real/brand_new.html"
+
+        monkeypatch.delenv("CI", raising=False)
+        monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+        monkeypatch.delenv("GITLAB_CI", raising=False)
+
+        with (
+            patch("tools.renew_fixtures.FIXTURES_DIR", tmp_path),
+            patch("tools.renew_fixtures.MANIFEST_PATH", tmp_path / "MANIFEST.yml"),
+            patch("tools.renew_fixtures.check_robots_allowed", return_value=True),
+            patch("tools.renew_fixtures.fetch_page", return_value="<html>brand new</html>"),
+            patch("tools.renew_fixtures.time.sleep"),
+            patch("tools.renew_fixtures.update_manifest", return_value=False),
+        ):
+            (tmp_path / "MANIFEST.yml").write_text("fixtures: []\n", encoding="utf-8")
+            main(
+                [
+                    "--source",
+                    "tot",
+                    "--url",
+                    "https://example.com",
+                    "--output",
+                    out_rel,
+                    "--yes",
+                ]
+            )
+
+        captured = capsys.readouterr()
+        assert "Nouveau fichier" in captured.out or "brand new" in captured.out
+
     def test_main_warns_pii_before_confirmation(self, tmp_path, monkeypatch, capsys):
         out_rel = "tot/real/listing_pii.html"
 
@@ -585,6 +758,7 @@ class TestMain:
         with (
             patch("tools.renew_fixtures.FIXTURES_DIR", tmp_path),
             patch("tools.renew_fixtures.MANIFEST_PATH", tmp_path / "MANIFEST.yml"),
+            patch("tools.renew_fixtures.check_robots_allowed", return_value=True),
             patch("tools.renew_fixtures.fetch_page", return_value=html_with_pii),
             patch("tools.renew_fixtures.time.sleep"),
             patch("tools.renew_fixtures.confirm_write", return_value=False),
@@ -610,11 +784,7 @@ class TestMain:
         monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
         monkeypatch.delenv("GITLAB_CI", raising=False)
 
-        with (
-            patch("tools.renew_fixtures.FIXTURES_DIR", tmp_path),
-            patch("tools.renew_fixtures.fetch_page", return_value="<html></html>"),
-            patch("tools.renew_fixtures.time.sleep"),
-        ):
+        with patch("tools.renew_fixtures.FIXTURES_DIR", tmp_path):
             result = main(
                 [
                     "--source",
@@ -628,6 +798,26 @@ class TestMain:
 
         assert result == 1
 
+    def test_main_path_traversal_dot_dot_bypass(self, tmp_path, monkeypatch):
+        """tot/real/../../tc/synthetic/x.html passe le prefix check mais pas le resolve check."""
+        monkeypatch.delenv("CI", raising=False)
+        monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+        monkeypatch.delenv("GITLAB_CI", raising=False)
+
+        with patch("tools.renew_fixtures.FIXTURES_DIR", tmp_path):
+            result = main(
+                [
+                    "--source",
+                    "tot",
+                    "--url",
+                    "https://example.com",
+                    "--output",
+                    "tot/real/../../tc/synthetic/event_full.html",
+                ]
+            )
+
+        assert result == 1
+
     def test_main_network_error_returns_1(self, tmp_path, monkeypatch):
         monkeypatch.delenv("CI", raising=False)
         monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
@@ -635,6 +825,7 @@ class TestMain:
 
         with (
             patch("tools.renew_fixtures.FIXTURES_DIR", tmp_path),
+            patch("tools.renew_fixtures.check_robots_allowed", return_value=True),
             patch(
                 "tools.renew_fixtures.fetch_page", side_effect=requests.ConnectionError("timeout")
             ),
@@ -652,8 +843,33 @@ class TestMain:
 
         assert result == 1
 
+    def test_main_rejects_disallowed_robots(self, tmp_path, monkeypatch):
+        """robots.txt interdit → exit 1 avant tout fetch."""
+        monkeypatch.delenv("CI", raising=False)
+        monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+        monkeypatch.delenv("GITLAB_CI", raising=False)
+
+        with (
+            patch("tools.renew_fixtures.FIXTURES_DIR", tmp_path),
+            patch("tools.renew_fixtures.check_robots_allowed", return_value=False),
+            patch("tools.renew_fixtures.fetch_page") as mock_fetch,
+        ):
+            result = main(
+                [
+                    "--source",
+                    "tot",
+                    "--url",
+                    "https://example.com",
+                    "--output",
+                    "tot/real/listing.html",
+                ]
+            )
+
+        assert result == 1
+        mock_fetch.assert_not_called()
+
     def test_main_rejects_output_outside_source_real(self, tmp_path, monkeypatch):
-        """--output doit commencer par {source}/real/ sinon exit 1."""
+        """--output doit résoudre sous {source}/real/ sinon exit 1."""
         monkeypatch.delenv("CI", raising=False)
         monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
         monkeypatch.delenv("GITLAB_CI", raising=False)
