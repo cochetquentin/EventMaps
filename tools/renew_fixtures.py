@@ -124,15 +124,14 @@ def fetch_page(url: str, user_agent: str, timeout: int = 30) -> str:
 
 def compute_diff(old_content: str, new_content: str, filename: str) -> str:
     """Retourne un diff unified entre old et new. Chaîne vide si contenu identique."""
-    old_lines = old_content.splitlines(keepends=True)
-    new_lines = new_content.splitlines(keepends=True)
+    old_lines = old_content.splitlines(keepends=False)
+    new_lines = new_content.splitlines(keepends=False)
     diff_lines = list(
         difflib.unified_diff(
             old_lines,
             new_lines,
             fromfile=f"a/{filename}",
             tofile=f"b/{filename}",
-            lineterm="",
         )
     )
     return "".join(diff_lines)
@@ -202,29 +201,34 @@ def update_manifest(
     url: str,
     source: str,  # noqa: ARG001
 ) -> bool:
-    """Met à jour captured_at (et url si null) pour fixture_file dans le manifeste.
+    """Met à jour captured_at et url pour fixture_file dans le manifeste.
 
     Utilise une substitution regex chirurgicale pour préserver les commentaires
-    et l'indentation YAML d'origine.
+    et l'indentation YAML d'origine. La regex est bornée à l'entrée sélectionnée
+    (stop avant le prochain '- file:') pour éviter toute corruption des autres entrées.
 
     Retourne True si l'entrée a été trouvée et mise à jour, False sinon.
     """
     content = manifest_path.read_text(encoding="utf-8")
 
     escaped = re.escape(fixture_file)
+    # (?:(?!- file:).)* : avance caractère par caractère en s'arrêtant dès que
+    # la séquence '- file:' apparaît, ce qui borne la correspondance à l'entrée
+    # sélectionnée et évite toute corruption des entrées suivantes.
+    entry_bound = r"(?:(?!- file:).)*?"
 
     # Remplace captured_at (null ou "YYYY-MM-DD") dans le bloc de cette entrée
     date_pattern = re.compile(
-        rf"(- file: {escaped}.*?captured_at: )(?:\"[^\"]*\"|null)",
+        rf"(- file: {escaped}{entry_bound}captured_at: )(?:\"[^\"]*\"|null)",
         re.DOTALL,
     )
     new_content, n_date = date_pattern.subn(rf'\g<1>"{new_date}"', content)
     if n_date == 0:
         return False
 
-    # Remplace url: null par l'URL réelle si c'était null
+    # Remplace url (null ou valeur existante) par l'URL canonique fournie
     url_pattern = re.compile(
-        rf"(- file: {escaped}.*?url: )null",
+        rf'(- file: {escaped}{entry_bound}url: )(?:"[^"]*"|null)',
         re.DOTALL,
     )
     new_content, _ = url_pattern.subn(rf'\g<1>"{url}"', new_content)
@@ -242,6 +246,15 @@ def main(argv: list[str] | None = None) -> int:
 
     # Blocage CI
     check_not_ci()
+
+    # Validation : l'output doit être sous {source}/real/ (fixtures réelles uniquement)
+    expected_prefix = f"{args.source}/real/"
+    if not args.output.startswith(expected_prefix):
+        print(
+            f"ERREUR : --output doit commencer par {expected_prefix!r} pour --source {args.source!r}.",
+            file=sys.stderr,
+        )
+        return 1
 
     # Validation du chemin de sortie (anti path-traversal)
     output_path = FIXTURES_DIR / args.output

@@ -651,3 +651,90 @@ class TestMain:
             )
 
         assert result == 1
+
+    def test_main_rejects_output_outside_source_real(self, tmp_path, monkeypatch):
+        """--output doit commencer par {source}/real/ sinon exit 1."""
+        monkeypatch.delenv("CI", raising=False)
+        monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+        monkeypatch.delenv("GITLAB_CI", raising=False)
+
+        with patch("tools.renew_fixtures.FIXTURES_DIR", tmp_path):
+            # Mauvaise source
+            result = main(
+                [
+                    "--source",
+                    "tc",
+                    "--url",
+                    "https://example.com",
+                    "--output",
+                    "tot/real/listing.html",
+                ]
+            )
+        assert result == 1
+
+    def test_main_rejects_synthetic_output(self, tmp_path, monkeypatch):
+        """--output vers un chemin synthetic est rejeté."""
+        monkeypatch.delenv("CI", raising=False)
+        monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+        monkeypatch.delenv("GITLAB_CI", raising=False)
+
+        with patch("tools.renew_fixtures.FIXTURES_DIR", tmp_path):
+            result = main(
+                [
+                    "--source",
+                    "tc",
+                    "--url",
+                    "https://example.com",
+                    "--output",
+                    "tc/synthetic/event_full.html",
+                ]
+            )
+        assert result == 1
+
+
+class TestUpdateManifestUrlUpdate:
+    """Tests spécifiques à la mise à jour de l'URL (P1 + P2 Codex)."""
+
+    def _make_manifest(self, tmp_path: Path, content: str) -> Path:
+        manifest = tmp_path / "MANIFEST.yml"
+        manifest.write_text(content, encoding="utf-8")
+        return manifest
+
+    def test_updates_existing_non_null_url(self, tmp_path):
+        """L'URL existante (non-null) est remplacée par la nouvelle URL fournie."""
+        import textwrap
+
+        content = textwrap.dedent("""\
+            fixtures:
+              - file: tot/real/listing.html
+                captured_at: "2026-06-06"
+                url: "https://old-url.com/page"
+        """)
+        manifest = self._make_manifest(tmp_path, content)
+        update_manifest(
+            manifest, "tot/real/listing.html", "2026-06-08", "https://new-url.com/page", "tot"
+        )
+        updated = manifest.read_text(encoding="utf-8")
+        assert '"https://new-url.com/page"' in updated
+        assert '"https://old-url.com/page"' not in updated
+
+    def test_url_replacement_bounded_to_entry(self, tmp_path):
+        """La regex URL ne corrompt pas l'entrée suivante qui a url: null."""
+        import textwrap
+
+        content = textwrap.dedent("""\
+            fixtures:
+              - file: tot/real/listing.html
+                captured_at: "2026-06-06"
+                url: "https://existing.com"
+              - file: tot/synthetic/event.html
+                captured_at: null
+                url: null
+        """)
+        manifest = self._make_manifest(tmp_path, content)
+        update_manifest(manifest, "tot/real/listing.html", "2026-06-08", "https://new.com", "tot")
+        updated = manifest.read_text(encoding="utf-8")
+        # L'entrée synthetic doit toujours avoir url: null
+        assert "url: null" in updated
+        # L'entrée real doit avoir la nouvelle URL
+        assert '"https://new.com"' in updated
