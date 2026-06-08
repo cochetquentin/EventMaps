@@ -26,10 +26,10 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 ## TEST-002 — Réorganiser et inventorier les fixtures par source
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** TEST-001
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/57
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/83
 
 **Actions.** Créer une arborescence par source et catégorie, adopter des noms décrivant le cas, et ajouter un manifeste léger contenant URL, date de capture, structure couverte et éventuelles transformations.
 
@@ -37,10 +37,10 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 ## TEST-003 — Constituer un corpus réel Tokyo Cheapo
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** TEST-001, TEST-002
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/58
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/87
 
 **Corpus cible.** Environ cinq pages événement réelles et au moins deux listings : événement complet, sans description, dates floues ou multi-jour, plusieurs lieux, données optionnelles absentes, et variations de listing observées.
 
@@ -48,10 +48,10 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 ## TEST-004 — Constituer un corpus réel Hanabi Walker
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** TEST-001, TEST-002
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/59
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/87
 
 **Corpus cible.** Environ cinq événements réels issus de régions et structures différentes, avec leurs pages/fragments nécessaires : date valide, date reportée/annulée, coordonnées présentes/absentes, champs de tableau variables, et listings représentatifs.
 
@@ -59,10 +59,10 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 ## TEST-005 — Qualifier et compléter le corpus Time Out Tokyo
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** TEST-001, TEST-002
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/60
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/84
 
 **Actions.** Confirmer la provenance des captures existantes, ajouter les métadonnées manquantes et compléter jusqu'à environ cinq pages représentatives : événement JSON-LD, article, données incomplètes, coordonnées absentes et variation de listing.
 
@@ -81,10 +81,10 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 ## TEST-007 — Définir le renouvellement contrôlé des captures
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P2**
 - **Dépendances :** TEST-001
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/89
 
 **Actions.** Fournir une procédure manuelle ou un script opt-in respectueux des sites, avec user-agent, délais, revue du diff et vérification des droits ; ne pas automatiser la collecte en CI.
 
