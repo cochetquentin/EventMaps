@@ -124,11 +124,13 @@ def check_not_ci() -> None:
 # ── Réseau ────────────────────────────────────────────────────────────────────
 
 
-def fetch_page(url: str, user_agent: str, timeout: int = 30) -> str:
+def fetch_page(url: str, user_agent: str, timeout: int = 30, delay: float = 0.0) -> str:
     """Récupère le contenu HTML de l'URL. Lève requests.HTTPError si status >= 400.
 
     Suit les redirections manuellement pour vérifier robots.txt à chaque hop.
-    Détecte le charset depuis <meta charset> si absent des en-têtes HTTP.
+    Applique `delay` secondes entre chaque hop de redirection pour respecter les sites.
+    Détecte le charset depuis <meta charset> si absent des en-têtes HTTP ;
+    si aucun charset détectable, décode en UTF-8 (avec remplacement des caractères invalides).
     Lève TooManyRedirects après 10 sauts consécutifs.
     """
     headers = {"User-Agent": user_agent}
@@ -153,7 +155,16 @@ def fetch_page(url: str, user_agent: str, timeout: int = 30) -> str:
                     response=response,
                 )
             current_url = next_url
+            if delay > 0:
+                time.sleep(delay)
             continue
+
+        # Rejeter les 3xx sans Location : is_redirect=False mais raise_for_status ne les rejette pas
+        if 300 <= response.status_code < 400:
+            raise requests.HTTPError(
+                f"Réponse {response.status_code} sans en-tête Location pour {current_url!r}",
+                response=response,
+            )
 
         response.raise_for_status()
 
@@ -168,33 +179,46 @@ def fetch_page(url: str, user_agent: str, timeout: int = 30) -> str:
             if meta_match:
                 charset = meta_match.group(1)
                 return response.content.decode(charset, errors="replace")
+            # Fallback UTF-8 : préférable à ISO-8859-1 (comportement par défaut de Requests)
+            return response.content.decode("utf-8", errors="replace")
 
         return response.text
 
     raise requests.TooManyRedirects(f"Trop de redirections : {url!r}")
 
 
-def _fetch_robots(robots_url: str, user_agent: str) -> str:
-    """Récupère le contenu de robots.txt. Retourne '' si inaccessible."""
+def _fetch_robots(robots_url: str, user_agent: str) -> str | None:
+    """Récupère le contenu de robots.txt.
+
+    Retourne :
+    - str non vide : robots.txt valide (200)
+    - ""            : robots.txt absent (4xx) — aucune restriction
+    - None          : injoignable (erreur réseau ou 5xx) — bloquer par précaution (RFC 9309)
+    """
     try:
         resp = requests.get(robots_url, headers={"User-Agent": user_agent}, timeout=10)
         if resp.status_code == 200:
             return resp.text
+        if resp.status_code >= 500:
+            return None  # 5xx = injoignable
+        return ""  # 4xx = pas de robots.txt = autorisé
     except Exception:  # noqa: BLE001
-        pass
-    return ""
+        return None  # Erreur réseau = injoignable
 
 
 def check_robots_allowed(url: str, user_agent: str) -> bool:
     """Vérifie que robots.txt autorise la capture de cette URL.
 
-    Retourne True si autorisé ou si robots.txt est inaccessible.
+    Retourne False si robots.txt est injoignable (RFC 9309 : assumer disallow total).
+    Retourne True si robots.txt est absent (4xx) ou si la règle autorise l'URL.
     """
     parsed = urlparse(url)
     robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
     robots_content = _fetch_robots(robots_url, user_agent)
+    if robots_content is None:
+        return False  # Injoignable → bloquer par précaution (RFC 9309)
     if not robots_content:
-        return True  # Pas de robots.txt accessible = autorisation implicite
+        return True  # Pas de robots.txt → autorisé
     rp = urllib.robotparser.RobotFileParser()
     rp.parse(robots_content.splitlines())
     return rp.can_fetch(user_agent, url)
@@ -317,9 +341,9 @@ def update_manifest(
 
     escaped = re.escape(fixture_file)
     entry_bound = r"(?:(?!- file:).)*?"
-    # Valeurs YAML valides : double-quoté, simple-quoté, non-quoté, null
-    date_value = r'(?:"[^"]*"|\'[^\']*\'|null|[0-9]{4}-[0-9]{2}-[0-9]{2})'
-    url_value = r'(?:"[^"]*"|\'[^\']*\'|null|https?://\S+)'
+    # Valeurs YAML : double-quoté (avec guillemets échappés), simple-quoté, non-quoté, null
+    date_value = r'(?:"(?:[^"\\]|\\.)*"|\'[^\']*\'|null|[0-9]{4}-[0-9]{2}-[0-9]{2})'
+    url_value = r'(?:"(?:[^"\\]|\\.)*"|\'[^\']*\'|null|https?://\S+)'
 
     # Remplace captured_at dans le bloc de cette entrée (ancre exacte après le nom)
     date_pattern = re.compile(
@@ -338,6 +362,13 @@ def update_manifest(
     )
     safe_url = _yaml_escape(url)
     new_content, _ = url_pattern.subn(lambda m: m.group(1) + f'"{safe_url}"', new_content)
+
+    # Réinitialise anonymized: true → false (le nouveau HTML n'est pas encore anonymisé)
+    anonymized_pattern = re.compile(
+        rf"(- file: {escaped}(?=\s){entry_bound}anonymized: )true",
+        re.DOTALL,
+    )
+    new_content, _ = anonymized_pattern.subn(lambda m: m.group(1) + "false", new_content)
 
     manifest_path.write_text(new_content, encoding="utf-8")
     return True
@@ -381,7 +412,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"→ Récupération de {args.url}")
     try:
-        new_content = fetch_page(args.url, args.user_agent)
+        new_content = fetch_page(args.url, args.user_agent, delay=args.delay)
     except requests.RequestException as exc:
         print(f"ERREUR réseau : {exc}", file=sys.stderr)
         return 1

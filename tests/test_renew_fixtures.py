@@ -429,6 +429,24 @@ class TestUpdateManifest:
         assert '"https://new.example.com/page"' in updated
         assert "url: https://old.example.com/page" not in updated
 
+    def test_resets_anonymized_true_to_false(self, tmp_path):
+        """Lors d'un renouvellement, anonymized: true est remis à false."""
+        content = textwrap.dedent("""\
+            fixtures:
+              - file: tot/real/listing.html
+                category: real
+                captured_at: "2026-06-06"
+                url: "https://example.com"
+                anonymized: true
+        """)
+        manifest = self._make_manifest(tmp_path, content)
+        update_manifest(
+            manifest, "tot/real/listing.html", "2026-06-08", "https://example.com", "tot"
+        )
+        updated = manifest.read_text(encoding="utf-8")
+        assert "anonymized: false" in updated
+        assert "anonymized: true" not in updated
+
     def test_exact_filename_no_partial_match(self, tmp_path):
         """a.html ne doit pas matcher a.html.bak dans le manifeste."""
         content = textwrap.dedent("""\
@@ -491,16 +509,21 @@ class TestCheckRobotsAllowed:
         with patch("tools.renew_fixtures._fetch_robots", return_value=robots_txt):
             assert check_robots_allowed("https://example.com/page", "Bot/1.0") is False
 
-    def test_allowed_when_robots_inaccessible(self):
+    def test_allowed_when_robots_absent_404(self):
         with patch("tools.renew_fixtures._fetch_robots", return_value=""):
             assert check_robots_allowed("https://example.com/page", "Bot/1.0") is True
+
+    def test_blocked_when_robots_unreachable(self):
+        """None (erreur réseau ou 5xx) → bloquer par précaution (RFC 9309)."""
+        with patch("tools.renew_fixtures._fetch_robots", return_value=None):
+            assert check_robots_allowed("https://example.com/page", "Bot/1.0") is False
 
     def test_denied_only_for_matching_user_agent(self):
         robots_txt = "User-agent: BadBot\nDisallow: /\n"
         with patch("tools.renew_fixtures._fetch_robots", return_value=robots_txt):
             assert check_robots_allowed("https://example.com/page", "GoodBot/1.0") is True
 
-    def test_fetch_robots_returns_empty_on_error(self):
+    def test_fetch_robots_returns_empty_on_4xx(self):
         mock_resp = MagicMock()
         mock_resp.status_code = 404
         mock_resp.text = "Not Found"
@@ -516,8 +539,25 @@ class TestCheckRobotsAllowed:
             result = _fetch_robots("https://example.com/robots.txt", "Bot/1.0")
         assert "User-agent" in result
 
-    def test_fetch_robots_returns_empty_on_exception(self):
+    def test_fetch_robots_returns_none_on_exception(self):
+        """Erreur réseau → None (injoignable)."""
         with patch("tools.renew_fixtures.requests.get", side_effect=Exception("network error")):
+            result = _fetch_robots("https://example.com/robots.txt", "Bot/1.0")
+        assert result is None
+
+    def test_fetch_robots_returns_none_on_5xx(self):
+        """5xx → None (injoignable)."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 503
+        with patch("tools.renew_fixtures.requests.get", return_value=mock_resp):
+            result = _fetch_robots("https://example.com/robots.txt", "Bot/1.0")
+        assert result is None
+
+    def test_fetch_robots_returns_empty_on_404(self):
+        """4xx → '' (pas de robots.txt = autorisé)."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 404
+        with patch("tools.renew_fixtures.requests.get", return_value=mock_resp):
             result = _fetch_robots("https://example.com/robots.txt", "Bot/1.0")
         assert result == ""
 
@@ -530,6 +570,7 @@ class TestFetchPage:
         mock_response = MagicMock()
         mock_response.text = text
         mock_response.is_redirect = False
+        mock_response.status_code = 200
         mock_response.raise_for_status = MagicMock()
         mock_response.headers = {}
         mock_response.content = text.encode("utf-8")
@@ -569,6 +610,7 @@ class TestFetchPage:
     def test_fetch_raises_on_http_error(self):
         mock_response = MagicMock()
         mock_response.is_redirect = False
+        mock_response.status_code = 404
         mock_response.raise_for_status.side_effect = requests.HTTPError("404")
 
         with patch("tools.renew_fixtures.requests.get", return_value=mock_response):
@@ -617,6 +659,7 @@ class TestFetchPage:
         html_bytes = b'<html><head><meta charset="iso-8859-1"></head><body>caf\xe9</body></html>'
         mock_response = MagicMock()
         mock_response.is_redirect = False
+        mock_response.status_code = 200
         mock_response.raise_for_status = MagicMock()
         mock_response.headers = {}  # pas de charset dans Content-Type
         mock_response.content = html_bytes
@@ -625,6 +668,57 @@ class TestFetchPage:
             result = fetch_page("https://example.com", "Bot/1.0")
 
         assert "café" in result
+
+    def test_fetch_fallback_utf8_when_no_charset(self):
+        """Quand aucun charset détectable, décode en UTF-8 plutôt qu'ISO-8859-1."""
+        html_bytes = "<html><body>日本語</body></html>".encode()
+        mock_response = MagicMock()
+        mock_response.is_redirect = False
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.headers = {}  # pas de charset
+        mock_response.content = html_bytes
+
+        with patch("tools.renew_fixtures.requests.get", return_value=mock_response):
+            result = fetch_page("https://example.com", "Bot/1.0")
+
+        assert "日本語" in result
+
+    def test_fetch_applies_delay_on_redirect(self):
+        """Le délai est appliqué entre les hops de redirection."""
+        redirect_response = MagicMock()
+        redirect_response.is_redirect = True
+        redirect_response.headers = {"Location": "https://example.com/final"}
+
+        final_response = self._make_ok_response("<html>final</html>")
+
+        call_count = {"n": 0}
+
+        def side_effect(url, **kwargs):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                return redirect_response
+            return final_response
+
+        with (
+            patch("tools.renew_fixtures.requests.get", side_effect=side_effect),
+            patch("tools.renew_fixtures.check_robots_allowed", return_value=True),
+            patch("tools.renew_fixtures.time.sleep") as mock_sleep,
+        ):
+            fetch_page("https://example.com/old", "Bot/1.0", delay=1.5)
+
+        mock_sleep.assert_called_with(1.5)
+
+    def test_fetch_raises_on_3xx_without_location(self):
+        """3xx sans Location header → HTTPError (ne pas utiliser le body comme fixture)."""
+        mock_response = MagicMock()
+        mock_response.is_redirect = False
+        mock_response.status_code = 302
+        mock_response.raise_for_status = MagicMock()
+
+        with patch("tools.renew_fixtures.requests.get", return_value=mock_response):
+            with pytest.raises(requests.HTTPError):
+                fetch_page("https://example.com", "Bot/1.0")
 
 
 # ── TestWriteFixture ───────────────────────────────────────────────────────────
@@ -1035,6 +1129,26 @@ class TestUpdateManifestUrlUpdate:
         updated = manifest.read_text(encoding="utf-8")
         # Le guillemet doit être échappé, pas brut
         assert '\\"test\\"' in updated
+
+    def test_manifest_url_with_escaped_quotes_replaced_correctly(self, tmp_path):
+        """URL existante contenant des guillemets échappés est correctement remplacée."""
+        import textwrap
+
+        # Manifeste avec une URL précédemment stockée avec guillemets échappés
+        content = textwrap.dedent("""\
+            fixtures:
+              - file: tot/real/listing.html
+                captured_at: "2026-06-06"
+                url: "https://old.com/path?q=\\"test\\""
+        """)
+        manifest = self._make_manifest(tmp_path, content)
+        update_manifest(
+            manifest, "tot/real/listing.html", "2026-06-08", "https://new.com/page", "tot"
+        )
+        updated = manifest.read_text(encoding="utf-8")
+        assert '"https://new.com/page"' in updated
+        # L'ancienne URL avec guillemets échappés ne doit plus être présente
+        assert "old.com" not in updated
 
     def test_url_replacement_bounded_to_entry(self, tmp_path):
         """La regex URL ne corrompt pas l'entrée suivante qui a url: null."""
