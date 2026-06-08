@@ -275,6 +275,42 @@ def test_scrape_event_raises_on_no_title(tot, monkeypatch):
         tot.scrape_event("https://www.timeout.com/tokyo/art/unknown")
 
 
+def test_scrape_event_no_coordinates_returns_none(tot, monkeypatch):
+    """Event with valid JSON-LD but no data-zone-location-info → lat/lon = None."""
+    html_bytes = (FIXTURES_DIR / "tot/synthetic/event_no_coordinates.html").read_bytes()
+    soup = BeautifulSoup(html_bytes, "html.parser")
+    monkeypatch.setattr(tot, "get_event_page", lambda url: soup)
+
+    result = tot.scrape_event("https://www.timeout.com/tokyo/things-to-do/no-coords")
+
+    assert result["latitude"] is None
+    assert result["longitude"] is None
+    assert result["title"] == "No Coordinates Festival"
+    assert result["start_date"] == "2026-08-01"
+
+
+def test_scrape_event_incomplete_data_returns_none_fields(tot, monkeypatch):
+    """Event JSON-LD with only name → all optional fields return None."""
+    html_bytes = (FIXTURES_DIR / "tot/synthetic/event_incomplete_data.html").read_bytes()
+    soup = BeautifulSoup(html_bytes, "html.parser")
+    monkeypatch.setattr(tot, "get_event_page", lambda url: soup)
+
+    result = tot.scrape_event("https://www.timeout.com/tokyo/things-to-do/minimal")
+
+    assert result["title"] == "Minimal Incomplete Event"
+    assert result["start_date"] is None
+    assert result["end_date"] is None
+    assert result["times"] is None
+    assert result["price"] is None
+    assert result["venue_name"] is None
+    assert result["venue_address"] is None
+    assert result["latitude"] is None
+    assert result["longitude"] is None
+    assert result["image_url"] is None
+    assert result["categories"] == []
+    assert result["description"] is None
+
+
 # ── scrape_all ────────────────────────────────────────────────────────────────
 
 
