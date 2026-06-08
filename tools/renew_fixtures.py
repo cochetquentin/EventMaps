@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import math
 import os
 import re
 import sys
@@ -28,7 +29,7 @@ import time
 import urllib.robotparser
 from datetime import date
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import requests
 
@@ -55,6 +56,8 @@ def _non_negative_float(value: str) -> float:
         f = float(value)
     except ValueError:
         raise argparse.ArgumentTypeError(f"{value!r} n'est pas un nombre valide")
+    if not math.isfinite(f):
+        raise argparse.ArgumentTypeError(f"le délai doit être un nombre fini, reçu {f}")
     if f < 0:
         raise argparse.ArgumentTypeError(f"le délai doit être >= 0, reçu {f}")
     return f
@@ -122,14 +125,53 @@ def check_not_ci() -> None:
 
 
 def fetch_page(url: str, user_agent: str, timeout: int = 30) -> str:
-    """Récupère le contenu HTML de l'URL. Lève requests.HTTPError si status >= 400."""
-    response = requests.get(
-        url,
-        headers={"User-Agent": user_agent},
-        timeout=timeout,
-    )
-    response.raise_for_status()
-    return response.text
+    """Récupère le contenu HTML de l'URL. Lève requests.HTTPError si status >= 400.
+
+    Suit les redirections manuellement pour vérifier robots.txt à chaque hop.
+    Détecte le charset depuis <meta charset> si absent des en-têtes HTTP.
+    Lève TooManyRedirects après 10 sauts consécutifs.
+    """
+    headers = {"User-Agent": user_agent}
+    current_url = url
+    max_hops = 10
+
+    for _ in range(max_hops):
+        response = requests.get(
+            current_url,
+            headers=headers,
+            timeout=timeout,
+            allow_redirects=False,
+        )
+        if response.is_redirect:
+            location = response.headers.get("Location", "")
+            if not location:
+                break
+            next_url = urljoin(current_url, location)
+            if not check_robots_allowed(next_url, user_agent):
+                raise requests.HTTPError(
+                    f"robots.txt interdit le suivi de la redirection vers {next_url!r}",
+                    response=response,
+                )
+            current_url = next_url
+            continue
+
+        response.raise_for_status()
+
+        # Détecte le charset dans <meta charset> si absent des en-têtes HTTP
+        if "charset" not in response.headers.get("Content-Type", "").lower():
+            snippet = response.content[:4096].decode("latin-1", errors="replace")
+            meta_match = re.search(
+                r'<meta[^>]+charset=["\']?\s*([a-zA-Z0-9_-]+)',
+                snippet,
+                re.IGNORECASE,
+            )
+            if meta_match:
+                charset = meta_match.group(1)
+                return response.content.decode(charset, errors="replace")
+
+        return response.text
+
+    raise requests.TooManyRedirects(f"Trop de redirections : {url!r}")
 
 
 def _fetch_robots(robots_url: str, user_agent: str) -> str:
@@ -164,14 +206,14 @@ def check_robots_allowed(url: str, user_agent: str) -> bool:
 def compute_diff(old_content: str, new_content: str, filename: str) -> str:
     """Retourne un diff unified entre old et new. Chaîne vide si contenu identique.
 
-    Note d'implémentation : splitlines() (sans keepends) + lineterm="" produit
-    des lignes sans terminateur ; "\n".join() les sépare proprement. Cela évite
-    la concaténation silencieuse des lignes de contrôle (---/+++/@@) avec les
-    lignes de contenu qui survenait lorsque les deux sources de terminateurs
-    (keepends et lineterm) étaient incohérentes.
+    Utilise splitlines(keepends=True) pour préserver les différences de fins de
+    ligne (CRLF vs LF) : deux fichiers identiques à la virgule près mais avec
+    des terminateurs différents produisent un diff non-vide. Les lignes d'en-tête
+    (---/+++/@@), qui n'ont pas de terminateur natif avec lineterm="", reçoivent
+    un \n explicite pour un rendu cohérent.
     """
-    old_lines = old_content.splitlines()
-    new_lines = new_content.splitlines()
+    old_lines = old_content.splitlines(keepends=True)
+    new_lines = new_content.splitlines(keepends=True)
     diff_lines = list(
         difflib.unified_diff(
             old_lines,
@@ -181,7 +223,11 @@ def compute_diff(old_content: str, new_content: str, filename: str) -> str:
             lineterm="",
         )
     )
-    return "\n".join(diff_lines)
+    if not diff_lines:
+        return ""
+    # Les lignes de contenu ont déjà \n/\r\n ; les lignes d'en-tête n'en ont pas.
+    normalized = [line if line.endswith(("\n", "\r\n")) else line + "\n" for line in diff_lines]
+    return "".join(normalized).rstrip("\n")
 
 
 def print_diff(diff: str, filename: str) -> None:
@@ -241,6 +287,11 @@ def write_fixture(output_path: Path, content: str) -> None:
 # ── Manifeste ────────────────────────────────────────────────────────────────
 
 
+def _yaml_escape(value: str) -> str:
+    """Échappe value pour une insertion sûre dans un scalaire YAML double-quoté."""
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def update_manifest(
     manifest_path: Path,
     fixture_file: str,
@@ -275,7 +326,8 @@ def update_manifest(
         rf"(- file: {escaped}(?=\s){entry_bound}captured_at: ){date_value}",
         re.DOTALL,
     )
-    new_content, n_date = date_pattern.subn(rf'\g<1>"{new_date}"', content)
+    safe_date = _yaml_escape(new_date)
+    new_content, n_date = date_pattern.subn(lambda m: m.group(1) + f'"{safe_date}"', content)
     if n_date == 0:
         return False
 
@@ -284,7 +336,8 @@ def update_manifest(
         rf"(- file: {escaped}(?=\s){entry_bound}url: ){url_value}",
         re.DOTALL,
     )
-    new_content, _ = url_pattern.subn(rf'\g<1>"{url}"', new_content)
+    safe_url = _yaml_escape(url)
+    new_content, _ = url_pattern.subn(lambda m: m.group(1) + f'"{safe_url}"', new_content)
 
     manifest_path.write_text(new_content, encoding="utf-8")
     return True
@@ -324,14 +377,14 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
+    time.sleep(args.delay)
+
     print(f"→ Récupération de {args.url}")
     try:
         new_content = fetch_page(args.url, args.user_agent)
     except requests.RequestException as exc:
         print(f"ERREUR réseau : {exc}", file=sys.stderr)
         return 1
-
-    time.sleep(args.delay)
 
     # Diff — toujours affiché (nouveau fichier compris, comparé à "")
     if output_path.exists():

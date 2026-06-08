@@ -16,6 +16,7 @@ import requests
 from tools.renew_fixtures import (
     _fetch_robots,
     _non_negative_float,
+    _yaml_escape,
     check_not_ci,
     check_robots_allowed,
     compute_diff,
@@ -218,6 +219,13 @@ class TestComputeDiff:
 
     def test_diff_empty_both(self):
         assert compute_diff("", "", "file.html") == ""
+
+    def test_diff_detects_crlf_vs_lf(self):
+        """Deux fichiers identiques en contenu mais avec terminateurs différents → diff non-vide."""
+        old = "line1\r\nline2\r\n"
+        new = "line1\nline2\n"
+        diff = compute_diff(old, new, "file.html")
+        assert diff != ""
 
 
 # ── TestPrintDiff ──────────────────────────────────────────────────────────────
@@ -457,6 +465,14 @@ class TestNonNegativeFloat:
         with pytest.raises(argparse.ArgumentTypeError):
             _non_negative_float("abc")
 
+    def test_nan_raises(self):
+        with pytest.raises(argparse.ArgumentTypeError):
+            _non_negative_float("nan")
+
+    def test_inf_raises(self):
+        with pytest.raises(argparse.ArgumentTypeError):
+            _non_negative_float("inf")
+
 
 # ── TestCheckRobotsAllowed ─────────────────────────────────────────────────────
 
@@ -510,10 +526,17 @@ class TestCheckRobotsAllowed:
 
 
 class TestFetchPage:
-    def test_fetch_returns_html(self):
+    def _make_ok_response(self, text: str = "<html>content</html>") -> MagicMock:
         mock_response = MagicMock()
-        mock_response.text = "<html>content</html>"
+        mock_response.text = text
+        mock_response.is_redirect = False
         mock_response.raise_for_status = MagicMock()
+        mock_response.headers = {}
+        mock_response.content = text.encode("utf-8")
+        return mock_response
+
+    def test_fetch_returns_html(self):
+        mock_response = self._make_ok_response()
 
         with patch("tools.renew_fixtures.requests.get", return_value=mock_response) as mock_get:
             result = fetch_page("https://example.com", "TestBot/1.0")
@@ -522,9 +545,7 @@ class TestFetchPage:
         mock_get.assert_called_once()
 
     def test_fetch_sends_user_agent_header(self):
-        mock_response = MagicMock()
-        mock_response.raise_for_status = MagicMock()
-        mock_response.text = ""
+        mock_response = self._make_ok_response("")
 
         with patch("tools.renew_fixtures.requests.get", return_value=mock_response) as mock_get:
             fetch_page("https://example.com", "MyAgent/2.0")
@@ -536,9 +557,7 @@ class TestFetchPage:
         assert headers["User-Agent"] == "MyAgent/2.0"
 
     def test_fetch_uses_timeout(self):
-        mock_response = MagicMock()
-        mock_response.raise_for_status = MagicMock()
-        mock_response.text = ""
+        mock_response = self._make_ok_response("")
 
         with patch("tools.renew_fixtures.requests.get", return_value=mock_response) as mock_get:
             fetch_page("https://example.com", "Bot/1.0", timeout=30)
@@ -549,11 +568,63 @@ class TestFetchPage:
 
     def test_fetch_raises_on_http_error(self):
         mock_response = MagicMock()
+        mock_response.is_redirect = False
         mock_response.raise_for_status.side_effect = requests.HTTPError("404")
 
         with patch("tools.renew_fixtures.requests.get", return_value=mock_response):
             with pytest.raises(requests.HTTPError):
                 fetch_page("https://example.com", "Bot/1.0")
+
+    def test_fetch_follows_redirect_when_robots_allows(self):
+        """Suivi d'une redirection 301 autorisée par robots.txt."""
+        redirect_response = MagicMock()
+        redirect_response.is_redirect = True
+        redirect_response.headers = {"Location": "https://example.com/final"}
+
+        final_response = self._make_ok_response("<html>final</html>")
+
+        call_count = {"n": 0}
+
+        def side_effect(url, **kwargs):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                return redirect_response
+            return final_response
+
+        with (
+            patch("tools.renew_fixtures.requests.get", side_effect=side_effect),
+            patch("tools.renew_fixtures.check_robots_allowed", return_value=True),
+        ):
+            result = fetch_page("https://example.com/old", "Bot/1.0")
+
+        assert result == "<html>final</html>"
+
+    def test_fetch_raises_when_robots_blocks_redirect(self):
+        """Redirection interdite par robots.txt → HTTPError."""
+        redirect_response = MagicMock()
+        redirect_response.is_redirect = True
+        redirect_response.headers = {"Location": "https://example.com/forbidden"}
+
+        with (
+            patch("tools.renew_fixtures.requests.get", return_value=redirect_response),
+            patch("tools.renew_fixtures.check_robots_allowed", return_value=False),
+        ):
+            with pytest.raises(requests.HTTPError):
+                fetch_page("https://example.com/start", "Bot/1.0")
+
+    def test_fetch_detects_meta_charset(self):
+        """Charset déclaré dans <meta> est utilisé quand absent des en-têtes HTTP."""
+        html_bytes = b'<html><head><meta charset="iso-8859-1"></head><body>caf\xe9</body></html>'
+        mock_response = MagicMock()
+        mock_response.is_redirect = False
+        mock_response.raise_for_status = MagicMock()
+        mock_response.headers = {}  # pas de charset dans Content-Type
+        mock_response.content = html_bytes
+
+        with patch("tools.renew_fixtures.requests.get", return_value=mock_response):
+            result = fetch_page("https://example.com", "Bot/1.0")
+
+        assert "café" in result
 
 
 # ── TestWriteFixture ───────────────────────────────────────────────────────────
@@ -908,6 +979,20 @@ class TestMain:
         assert result == 1
 
 
+class TestYamlEscape:
+    def test_plain_string_unchanged(self):
+        assert _yaml_escape("https://example.com") == "https://example.com"
+
+    def test_double_quote_escaped(self):
+        assert _yaml_escape('say "hello"') == 'say \\"hello\\"'
+
+    def test_backslash_escaped(self):
+        assert _yaml_escape("a\\b") == "a\\\\b"
+
+    def test_both_escaped(self):
+        assert _yaml_escape('a\\"b') == 'a\\\\\\"b'
+
+
 class TestUpdateManifestUrlUpdate:
     """Tests spécifiques à la mise à jour de l'URL (P1 + P2 Codex)."""
 
@@ -933,6 +1018,23 @@ class TestUpdateManifestUrlUpdate:
         updated = manifest.read_text(encoding="utf-8")
         assert '"https://new-url.com/page"' in updated
         assert '"https://old-url.com/page"' not in updated
+
+    def test_url_with_special_chars_escaped(self, tmp_path):
+        """URL contenant des guillemets ou backslashes → YAML valide."""
+        import textwrap
+
+        content = textwrap.dedent("""\
+            fixtures:
+              - file: tot/real/listing.html
+                captured_at: "2026-06-06"
+                url: "https://old.com"
+        """)
+        manifest = self._make_manifest(tmp_path, content)
+        tricky_url = 'https://example.com/path?q="test"'
+        update_manifest(manifest, "tot/real/listing.html", "2026-06-08", tricky_url, "tot")
+        updated = manifest.read_text(encoding="utf-8")
+        # Le guillemet doit être échappé, pas brut
+        assert '\\"test\\"' in updated
 
     def test_url_replacement_bounded_to_entry(self, tmp_path):
         """La regex URL ne corrompt pas l'entrée suivante qui a url: null."""
