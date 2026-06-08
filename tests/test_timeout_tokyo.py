@@ -566,9 +566,10 @@ def test_contract_listing_rate_real(tot, monkeypatch):
 
     links = tot.get_event_links(max_pages=1)
 
-    assert len(links) >= 10, (
+    # Baseline capturée : 31 liens (fixture statique, compte déterministe)
+    assert len(links) == 31, (
         f"[{_FIXTURE_TOT_LISTING}] {len(links)} liens extraits"
-        " — sélecteur probablement cassé (attendu ≥ 10)"
+        " — sélecteur probablement cassé (baseline : 31)"
     )
 
 
@@ -585,8 +586,9 @@ def test_contract_essential_fields_real_event_full(tot, monkeypatch):
     assert result["start_date"], f"[{f}] start_date est vide"
     assert result["venue_name"], f"[{f}] venue_name est vide"
     assert result["url"], f"[{f}] url est vide"
-    # Pas de perte silencieuse : au moins 7 champs renseignés sur 13
+    # Pas de perte silencieuse : fixture réelle peuple 13/13 champs, tolérance 1
     renseignes = [k for k, v in result.items() if v is not None and v != "" and v != []]
-    assert len(renseignes) >= 7, (
+    assert len(renseignes) >= 12, (
         f"[{f}] trop de champs vides — {len(renseignes)}/{len(result)} renseignés"
+        f" (attendu ≥ 12 sur 13)"
     )
