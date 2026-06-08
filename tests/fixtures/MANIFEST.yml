@@ -26,6 +26,7 @@ fixtures:
       description et localisation JSON Apple Maps. Cas nominal du parseur.
     tests_consuming:
       - test_tokyo_cheapo.py::test_scrape_event_full_fixture
+      - test_tokyo_cheapo.py::test_contract_essential_fields_event_full
 
   - file: tc/synthetic/event_no_description.html
     category: synthetic
@@ -120,6 +121,7 @@ fixtures:
       japonais (nom, dates, horaires, prix, lieu). Premier onglet d'un événement.
     tests_consuming:
       - test_hanabi_walker.py::test_parse_event_table_from_fixture
+      - test_hanabi_walker.py::test_contract_essential_fields_event
 
   - file: hanabi/synthetic/event_map.html
     category: synthetic
@@ -132,6 +134,7 @@ fixtures:
       Utilisé avec hanabi/synthetic/event_data.html pour assembler un Event complet.
     tests_consuming:
       - test_hanabi_walker.py::test_parse_coordinates_from_fixture
+      - test_hanabi_walker.py::test_contract_essential_fields_event
 
   - file: hanabi/synthetic/event_cancelled_data.html
     category: synthetic
@@ -192,6 +195,7 @@ fixtures:
     anonymized: false  # tokens côté client à examiner — voir TEST-005
     tests_consuming:
       - test_timeout_tokyo.py::test_get_event_links_extracts_and_deduplicates
+      - test_timeout_tokyo.py::test_contract_listing_rate_real
 
   - file: tot/real/event_full.html
     category: real
@@ -207,6 +211,7 @@ fixtures:
       - test_timeout_tokyo.py::test_parse_json_ld_finds_theater_event
       - test_timeout_tokyo.py::test_is_news_article_false_for_event
       - test_timeout_tokyo.py::test_scrape_event_full_from_fixture
+      - test_timeout_tokyo.py::test_contract_essential_fields_real_event_full
 
   - file: tot/real/event_news_article.html
     category: real

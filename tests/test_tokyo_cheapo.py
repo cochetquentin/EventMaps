@@ -757,6 +757,44 @@ def test_scrape_event_missing_optional_fields(tc, monkeypatch):
     assert result["price"] is None
 
 
+# ---------------------------------------------------------------------------
+# TEST-006 : assertions de contrat et qualité d'extraction
+# ---------------------------------------------------------------------------
+
+_FIXTURE_TC_EVENT_FULL = "tc/synthetic/event_full.html"
+
+
+def test_contract_essential_fields_event_full(tc, monkeypatch):
+    """CONTRAT: tc/synthetic/event_full.html — champs essentiels, pas de perte silencieuse."""
+    html_bytes = (FIXTURES_DIR / _FIXTURE_TC_EVENT_FULL).read_bytes()
+    soup = BeautifulSoup(html_bytes, "html.parser")
+    monkeypatch.setattr(tc, "get_event_page", lambda url: soup)
+    fixed_jst = _date_cls(2026, 6, 5)
+    monkeypatch.setattr("scrapers.tokyo_cheapo._today_jst", lambda: fixed_jst)
+
+    result = tc.scrape_event("https://tokyocheapo.com/events/kawaii-flea-market-2026/")
+    f = _FIXTURE_TC_EVENT_FULL
+
+    # Ensemble fixe de clés contractuelles peuplées par la fixture
+    # (résistant à l'ajout de nouveaux champs optionnels dans le scraper)
+    _EXPECTED_KEYS = {
+        "url",
+        "title",
+        "start_date",
+        "end_date",
+        "start_time",
+        "end_time",
+        "price",
+        "description",
+        "categories",
+        "tags",
+        "official_link",
+        "locations",
+    }
+    manquants = {k for k in _EXPECTED_KEYS if not result.get(k)}
+    assert not manquants, f"[{f}] champs contractuels absents : {sorted(manquants)}"
+
+
 def test_get_event_links_deduplicates_and_excludes(tc, monkeypatch):
     """Listing avec 5 uniques + 1 doublon + liens exclus → 5 liens retournés."""
     html_bytes = (FIXTURES_DIR / "tc/synthetic/listing_rich.html").read_bytes()

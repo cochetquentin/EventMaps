@@ -592,3 +592,47 @@ def test_get_event_links_deduplicates_from_fixture(hw):
     assert "/detail/ar0300e011/" in links
     assert "/detail/ar0300e012/" in links
     assert "/detail/ar0300e013/" in links
+
+
+# ---------------------------------------------------------------------------
+# TEST-006 : assertions de contrat et qualité d'extraction
+# ---------------------------------------------------------------------------
+
+_FIXTURE_HW_EVENT_DATA = "hanabi/synthetic/event_data.html"
+_FIXTURE_HW_EVENT_MAP = "hanabi/synthetic/event_map.html"
+
+
+def test_contract_essential_fields_event(hw):
+    """CONTRAT: event_data + event_map — champs essentiels, pas de perte silencieuse."""
+    soup_data = _load_fixture(_FIXTURE_HW_EVENT_DATA)
+    soup_map = _load_fixture(_FIXTURE_HW_EVENT_MAP)
+
+    hw.get_data_page = MagicMock(return_value=soup_data)
+    hw.get_map_page = MagicMock(return_value=soup_map)
+
+    result = hw.scrape_event("/detail/ar0300e001/")
+    f = _FIXTURE_HW_EVENT_DATA
+
+    # Ensemble fixe de clés contractuelles attendues dans cette fixture
+    # (résistant à l'ajout de nouveaux champs optionnels)
+    _EXPECTED_KEYS = {
+        "title",
+        "dates",
+        "venue",
+        "url",
+        "lat",
+        "lng",
+        "start_time",
+        "end_time",
+        "fireworks_count",
+        "fireworks_duration",
+        "expected_crowd",
+        "rain_policy",
+        "paid_seating",
+        "food_stalls",
+        "access",
+        "parking",
+        "contact",
+    }
+    manquants = {k for k in _EXPECTED_KEYS if not result.get(k)}
+    assert not manquants, f"[{f}] champs contractuels absents : {sorted(manquants)}"
