@@ -398,7 +398,7 @@ fixtures:
       Utilisé avec event-ar0308e00896-data.html pour assembler l'événement.
     linked_fragments:
       - hanabi/real/event-ar0308e00896-data.html
-    anonymized: false
+    anonymized: true  # Google Maps key remplacée par AIzaSyREDACTED
     tests_consuming:
       - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0308e00896]
 
@@ -425,7 +425,7 @@ fixtures:
       Fragment map réel pour ar0311e00250.
     linked_fragments:
       - hanabi/real/event-ar0311e00250-data.html
-    anonymized: false
+    anonymized: true  # Google Maps key remplacée par AIzaSyREDACTED
     tests_consuming:
       - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0311e00250]
 
@@ -452,7 +452,7 @@ fixtures:
       Fragment map réel pour ar0313e00858.
     linked_fragments:
       - hanabi/real/event-ar0313e00858-data.html
-    anonymized: false
+    anonymized: true  # Google Maps key remplacée par AIzaSyREDACTED
     tests_consuming:
       - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0313e00858]
 
@@ -479,7 +479,7 @@ fixtures:
       Fragment map réel pour ar0516e00063.
     linked_fragments:
       - hanabi/real/event-ar0516e00063-data.html
-    anonymized: false
+    anonymized: true  # Google Maps key remplacée par AIzaSyREDACTED
     tests_consuming:
       - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0516e00063]
 
@@ -506,6 +506,6 @@ fixtures:
       Fragment map réel pour ar0518e00070.
     linked_fragments:
       - hanabi/real/event-ar0518e00070-data.html
-    anonymized: false
+    anonymized: true  # Google Maps key remplacée par AIzaSyREDACTED
     tests_consuming:
       - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0518e00070]
