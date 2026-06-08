@@ -837,6 +837,17 @@ _REAL_TC_DIR = FIXTURES_DIR / "tc" / "real"
 _REAL_TC_EVENTS = sorted(_REAL_TC_DIR.glob("event-*.html")) if _REAL_TC_DIR.exists() else []
 _REAL_TC_LISTINGS = sorted(_REAL_TC_DIR.glob("listing-*.html")) if _REAL_TC_DIR.exists() else []
 
+# Champs attendus non vides pour chaque fixture réelle (couverture des sélecteurs par cas)
+_TC_FIXTURE_REQUIRED: dict[str, set[str]] = {
+    "event-katsushika-iris-festival": {"start_date", "locations"},
+    "event-candlelight-concert-a-collection-of-great-love-songs": {"start_date"},
+    "event-dagashiya-conversation-class-learn-japanese-with-retro-candy": {"start_date"},
+    "event-downtown-highball-festival": {"start_date"},
+    "event-torigoe-matsuri": {"start_date"},
+}
+# Fixtures pour lesquelles ≥ 2 lieux sont attendus
+_TC_MULTI_LOCATION: set[str] = {"event-katsushika-iris-festival"}
+
 
 @pytest.mark.parametrize("fixture", _REAL_TC_EVENTS, ids=lambda f: f.stem)
 def test_real_event_parses_title_and_url(tc, monkeypatch, fixture):
@@ -850,6 +861,24 @@ def test_real_event_parses_title_and_url(tc, monkeypatch, fixture):
     assert result.get("title"), f"[{fixture.name}] title vide ou absent"
     assert result.get("url"), f"[{fixture.name}] url vide ou absent"
     assert result["url"] == url
+    # Assertions de structure : sélecteurs ne doivent pas lever d'exception ni changer de type
+    assert isinstance(result.get("description"), str), (
+        f"[{fixture.name}] description doit être une str"
+    )
+    assert isinstance(result.get("locations"), list), (
+        f"[{fixture.name}] locations doit être une liste"
+    )
+    assert isinstance(result.get("categories"), list), (
+        f"[{fixture.name}] categories doit être une liste"
+    )
+    # Assertions spécifiques à chaque fixture selon la variante couverte
+    required = _TC_FIXTURE_REQUIRED.get(fixture.stem, set())
+    if "start_date" in required:
+        assert result.get("start_date"), f"[{fixture.name}] start_date attendue mais absente"
+    if fixture.stem in _TC_MULTI_LOCATION:
+        assert len(result.get("locations", [])) >= 2, (
+            f"[{fixture.name}] ≥ 2 lieux attendus pour cette fixture multi-lieu"
+        )
 
 
 @pytest.mark.parametrize("fixture", _REAL_TC_LISTINGS, ids=lambda f: f.stem)

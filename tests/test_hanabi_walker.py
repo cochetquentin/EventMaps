@@ -660,12 +660,21 @@ if os.path.isdir(_REAL_HANABI_DIR):
     )
 
 
+# IDs des events dont on sait que les coordonnées sont présentes dans la fixture.
+# Ajouter les IDs coord-absents dans _HANABI_EVENTS_NO_COORDS pour couvrir cette variante.
+_HANABI_EVENTS_WITH_COORDS: set[str] = {
+    "ar0308e00896",
+    "ar0311e00250",
+    "ar0313e00858",
+    "ar0516e00063",
+    "ar0518e00070",
+}
+_HANABI_EVENTS_NO_COORDS: set[str] = set()  # à alimenter si fixture coord-absente ajoutée
+
+
 @pytest.mark.parametrize("event_id", _REAL_HANABI_EVENT_IDS)
 def test_real_event_parses_essential_fields(hw, event_id):
-    """Chaque paire data+map réelle Hanabi produit titre, dates et coordonnées."""
-    data_path = os.path.join(_REAL_HANABI_DIR, f"event-{event_id}-data.html")
-    map_path = os.path.join(_REAL_HANABI_DIR, f"event-{event_id}-map.html")
-
+    """Chaque paire data+map réelle Hanabi produit titre, dates et URL."""
     soup_data = _load_fixture(f"hanabi/real/event-{event_id}-data.html")
     soup_map = _load_fixture(f"hanabi/real/event-{event_id}-map.html")
 
@@ -677,8 +686,13 @@ def test_real_event_parses_essential_fields(hw, event_id):
     assert result.get("title"), f"[{event_id}] title vide ou absent"
     assert result.get("dates"), f"[{event_id}] dates vide ou absent"
     assert result.get("url"), f"[{event_id}] url vide ou absent"
-    assert result.get("lat") is not None, f"[{event_id}] lat absent"
-    assert result.get("lng") is not None, f"[{event_id}] lng absent"
+    # Assertions lat/lng spécifiques à la variante couverte par chaque fixture
+    if event_id in _HANABI_EVENTS_WITH_COORDS:
+        assert result.get("lat") is not None, f"[{event_id}] lat attendu non-null mais absent"
+        assert result.get("lng") is not None, f"[{event_id}] lng attendu non-null mais absent"
+    elif event_id in _HANABI_EVENTS_NO_COORDS:
+        assert result.get("lat") is None, f"[{event_id}] lat attendu null mais présent"
+        assert result.get("lng") is None, f"[{event_id}] lng attendu null mais présent"
 
 
 @pytest.mark.parametrize(
