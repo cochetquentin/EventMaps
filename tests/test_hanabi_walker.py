@@ -592,3 +592,33 @@ def test_get_event_links_deduplicates_from_fixture(hw):
     assert "/detail/ar0300e011/" in links
     assert "/detail/ar0300e012/" in links
     assert "/detail/ar0300e013/" in links
+
+
+# ---------------------------------------------------------------------------
+# TEST-006 : assertions de contrat et qualité d'extraction
+# ---------------------------------------------------------------------------
+
+_FIXTURE_HW_EVENT_DATA = "hanabi/synthetic/event_data.html"
+_FIXTURE_HW_EVENT_MAP = "hanabi/synthetic/event_map.html"
+
+
+def test_contract_essential_fields_event(hw):
+    """CONTRAT: event_data + event_map — champs essentiels, pas de perte silencieuse."""
+    soup_data = _load_fixture(_FIXTURE_HW_EVENT_DATA)
+    soup_map = _load_fixture(_FIXTURE_HW_EVENT_MAP)
+
+    hw.get_data_page = MagicMock(return_value=soup_data)
+    hw.get_map_page = MagicMock(return_value=soup_map)
+
+    result = hw.scrape_event("/detail/ar0300e001/")
+    f = _FIXTURE_HW_EVENT_DATA
+
+    assert result["title"], f"[{f}] title est vide"
+    assert result["dates"], f"[{f}] dates est vide"
+    assert result["venue"], f"[{f}] venue est vide"
+    assert result["url"], f"[{f}] url est vide"
+    # Pas de perte silencieuse : au moins 6 champs renseignés
+    renseignes = [k for k, v in result.items() if v is not None and v != "" and v != []]
+    assert len(renseignes) >= 6, (
+        f"[{f}] trop de champs vides — {len(renseignes)}/{len(result)} renseignés"
+    )

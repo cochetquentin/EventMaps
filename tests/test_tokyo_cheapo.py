@@ -757,6 +757,35 @@ def test_scrape_event_missing_optional_fields(tc, monkeypatch):
     assert result["price"] is None
 
 
+# ---------------------------------------------------------------------------
+# TEST-006 : assertions de contrat et qualité d'extraction
+# ---------------------------------------------------------------------------
+
+_FIXTURE_TC_EVENT_FULL = "tc/synthetic/event_full.html"
+
+
+def test_contract_essential_fields_event_full(tc, monkeypatch):
+    """CONTRAT: tc/synthetic/event_full.html — champs essentiels, pas de perte silencieuse."""
+    html_bytes = (FIXTURES_DIR / _FIXTURE_TC_EVENT_FULL).read_bytes()
+    soup = BeautifulSoup(html_bytes, "html.parser")
+    monkeypatch.setattr(tc, "get_event_page", lambda url: soup)
+    fixed_jst = _date_cls(2026, 6, 5)
+    monkeypatch.setattr("scrapers.tokyo_cheapo._today_jst", lambda: fixed_jst)
+
+    result = tc.scrape_event("https://tokyocheapo.com/events/kawaii-flea-market-2026/")
+    f = _FIXTURE_TC_EVENT_FULL
+
+    assert result["title"], f"[{f}] title est vide"
+    assert result["start_date"], f"[{f}] start_date est vide"
+    assert isinstance(result["locations"], list), f"[{f}] locations n'est pas une liste"
+    assert result["locations"], f"[{f}] locations est vide"
+    # Pas de perte silencieuse : au moins 8 champs renseignés sur 12
+    renseignes = [k for k, v in result.items() if v is not None and v != "" and v != []]
+    assert len(renseignes) >= 8, (
+        f"[{f}] trop de champs vides — {len(renseignes)}/{len(result)} renseignés"
+    )
+
+
 def test_get_event_links_deduplicates_and_excludes(tc, monkeypatch):
     """Listing avec 5 uniques + 1 doublon + liens exclus → 5 liens retournés."""
     html_bytes = (FIXTURES_DIR / "tc/synthetic/listing_rich.html").read_bytes()

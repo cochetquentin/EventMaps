@@ -538,3 +538,55 @@ def test_scrape_event_free_price(tot, monkeypatch):
     result = tot.scrape_event("https://www.timeout.com/tokyo/music/free-concert")
 
     assert result["price"] == "Free"
+
+
+# ── TEST-006 : assertions de contrat et qualité d'extraction ──────────────────
+
+_FIXTURE_TOT_LISTING = "tot/real/listing.html"
+_FIXTURE_TOT_EVENT_FULL = "tot/real/event_full.html"
+
+
+def test_contract_listing_rate_real(tot, monkeypatch):
+    """CONTRAT: tot/real/listing.html — ≥ 10 liens extraits (sélecteur cassé → échoue)."""
+    import requests as _requests
+
+    html_bytes = (FIXTURES_DIR / _FIXTURE_TOT_LISTING).read_bytes()
+
+    def fake_fetch(url, session, timeout):
+        r = _requests.Response()
+        r.status_code = 200
+        r._content = html_bytes
+        return r
+
+    monkeypatch.setattr("scrapers.timeout_tokyo._fetch", fake_fetch)
+    monkeypatch.setattr(
+        "scrapers.timeout_tokyo._listing_paths",
+        lambda n: ["/tokyo/things-to-do/things-to-do-this-week-in-tokyo"],
+    )
+
+    links = tot.get_event_links(max_pages=1)
+
+    assert len(links) >= 10, (
+        f"[{_FIXTURE_TOT_LISTING}] {len(links)} liens extraits"
+        " — sélecteur probablement cassé (attendu ≥ 10)"
+    )
+
+
+def test_contract_essential_fields_real_event_full(tot, monkeypatch):
+    """CONTRAT: tot/real/event_full.html — champs essentiels non-vides, pas de perte silencieuse."""
+    html_bytes = (FIXTURES_DIR / _FIXTURE_TOT_EVENT_FULL).read_bytes()
+    soup = BeautifulSoup(html_bytes, "html.parser")
+    monkeypatch.setattr(tot, "get_event_page", lambda url: soup)
+
+    result = tot.scrape_event("https://www.timeout.com/tokyo/art/bunkyo-matsuri")
+    f = _FIXTURE_TOT_EVENT_FULL
+
+    assert result["title"], f"[{f}] title est vide"
+    assert result["start_date"], f"[{f}] start_date est vide"
+    assert result["venue_name"], f"[{f}] venue_name est vide"
+    assert result["url"], f"[{f}] url est vide"
+    # Pas de perte silencieuse : au moins 7 champs renseignés sur 13
+    renseignes = [k for k, v in result.items() if v is not None and v != "" and v != []]
+    assert len(renseignes) >= 7, (
+        f"[{f}] trop de champs vides — {len(renseignes)}/{len(result)} renseignés"
+    )

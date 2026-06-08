@@ -70,7 +70,7 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 ## TEST-006 — Ajouter des assertions de contrat et de qualité d'extraction
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** TEST-003, TEST-004, TEST-005
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/61
