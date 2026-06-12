@@ -1,5 +1,5 @@
 {
-  "_comment_tool003_slot": "TOOL-003: une fois scripts/handle_codex_review.py créé, ajouter Bash(uv run --locked python scripts/handle_codex_review.py*) et réduire les règles gh/git ci-dessous",
+  "_comment_tool003_slot": "TOOL-003: une fois scripts/handle_codex_review.py créé, ajouter Bash(uv run --locked python scripts/handle_codex_review.py*) et supprimer Bash(uv run python -c*) — ce dernier est un compromis pré-TOOL-003 pour les snippets de normalisation d'horodatage",
   "permissions": {
     "allow": [
       "Bash(uv run --locked python -m pytest*)",
@@ -36,15 +36,29 @@
       "Bash(git push * --force*)",
       "Bash(git push * -f*)",
       "Bash(git push *+*)",
+      "Bash(git push --delete*)",
+      "Bash(git push --mirror*)",
       "Bash(git clean*)",
       "Bash(git reset --hard*)",
+      "Bash(git commit --amend*)",
       "Bash(git stash clear*)",
+      "Bash(git stash drop*)",
       "Bash(git branch -D*)",
       "Bash(git branch -d*)",
+      "Bash(git branch --delete*)",
+      "Bash(git branch -M*)",
+      "Bash(git checkout -f*)",
+      "Bash(git checkout -B*)",
       "Bash(gh api * --method DELETE*)",
       "Bash(gh api * --method PATCH*)",
       "Bash(gh api * --method PUT*)",
-      "Bash(gh api * --method POST*)"
+      "Bash(gh api * --method POST*)",
+      "Bash(gh api * -f *)",
+      "Bash(gh api * -F *)",
+      "Bash(gh pr comment --delete-last*)",
+      "Bash(gh pr comment --edit-last*)",
+      "Bash(gh issue comment --delete-last*)",
+      "Bash(gh issue comment --edit-last*)"
     ]
   }
 }
