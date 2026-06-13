@@ -21,7 +21,7 @@
 
 - **Statut : Terminé**
 - **Priorité : P0**
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/51
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/51 — PR : https://github.com/cochetquentin/EventMaps/pull/92
 
 **Contrainte impérative.** `/handle-codex-review` doit continuer à fonctionner sans validation manuelle pour chaque sous-commande.
 
