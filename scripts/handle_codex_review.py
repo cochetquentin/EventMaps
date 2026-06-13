@@ -570,7 +570,11 @@ def print_summary(result: CycleResult) -> None:
         for desc, reason in result.ignored:
             print(f"  - {desc} → {reason}")
     cov_str = f" (coverage : {result.coverage}%)" if result.coverage is not None else ""
-    print(f"Tests : {'PASS' if result.tests_passed else 'FAIL'}{cov_str}")
+    if result.stopped_early and result.coverage is None:
+        tests_label = "N/A (arrêt anticipé)"
+    else:
+        tests_label = f"{'PASS' if result.tests_passed else 'FAIL'}{cov_str}"
+    print(f"Tests : {tests_label}")
     if result.commit_sha:
         print(f'Commit : {result.commit_sha[:8]} — "{result.commit_message}"')
     else:
