@@ -7,16 +7,12 @@ from __future__ import annotations
 
 import json
 import subprocess
-from unittest.mock import MagicMock, call, patch
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 import scripts.handle_codex_review as hcr
 from scripts.handle_codex_review import (
     CODEX_BOT,
-    CODEX_INTRO_MARKER,
     CodexRemark,
-    CycleResult,
     PRInfo,
     _latest_epoch,
     _parse_remarks_from_json,
@@ -30,7 +26,6 @@ from scripts.handle_codex_review import (
     phase6_commit_push,
     rollback,
 )
-
 
 # ---------------------------------------------------------------------------
 # parse_iso_epoch

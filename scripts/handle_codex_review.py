@@ -18,8 +18,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import datetime
 
 # Force UTF-8 sur stdout/stderr pour les consoles Windows (cp1252 ne supporte pas les emojis)
 if hasattr(sys.stdout, "reconfigure"):
@@ -92,26 +91,26 @@ class PRInfo:
 class CodexRemark:
     source: str  # "review" | "inline" | "comment"
     body: str
-    file: Optional[str] = None
-    line: Optional[int] = None
+    file: str | None = None
+    line: int | None = None
     created_at: str = ""
 
 
 @dataclass
 class CycleResult:
-    pr: Optional[PRInfo] = None
+    pr: PRInfo | None = None
     remarks_found: int = 0
     applied: list[str] = field(default_factory=list)
     ignored: list[tuple[str, str]] = field(default_factory=list)
     tests_passed: bool = False
-    coverage: Optional[float] = None
-    commit_sha: Optional[str] = None
-    commit_message: Optional[str] = None
+    coverage: float | None = None
+    commit_sha: str | None = None
+    commit_message: str | None = None
     pushed: bool = False
     codex_relaunched: bool = False
-    skip_reason: Optional[str] = None
+    skip_reason: str | None = None
     stopped_early: bool = False
-    stop_reason: Optional[str] = None
+    stop_reason: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -382,13 +381,13 @@ def get_new_untracked_files(pre_dirty: list[str]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def phase5_run_tests() -> tuple[bool, Optional[float]]:
+def phase5_run_tests() -> tuple[bool, float | None]:
     """Lance pytest et retourne (passed, coverage_pct)."""
     result = _run(PYTEST_CMD, check=False)
     passed = result.returncode == 0
 
     # Extraire le pourcentage de coverage depuis stdout
-    coverage: Optional[float] = None
+    coverage: float | None = None
     for line in (result.stdout or "").splitlines():
         if "TOTAL" in line and "%" in line:
             parts = line.split()
@@ -430,7 +429,7 @@ def rollback(
 def phase6_commit_push(
     pr: PRInfo,
     files_to_stage: list[str],
-) -> tuple[Optional[str], Optional[str], bool]:
+) -> tuple[str | None, str | None, bool]:
     """Commit et push les fichiers produits par ce cycle. Retourne (sha, message, pushed).
 
     Réinitialise l'index avant de stager pour éviter d'inclure des changements
