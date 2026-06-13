@@ -16,11 +16,18 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
+
+# Force UTF-8 sur stdout/stderr pour les consoles Windows (cp1252 ne supporte pas les emojis)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 CODEX_BOT = "chatgpt-codex-connector[bot]"
 CODEX_TRIGGER = "@codex review"
@@ -52,7 +59,7 @@ def parse_iso_epoch(s: str) -> int:
 
 def _run(cmd: list[str], check: bool = True, capture: bool = True) -> subprocess.CompletedProcess:
     """Point d'entrée unique pour tous les appels subprocess — mockable dans les tests."""
-    return subprocess.run(cmd, capture_output=capture, text=True, check=check)
+    return subprocess.run(cmd, capture_output=capture, text=True, check=check, encoding="utf-8")
 
 
 def _gh(*args: str) -> str:
@@ -196,19 +203,27 @@ def phase2_anti_loop(pr: PRInfo) -> tuple[bool, str]:
     t_codex_e = _latest_epoch(all_codex_dates)
 
     # T_COMMIT : date du dernier commit de la PR
-    commit_raw = _gh(
-        "api", f"repos/{pr.repo}/commits/{pr.head_sha}", "--jq", ".commit.committer.date"
-    )
+    # check=False car une erreur API transiente ne doit pas annuler le cycle entier
+    try:
+        commit_raw = _gh(
+            "api", f"repos/{pr.repo}/commits/{pr.head_sha}", "--jq", ".commit.committer.date"
+        )
+    except subprocess.CalledProcessError:
+        commit_raw = ""
     if not commit_raw:
         commit_raw = _git("log", "-1", "--format=%cI")
     t_commit_e = parse_iso_epoch(commit_raw)
 
     if t_trigger_e > 0 and t_trigger_e > t_commit_e and t_codex_e < t_trigger_e:
-        return True, (
-            "Anti-boucle : @Codex review déjà posté après le dernier commit "
-            "et Codex n'a pas encore répondu."
+        return (
+            True,
+            (
+                "Anti-boucle : @Codex review déjà posté après le dernier commit "
+                "et Codex n'a pas encore répondu."
+            ),
+            t_trigger,
         )
-    return False, ""
+    return False, "", t_trigger
 
 
 # ---------------------------------------------------------------------------
@@ -252,7 +267,7 @@ def phase3_get_remarks(pr: PRInfo, since: str = "") -> list[CodexRemark]:
         "--paginate",
         f"repos/{pr.repo}/pulls/{pr.number}/reviews",
         "--jq",
-        f'.[] | select(.user.login == "{CODEX_BOT}"){since_filter_r}',
+        f'.[] | select(.user.login == "{CODEX_BOT}") | select(.state == "CHANGES_REQUESTED"){since_filter_r}',
     )
     raw_inline = _gh(
         "api",
@@ -312,9 +327,8 @@ def phase4_display_remarks(
             print(f"  [{i}] IGNORÉ ({reason}) — {loc}")
         else:
             print(f"  [{i}] {loc} — {remark.body[:80]}")
-            # L'opérateur (Claude) applique et remplit `applied` manuellement.
-            # Pour les appels automatisés, on marque chaque remarque comme "à traiter".
-            applied.append(f"{loc} — {remark.body[:60]}")
+            # `applied` reste vide ici — l'opérateur (Claude) applique les corrections
+            # via ses outils natifs, puis appelle phase5/6/7 séparément.
 
     return applied, ignored
 
@@ -376,7 +390,10 @@ def rollback(
             _git("checkout", "--", f, check=False)
     for f in new_untracked:
         try:
-            os.unlink(f)
+            if os.path.isdir(f):
+                shutil.rmtree(f)
+            else:
+                os.unlink(f)
         except OSError:
             pass
 
@@ -387,22 +404,26 @@ def rollback(
 
 
 def phase6_commit_push(
-    applied: list[str],
     pr: PRInfo,
     files_to_stage: list[str],
 ) -> tuple[Optional[str], Optional[str], bool]:
-    """Commit et push si des modifications existent. Retourne (sha, message, pushed)."""
-    # Vérifier qu'il y a bien un diff
-    status = _git("status", "--porcelain")
-    if not status.strip():
-        return None, None, False
+    """Commit et push les fichiers produits par ce cycle. Retourne (sha, message, pushed).
 
-    summary = applied[0] if applied else "corrections Codex"
-    message = f"fix: appliquer corrections Codex — {summary[:72]}"
+    Seuls les fichiers listés dans files_to_stage sont stagés pour éviter d'inclure
+    des changements pré-existants non liés au cycle Codex.
+    """
+    if not files_to_stage:
+        return None, None, False
 
     for f in files_to_stage:
         _git("add", f)
 
+    # Vérifier qu'il y a effectivement quelque chose de stagé
+    staged = _git("diff", "--cached", "--name-only", check=False)
+    if not staged.strip():
+        return None, None, False
+
+    message = "fix: appliquer corrections Codex"
     _git("commit", "-m", message)
     sha = _git("rev-parse", "HEAD")
 
@@ -421,8 +442,7 @@ def phase7_relaunch_codex(pr: PRInfo) -> bool:
     pr_json = _gh("pr", "view", "--json", "headRefOid")
     pr.head_sha = json.loads(pr_json)["headRefOid"]
 
-    should_stop, _ = phase2_anti_loop(pr)
-    if should_stop:
+    if phase2_anti_loop(pr)[0]:
         return False
 
     _gh("pr", "comment", str(pr.number), "--body", "@Codex review")
@@ -445,7 +465,7 @@ def run() -> CycleResult:
 
     # Phase 2
     print("\n## Phase 2 — Anti-boucle")
-    stop, reason = phase2_anti_loop(pr)
+    stop, reason, t_trigger = phase2_anti_loop(pr)
     if stop:
         result.stopped_early = True
         result.stop_reason = reason
@@ -455,7 +475,7 @@ def run() -> CycleResult:
 
     # Phase 3
     print("\n## Phase 3 — Récupération des remarques Codex")
-    remarks = phase3_get_remarks(pr)
+    remarks = phase3_get_remarks(pr, since=t_trigger)
     result.remarks_found = len(remarks)
     if not remarks:
         result.stopped_early = True
@@ -501,12 +521,13 @@ def run() -> CycleResult:
 
     # Phase 6
     print("\n## Phase 6 — Commit et push")
-    if not applied:
-        result.skip_reason = "Aucune modification appliquée — pas de commit."
+    files_changed = workflow_tracked + new_untracked
+    if not files_changed:
+        result.skip_reason = "Aucune modification — pas de commit."
         print(result.skip_reason)
         return result
 
-    sha, message, pushed = phase6_commit_push(applied, pr, workflow_tracked + new_untracked)
+    sha, message, pushed = phase6_commit_push(pr, files_changed)
     result.commit_sha = sha
     result.commit_message = message
     result.pushed = pushed

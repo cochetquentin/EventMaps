@@ -156,10 +156,11 @@ def test_anti_loop_stops_when_trigger_after_commit_no_codex_response():
             commit=T_COMMIT,
         )
         mock_git.return_value = ""
-        stop, reason = phase2_anti_loop(PR)
+        stop, reason, t_trigger = phase2_anti_loop(PR)
 
     assert stop is True
     assert "Anti-boucle" in reason
+    assert t_trigger == T_TRIGGER
 
 
 def test_anti_loop_passes_when_codex_responded_after_trigger():
@@ -173,10 +174,11 @@ def test_anti_loop_passes_when_codex_responded_after_trigger():
             commit=T_COMMIT,
         )
         mock_git.return_value = ""
-        stop, reason = phase2_anti_loop(PR)
+        stop, reason, t_trigger = phase2_anti_loop(PR)
 
     assert stop is False
     assert reason == ""
+    assert t_trigger == T_TRIGGER
 
 
 def test_anti_loop_passes_when_no_trigger():
@@ -190,9 +192,10 @@ def test_anti_loop_passes_when_no_trigger():
             commit=T_COMMIT,
         )
         mock_git.return_value = ""
-        stop, _ = phase2_anti_loop(PR)
+        stop, _, t_trigger = phase2_anti_loop(PR)
 
     assert stop is False
+    assert t_trigger == ""
 
 
 def test_anti_loop_passes_when_trigger_before_commit():
@@ -206,7 +209,7 @@ def test_anti_loop_passes_when_trigger_before_commit():
             commit=T_COMMIT,
         )
         mock_git.return_value = ""
-        stop, _ = phase2_anti_loop(PR)
+        stop, _, _ = phase2_anti_loop(PR)
 
     assert stop is False
 
@@ -252,22 +255,24 @@ def test_remark_on_dirty_file_is_ignored():
     assert "modifié localement" in ignored[0][1]
 
 
-def test_remark_on_clean_file_is_applied():
+def test_remark_on_clean_file_is_displayed_not_applied():
+    """Les remarques sur fichiers propres sont affichées mais applied reste vide."""
     remark = CodexRemark(source="comment", body="Ajoute des types", file="api/app.py", line=5)
     dirty: list[str] = []
 
     applied, ignored = phase4_display_remarks([remark], dirty)
 
-    assert len(applied) == 1
+    assert applied == []
     assert ignored == []
 
 
-def test_general_remark_no_file_is_applied():
+def test_general_remark_is_displayed_not_applied():
+    """Les remarques générales sont affichées mais applied reste vide."""
     remark = CodexRemark(source="review", body="Améliore la couverture")
 
     applied, ignored = phase4_display_remarks([remark], [])
 
-    assert len(applied) == 1
+    assert applied == []
     assert ignored == []
 
 
@@ -330,27 +335,41 @@ def test_rollback_skips_pre_dirty_files():
 # ---------------------------------------------------------------------------
 
 
-def test_no_diff_skips_commit():
-    """Si git status --porcelain est vide → pas de commit."""
+def test_no_diff_skips_commit_when_no_files():
+    """Si files_to_stage est vide → pas de commit."""
     with patch.object(hcr, "_git", return_value=""):
-        sha, message, pushed = phase6_commit_push(["fix: quelque chose"], PR, [])
+        sha, message, pushed = phase6_commit_push(PR, [])
+    assert sha is None
+    assert pushed is False
+
+
+def test_no_diff_skips_commit_when_nothing_staged():
+    """Si diff --cached est vide après git add → pas de commit."""
+
+    def git_side_effect(*args, **kwargs):
+        if args[0] == "diff":
+            return ""  # rien de stagé
+        return ""
+
+    with patch.object(hcr, "_git", side_effect=git_side_effect):
+        sha, message, pushed = phase6_commit_push(PR, ["api/app.py"])
+
     assert sha is None
     assert pushed is False
 
 
 def test_commit_and_push_when_diff_exists():
-    """Si git status retourne des fichiers → commit + push."""
-    call_count = {"n": 0}
+    """Si diff --cached retourne des fichiers → commit + push."""
 
     def git_side_effect(*args, **kwargs):
-        if args[0] == "status":
-            return "M api/app.py"
+        if args[0] == "diff":
+            return "api/app.py"
         if args[0] == "rev-parse":
             return "deadbeef1234"
         return ""
 
     with patch.object(hcr, "_git", side_effect=git_side_effect):
-        sha, message, pushed = phase6_commit_push(["fix: correction"], PR, ["api/app.py"])
+        sha, message, pushed = phase6_commit_push(PR, ["api/app.py"])
 
     assert sha == "deadbeef1234"
     assert pushed is True
