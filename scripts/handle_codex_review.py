@@ -446,8 +446,10 @@ def rollback(
     for f in tracked_modified:
         if f not in pre_dirty:
             # Restaure depuis HEAD (pas depuis l'index) pour éviter de restaurer
-            # un état intermédiaire stagé non committé
-            _git("checkout", "HEAD", "--", f, check=False)
+            # un état intermédiaire stagé non committé.
+            # :(literal) désactive la magie pathspec git pour les noms de fichiers
+            # contenant des caractères spéciaux comme ':(top)*'.
+            _git("checkout", "HEAD", "--", f":(literal){f}", check=False)
     for f in new_untracked:
         try:
             os.unlink(f)
@@ -476,9 +478,8 @@ def phase6_commit(
         return None, None
 
     for f in files_to_stage:
-        # -- sépare les options des chemins et prévient l'injection d'options
-        # (ex : un fichier nommé '--all' ne deviendrait pas git add --all)
-        _git("add", "--", f)
+        # :(literal) désactive la magie pathspec + -- sépare options et chemins
+        _git("add", "--", f":(literal){f}")
 
     # Vérifier qu'il y a effectivement quelque chose de stagé
     staged = _git("diff", "--cached", "--name-only", check=False)
@@ -504,8 +505,8 @@ def phase7_relaunch_codex(pr: PRInfo) -> bool:
     acteur externe pourrait avoir posté un trigger entre notre push et phase7,
     et poster un second trigger sans nouveau commit violerait la règle absolue.
     """
-    # Re-fetch HEAD après push
-    pr_json = _gh("pr", "view", "--json", "headRefOid")
+    # Re-fetch HEAD après push (par numéro pour cibler la bonne PR)
+    pr_json = _gh("pr", "view", str(pr.number), "--json", "headRefOid")
     pr.head_sha = json.loads(pr_json)["headRefOid"]
 
     # Récupérer la date du commit pushé via l'API GitHub (timestamp remote, pas local HEAD)
@@ -525,8 +526,10 @@ def phase7_relaunch_codex(pr: PRInfo) -> bool:
     _, _, t_trigger = phase2_anti_loop(pr)
     t_trigger_e = parse_iso_epoch(t_trigger)
 
-    # Garde absolue : si un trigger existe après notre commit → ne pas en poster un autre
-    if t_trigger_e > 0 and t_trigger_e > t_commit_e:
+    # Garde absolue : si un trigger existe au même instant ou après notre commit → refuser.
+    # GitHub a une précision à la seconde ; >= couvre le cas où le trigger et le commit
+    # ont le même epoch (ex : retry après un timeout côté client).
+    if t_trigger_e > 0 and t_trigger_e >= t_commit_e:
         return False
 
     _gh("pr", "comment", str(pr.number), "--body", "@Codex review")
@@ -651,6 +654,7 @@ def run_finish() -> CycleResult:
     pr_data = state["pr"]
     pr = PRInfo(**pr_data)
     pre_dirty: list[str] = state["pre_dirty"]
+    remark_files: list[str] = state.get("remark_files", [])
 
     # Vérifier que l'on est sur la bonne branche
     current_branch = _git("branch", "--show-current")
@@ -668,8 +672,8 @@ def run_finish() -> CycleResult:
     # --- Reprise : le commit a déjà été effectué lors d'un appel précédent ---
     existing_sha = state.get("commit_sha")
     if existing_sha:
-        # Revalider l'état de la PR avant tout push ou trigger
-        pr_resume_state = json.loads(_gh("pr", "view", "--json", "state"))
+        # Revalider l'état de la PR (par numéro) avant tout push ou trigger
+        pr_resume_state = json.loads(_gh("pr", "view", str(pr.number), "--json", "state"))
         if pr_resume_state.get("state", "").upper() != "OPEN":
             raise SystemExit(
                 "La PR a été fermée ou mergée avant la reprise du push — arrêt sans envoi."
@@ -681,11 +685,18 @@ def run_finish() -> CycleResult:
         result.tests_passed = True  # Les tests ont déjà passé lors du cycle initial
 
         local_sha = _git("rev-parse", "HEAD")
-        # Utiliser @{push} pour détecter le remote réel (triangular workflow)
-        push_sha = _git("rev-parse", "@{push}", check=False)
-        if not push_sha:
+        # Utiliser git ls-remote pour vérifier l'état réel du remote push
+        # (plutôt que le tracking ref local @{push} qui peut être périmé si
+        # le remote a été force-pushé entre-temps)
+        push_ref = _git("rev-parse", "--abbrev-ref", "@{push}", check=False)
+        if push_ref:
+            # push_ref = "origin/branche" → on interroge origin directement
+            remote_name, _, remote_branch = push_ref.partition("/")
+            ls_out = _git("ls-remote", remote_name, f"refs/heads/{remote_branch}", check=False)
+        else:
             # Fallback : origin/<branche>
-            push_sha = _git("rev-parse", f"origin/{pr.head_branch}", check=False)
+            ls_out = _git("ls-remote", "origin", f"refs/heads/{pr.head_branch}", check=False)
+        push_sha = ls_out.split()[0] if ls_out.strip() else ""
 
         if local_sha == existing_sha and push_sha != existing_sha:
             # Commit présent localement, pas encore pushé
@@ -718,8 +729,9 @@ def run_finish() -> CycleResult:
 
     # --- Flux normal ---
 
-    # Revalider l'état de la PR : elle peut avoir été fermée ou mergée pendant l'intervalle
-    pr_state_json = _gh("pr", "view", "--json", "state")
+    # Revalider l'état de la PR par numéro pour éviter de cibler une PR différente
+    # sur la même branche si la PR d'origine a été fermée entre-temps
+    pr_state_json = _gh("pr", "view", str(pr.number), "--json", "state")
     if json.loads(pr_state_json).get("state", "").upper() != "OPEN":
         raise SystemExit(
             "La PR a été fermée ou mergée pendant l'intervalle planification/finish — arrêt."
@@ -743,10 +755,19 @@ def run_finish() -> CycleResult:
     # (get_dirty_files inclut aussi les ?? ; on soustrait all_new_untracked pour n'avoir
     # que les fichiers véritablement trackés et modifiés)
     workflow_tracked = [f for f in post_dirty if f not in pre_dirty and f not in all_new_untracked]
-    # Tous les fichiers non-trackés apparus pendant le cycle sont inclus dans le commit :
-    # une correction peut créer des helpers, tests ou migrations non cités explicitement
-    # dans les remarques Codex, et les omettre produirait un push incomplet.
-    new_untracked_for_commit = all_new_untracked
+    # Untracked à committer : restreindre aux fichiers cités dans les remarques inline
+    # pour éviter de committer ou de rollback des fichiers créés par l'opérateur entre
+    # les deux étapes et non liés au cycle (ex : notes, artefacts temporaires).
+    # Si aucun remark_file n'est présent (remarques générales uniquement), tout inclure.
+    new_untracked_for_commit = (
+        [f for f in all_new_untracked if f in remark_files] if remark_files else all_new_untracked
+    )
+    excluded_untracked = [f for f in all_new_untracked if f not in new_untracked_for_commit]
+    if excluded_untracked:
+        print(
+            f"  ⚠ Fichiers non-trackés exclus du commit (non cités dans les remarques) : "
+            f"{', '.join(excluded_untracked)}"
+        )
 
     # Vérifier l'absence de changements pré-stagés avant de toucher à l'index
     pre_staged = _git("diff", "--cached", "--name-only", check=False)
@@ -776,6 +797,9 @@ def run_finish() -> CycleResult:
         # pas l'ensemble de all_new_untracked qui pourrait contenir du travail concurrent.
         rollback(workflow_tracked, new_untracked_for_commit, pre_dirty)
         result.skip_reason = "Tests en échec — rollback effectué."
+        # Supprimer le state : le rollback a annulé les corrections ;
+        # la prochaine invocation sans --finish peut repartir de zéro.
+        STATE_FILE.unlink(missing_ok=True)
         return result
 
     # Phase 6

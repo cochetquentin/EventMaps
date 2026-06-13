@@ -321,7 +321,7 @@ def test_rollback_calls_git_checkout_for_tracked_files(tmp_path, monkeypatch):
             new_untracked=[str(untracked)],
             pre_dirty=[],
         )
-    mock_git.assert_called_once_with("checkout", "HEAD", "--", "api/app.py", check=False)
+    mock_git.assert_called_once_with("checkout", "HEAD", "--", ":(literal)api/app.py", check=False)
     assert not untracked.exists()
 
 
