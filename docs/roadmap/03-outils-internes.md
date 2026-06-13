@@ -36,7 +36,7 @@
 - **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** TOOL-002
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/62 — PR : (à renseigner)
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/62 — PR : https://github.com/cochetquentin/EventMaps/pull/93
 
 **Actions.** Remplacer la majorité du document de commande par un script/module versionné ; isoler l'accès GitHub, la sélection des remarques, l'anti-boucle et le résumé ; utiliser des structures de données plutôt que des variables shell interpolées.
 
