@@ -29,14 +29,14 @@
 
 **Critères d'acceptation.** La politique distingue les permissions partagées des préférences locales ; elle définit la commande de haut niveau qui pourra être autorisée après TOOL-003 ; la proposition ne contient ni chemins personnels, ni suppressions ponctuelles, ni jokers plus larges que nécessaire.
 
-**Résultat.** `.claude/settings.json` créé et versionné. Politique minimale : uv (run, sync, lock), gh (PR view/list/comment, issue comment, API PR/issues/commits), git (status, log, diff, add, commit, push, stash, checkout, branch, rev-parse). Opérations destructrices (force push, git clean, reset --hard) explicitement refusées. Slot TOOL-003 documenté via clé `_comment_tool003_slot`.
+**Résultat.** `.claude/settings.json` créé et versionné. Politique minimale : uv (run, sync, lock), gh (PR view/list/comment, issue comment, API PR/issues/commits), git (status, log, diff, add, commit, push, stash, checkout, branch, rev-parse). Opérations destructrices (force push, git clean, reset --hard) explicitement refusées.
 
 ## TOOL-003 — Extraire l'orchestration de review dans un programme testable
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** TOOL-002
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/62
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/62 — PR : (à renseigner)
 
 **Actions.** Remplacer la majorité du document de commande par un script/module versionné ; isoler l'accès GitHub, la sélection des remarques, l'anti-boucle et le résumé ; utiliser des structures de données plutôt que des variables shell interpolées.
 
