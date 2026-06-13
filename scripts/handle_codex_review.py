@@ -436,9 +436,10 @@ def rollback(
 ) -> None:
     """Annule les modifications apportées par le workflow (sauf pre_dirty).
 
-    Les fichiers non-trackés sont listés individuellement (grâce à --untracked-files=all
-    dans get_new_untracked_files) : on peut donc les supprimer un par un sans risquer
-    d'effacer des fichiers ignorés par git dans un répertoire pré-existant.
+    new_untracked doit contenir TOUS les fichiers non-trackés apparus pendant le cycle
+    (pas seulement ceux ciblés par les remarques), afin de garantir un rollback complet.
+    Les fichiers non-trackés sont listés individuellement (grâce à --untracked-files=all)
+    ce qui évite d'effacer des fichiers ignorés par git dans un répertoire pré-existant.
     """
     for f in tracked_modified:
         if f not in pre_dirty:
@@ -532,6 +533,17 @@ def run() -> CycleResult:
     Enregistre l'état dans .hcr_state.json pour que run_finish() sache quels
     fichiers étaient déjà modifiés avant les corrections de l'opérateur.
     """
+    # Refuser d'écraser un cycle en cours dont le commit n'a pas été pushé
+    if STATE_FILE.exists():
+        existing = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+        if existing.get("commit_sha"):
+            raise SystemExit(
+                f"Un cycle précédent a créé le commit {existing['commit_sha'][:8]} "
+                "mais n'a pas terminé son push. "
+                "Lancez d'abord `--finish` pour reprendre, "
+                "ou supprimez manuellement .hcr_state.json si le commit est perdu."
+            )
+
     result = CycleResult()
 
     # Phase 1
@@ -641,14 +653,27 @@ def run_finish() -> CycleResult:
         print(f"Reprise : commit {existing_sha[:8]} déjà effectué.")
         result.commit_sha = existing_sha
         result.commit_message = state.get("commit_message")
+        result.tests_passed = True  # Les tests ont déjà passé lors du cycle initial
 
-        # Vérifier si le commit a déjà été pushé
-        remote_sha = _git("rev-parse", f"origin/{pr.head_branch}", check=False)
         local_sha = _git("rev-parse", "HEAD")
+        remote_sha = _git("rev-parse", f"origin/{pr.head_branch}", check=False)
+
         if local_sha == existing_sha and remote_sha != existing_sha:
+            # Commit présent localement, pas encore pushé
             print("Push en attente...")
             _git("push")
-        result.pushed = True
+            result.pushed = True
+        elif remote_sha == existing_sha:
+            # Commit déjà pushé (local HEAD peut avoir avancé)
+            result.pushed = True
+        else:
+            # Ni en local ni sur le remote : état incohérent
+            raise SystemExit(
+                f"Impossible de retrouver le commit sauvegardé ({existing_sha[:8]}) "
+                f"ni en local ({local_sha[:8]}) ni sur origin/{pr.head_branch} "
+                f"({remote_sha[:8]}). "
+                "Inspectez l'historique Git avant de continuer."
+            )
 
         print("\n## Phase 7 — Relance Codex")
         relaunched = phase7_relaunch_codex(pr)
@@ -664,17 +689,37 @@ def run_finish() -> CycleResult:
 
     # --- Flux normal ---
 
+    # Revalider l'état de la PR : elle peut avoir été fermée ou mergée pendant l'intervalle
+    pr_state_json = _gh("pr", "view", "--json", "state")
+    if json.loads(pr_state_json).get("state", "").upper() != "OPEN":
+        raise SystemExit(
+            "La PR a été fermée ou mergée pendant l'intervalle planification/finish — arrêt."
+        )
+
+    # Vérifier que HEAD n'a pas changé depuis la planification
+    # (des commits supplémentaires sur la branche seraient poussés involontairement)
+    local_sha = _git("rev-parse", "HEAD")
+    if local_sha != pr.head_sha:
+        raise SystemExit(
+            f"Le HEAD local ({local_sha[:8]}) ne correspond plus au SHA de planification "
+            f"({pr.head_sha[:8]}). Des commits ont été créés entre les deux étapes. "
+            "Annulez-les ou relancez la planification (sans --finish) pour repartir d'un état propre."
+        )
+
     # Calculer les fichiers modifiés par le cycle courant
     post_dirty = get_dirty_files()
-    # Tracked : inclure tous les fichiers modifiés hors pre_dirty.
-    # Pas de filtre par remark_files : une correction inline peut nécessiter
-    # de mettre à jour un fichier de test ou un helper non mentionné dans la remarque.
-    workflow_tracked = [f for f in post_dirty if f not in pre_dirty]
-    # Untracked : restreindre aux fichiers cités dans les remarques pour éviter
+    # Fichiers non-trackés apparus pendant le cycle (liste complète, pour rollback)
+    all_new_untracked = get_new_untracked_files(pre_dirty)
+    # Tracked : tous les fichiers modifiés hors pre_dirty, en excluant les non-trackés
+    # (get_dirty_files inclut aussi les ?? ; on soustrait all_new_untracked pour n'avoir
+    # que les fichiers véritablement trackés et modifiés)
+    workflow_tracked = [f for f in post_dirty if f not in pre_dirty and f not in all_new_untracked]
+    # Untracked à committer : restreindre aux fichiers cités dans les remarques pour éviter
     # de committer des fichiers générés ou personnels non liés au cycle.
-    new_untracked = get_new_untracked_files(pre_dirty)
-    if remark_files:
-        new_untracked = [f for f in new_untracked if f in remark_files]
+    # Pour le rollback, on utilise all_new_untracked (liste complète).
+    new_untracked_for_commit = (
+        [f for f in all_new_untracked if f in remark_files] if remark_files else all_new_untracked
+    )
 
     # Vérifier l'absence de changements pré-stagés avant de toucher à l'index
     pre_staged = _git("diff", "--cached", "--name-only", check=False)
@@ -700,13 +745,13 @@ def run_finish() -> CycleResult:
 
     if not passed:
         print("Tests en échec — rollback des modifications de ce cycle.")
-        rollback(workflow_tracked, new_untracked, pre_dirty)
+        rollback(workflow_tracked, all_new_untracked, pre_dirty)
         result.skip_reason = "Tests en échec — rollback effectué."
         return result
 
     # Phase 6
     print("\n## Phase 6 — Commit et push")
-    files_changed = workflow_tracked + new_untracked
+    files_changed = workflow_tracked + new_untracked_for_commit
     if not files_changed:
         result.skip_reason = "Aucune modification — pas de commit."
         print(result.skip_reason)
@@ -722,6 +767,7 @@ def run_finish() -> CycleResult:
 
     result.commit_sha = sha
     result.commit_message = message
+    result.applied = files_changed
 
     # Sauvegarder le SHA dans l'état AVANT le push : si le push échoue (réseau),
     # la prochaine exécution de --finish peut reprendre depuis phase 7 directement.
