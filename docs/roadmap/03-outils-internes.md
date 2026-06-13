@@ -63,3 +63,29 @@
 **Actions.** Garder dans `CLAUDE.md` uniquement le lien et les garde-fous essentiels ; placer le comportement détaillé près du programme et de ses tests ; documenter les prérequis `gh`, authentification et remote Git.
 
 **Critères d'acceptation.** Une règle n'a qu'une source d'autorité ; les prérequis et modes d'échec sont découvrables.
+
+## TOOL-006 — Publier un compte-rendu des remarques ignorées avant de relancer Codex
+
+- **Statut : À faire**
+- **Priorité : P2**
+- **Dépendances :** TOOL-003
+- **Suivi :** à renseigner
+
+**Contexte.** Lorsque le cycle applique une partie seulement des remarques Codex, il relance immédiatement `@Codex review` sans expliquer pourquoi certains points ont été laissés de côté. Codex les ressort alors au cycle suivant, et l'historique de la PR ne permet pas de distinguer un point délibérément ignoré d'un point oublié.
+
+**Actions.** Dans le script extrait par TOOL-003, juste après le push et avant de poster `@Codex review`, publier un commentaire GitHub listant chaque remarque ignorée avec sa justification. Ne poster ce commentaire que s'il existe au moins une remarque ignorée dans le cycle courant.
+
+**Format suggéré du commentaire :**
+
+```
+## Remarques Codex ignorées — cycle N
+
+| Remarque | Raison |
+|---|---|
+| `fichier:ligne` — titre court | justification |
+| ... | ... |
+
+Ces points ne seront pas adressés dans ce cycle. [lien vers le commentaire de justification si déjà posté]
+```
+
+**Critères d'acceptation.** Si au moins une remarque est ignorée, un commentaire est posté avant `@Codex review` ; le commentaire liste chaque point ignoré avec une raison non vide ; si aucune remarque n'est ignorée, aucun commentaire supplémentaire n'est créé ; le comportement est couvert par un test unitaire.
