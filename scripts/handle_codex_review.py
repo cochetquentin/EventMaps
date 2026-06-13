@@ -50,10 +50,16 @@ PYTEST_CMD = [
 
 
 def parse_iso_epoch(s: str) -> int:
-    """Convertit une date ISO 8601 en epoch UTC (secondes). Retourne 0 si vide."""
-    if not s or not s.strip():
+    """Convertit une date ISO 8601 en epoch UTC (secondes). Retourne 0 si vide ou non parseable."""
+    if not s:
         return 0
-    return int(datetime.fromisoformat(s.strip().replace("Z", "+00:00")).timestamp())
+    cleaned = s.strip()
+    if not cleaned or cleaned == "null":
+        return 0
+    try:
+        return int(datetime.fromisoformat(cleaned.replace("Z", "+00:00")).timestamp())
+    except ValueError:
+        return 0
 
 
 def _run(cmd: list[str], check: bool = True, capture: bool = True) -> subprocess.CompletedProcess:
@@ -142,17 +148,26 @@ def phase1_get_pr_info() -> PRInfo:
     head_ref_name: str = data.get("headRefName") or head_branch
 
     # Détecter les forks : headRepositoryOwner expose directement le login de l'owner de la tête.
-    # headRepository expose nameWithOwner (disponible dans gh CLI), mais pas sshUrl/url.
-    # Pour les forks on construit l'URL SSH depuis nameWithOwner.
+    # headRepository expose nameWithOwner (disponible dans gh CLI).
     head_repo_owner_data = data.get("headRepositoryOwner") or {}
     head_repo_owner = (
         head_repo_owner_data.get("login", "") if isinstance(head_repo_owner_data, dict) else ""
     )
     base_repo_owner = repo.split("/")[0] if "/" in repo else ""
     if head_repo_owner and head_repo_owner.lower() != base_repo_owner.lower():
+        # PR depuis un fork : trouver le remote git local qui pointe vers le dépôt fork
+        # (évite de construire une URL SSH hardcodée qui peut différer de la config locale).
         head_repo = data.get("headRepository") or {}
         head_nwo = head_repo.get("nameWithOwner", "") if isinstance(head_repo, dict) else ""
-        push_remote = f"git@github.com:{head_nwo}.git" if head_nwo else "origin"
+        push_remote = "origin"  # fallback
+        if head_nwo:
+            remotes_out = _git("remote", "-v", check=False)
+            for line in remotes_out.splitlines():
+                # Chercher "remote_name\tURL (push)" ou "remote_name\tURL (fetch)"
+                parts = line.split()
+                if len(parts) >= 2 and head_nwo.lower() in parts[1].lower():
+                    push_remote = parts[0]
+                    break
     else:
         push_remote = "origin"
 
@@ -556,7 +571,7 @@ def phase7_relaunch_codex(pr: PRInfo) -> bool:
     et poster un second trigger sans nouveau commit violerait la règle absolue.
     """
     # Re-fetch HEAD après push (par numéro pour cibler la bonne PR)
-    pr_json = _gh("pr", "view", str(pr.number), "--json", "headRefOid")
+    pr_json = _gh("pr", "view", str(pr.number), "--repo", pr.repo, "--json", "headRefOid")
     pr.head_sha = json.loads(pr_json)["headRefOid"]
 
     # Récupérer la date du commit pushé via l'API GitHub (timestamp remote, pas local HEAD)
@@ -585,12 +600,12 @@ def phase7_relaunch_codex(pr: PRInfo) -> bool:
 
     # Revalider que la PR est toujours OPEN immédiatement avant de commenter
     # (elle peut avoir été fermée pendant les tests ou le push)
-    pr_current = json.loads(_gh("pr", "view", str(pr.number), "--json", "state"))
+    pr_current = json.loads(_gh("pr", "view", str(pr.number), "--repo", pr.repo, "--json", "state"))
     if pr_current.get("state", "").upper() != "OPEN":
         print("PR fermée ou mergée — @Codex review non posté.")
         return False
 
-    _gh("pr", "comment", str(pr.number), "--body", "@Codex review")
+    _gh("pr", "comment", str(pr.number), "--repo", pr.repo, "--body", "@Codex review")
     return True
 
 
@@ -733,7 +748,9 @@ def run_finish() -> CycleResult:
     existing_sha = state.get("commit_sha")
     if existing_sha:
         # Revalider l'état de la PR (par numéro) avant tout push ou trigger
-        pr_resume_state = json.loads(_gh("pr", "view", str(pr.number), "--json", "state"))
+        pr_resume_state = json.loads(
+            _gh("pr", "view", str(pr.number), "--repo", pr.repo, "--json", "state")
+        )
         if pr_resume_state.get("state", "").upper() != "OPEN":
             raise SystemExit(
                 "La PR a été fermée ou mergée avant la reprise du push — arrêt sans envoi."
@@ -760,7 +777,9 @@ def run_finish() -> CycleResult:
             result.pushed = True
             # Vérifier que le push a bien mis à jour la tête de la PR (même retry que chemin normal)
             for _attempt in range(3):
-                verify_pr = json.loads(_gh("pr", "view", str(pr.number), "--json", "headRefOid"))
+                verify_pr = json.loads(
+                    _gh("pr", "view", str(pr.number), "--repo", pr.repo, "--json", "headRefOid")
+                )
                 if verify_pr["headRefOid"] == existing_sha:
                     break
                 if _attempt < 2:
@@ -799,7 +818,7 @@ def run_finish() -> CycleResult:
 
     # Revalider l'état de la PR par numéro pour éviter de cibler une PR différente
     # sur la même branche si la PR d'origine a été fermée entre-temps
-    pr_state_json = _gh("pr", "view", str(pr.number), "--json", "state")
+    pr_state_json = _gh("pr", "view", str(pr.number), "--repo", pr.repo, "--json", "state")
     if json.loads(pr_state_json).get("state", "").upper() != "OPEN":
         raise SystemExit(
             "La PR a été fermée ou mergée pendant l'intervalle planification/finish — arrêt."
@@ -818,7 +837,7 @@ def run_finish() -> CycleResult:
     # Revalider le SHA remote avant de committer : si un acteur externe a réinitialisé
     # la branche, notre push serait un fast-forward valide qui restaure silencieusement
     # l'historique supprimé intentionnellement.
-    remote_head_json = _gh("pr", "view", str(pr.number), "--json", "headRefOid")
+    remote_head_json = _gh("pr", "view", str(pr.number), "--repo", pr.repo, "--json", "headRefOid")
     remote_head_sha = json.loads(remote_head_json).get("headRefOid", "")
     if remote_head_sha != pr.head_sha:
         raise SystemExit(
@@ -829,29 +848,51 @@ def run_finish() -> CycleResult:
 
     # Calculer les fichiers modifiés par le cycle courant
     post_dirty = get_dirty_files()
-    # Fichiers non-trackés apparus pendant le cycle (liste complète, pour rollback)
+    # Fichiers non-trackés apparus pendant le cycle (liste complète)
     all_new_untracked = get_new_untracked_files(pre_dirty)
     # Tracked : tous les fichiers modifiés hors pre_dirty, en excluant les non-trackés
-    # (get_dirty_files inclut aussi les ?? ; on soustrait all_new_untracked pour n'avoir
-    # que les fichiers véritablement trackés et modifiés)
-    workflow_tracked = [f for f in post_dirty if f not in pre_dirty and f not in all_new_untracked]
-    # Fichiers non-trackés à committer : restreindre aux fichiers cités dans les remarques inline
-    # pour éviter de publier des notes, artefacts ou fichiers sensibles créés par l'opérateur
-    # entre les deux étapes. Ce même scope est utilisé pour le rollback, garantissant la cohérence
-    # entre ce qui est commité et ce qui est annulé en cas d'échec.
-    # Si aucune remarque n'est inline (remarques générales uniquement), tout inclure.
-    new_untracked_for_commit = (
-        [f for f in all_new_untracked if f in remark_files] if remark_files else all_new_untracked
-    )
+    all_workflow_tracked = [
+        f for f in post_dirty if f not in pre_dirty and f not in all_new_untracked
+    ]
 
-    # Avertir si des fichiers trackés modifiés sont hors du périmètre des remarques inline.
     if remark_files:
-        out_of_scope_tracked = [f for f in workflow_tracked if f not in remark_files]
+        # Restreindre aux fichiers dans le périmètre des remarques inline.
+        # Les fichiers hors scope (édits opérateur, outils tiers) ne doivent pas être
+        # committés silencieusement ni effacés par un rollback.
+        out_of_scope_tracked = [f for f in all_workflow_tracked if f not in remark_files]
         if out_of_scope_tracked:
             print(
-                f"  ⚠ Fichiers trackés modifiés hors périmètre des remarques inline : "
-                f"{', '.join(out_of_scope_tracked)}"
+                "ERREUR : des fichiers trackés modifiés ne sont pas dans le périmètre "
+                "des remarques inline de ce cycle :\n"
+                + "\n".join(f"  {f}" for f in out_of_scope_tracked)
+                + "\nDéstagez ou annulez ces modifications avant de relancer --finish, "
+                "ou relancez la planification (sans --finish) si elles font partie du cycle.",
+                file=sys.stderr,
             )
+            result.skip_reason = "Fichiers trackés hors périmètre — état préservé pour retry."
+            return result
+        workflow_tracked = [f for f in all_workflow_tracked if f in remark_files]
+
+        # Aborter si des fichiers non-trackés apparus pendant le cycle sont exclus du commit.
+        # Cela arrive quand une correction crée un nouveau fichier (ex: rename old→new) dont
+        # le chemin n'est pas cité dans les remarques inline — committer sans lui serait silencieux.
+        excluded_untracked = [f for f in all_new_untracked if f not in remark_files]
+        if excluded_untracked:
+            print(
+                "ERREUR : des fichiers non-trackés créés pendant le cycle ne sont pas dans "
+                "le périmètre des remarques inline :\n"
+                + "\n".join(f"  {f}" for f in excluded_untracked)
+                + "\nSi ces fichiers font partie de la correction, ajoutez leurs chemins dans "
+                ".hcr_state.json (clé remark_files) avant de relancer --finish.",
+                file=sys.stderr,
+            )
+            result.skip_reason = "Fichiers non-trackés hors périmètre — état préservé pour retry."
+            return result
+        new_untracked_for_commit = [f for f in all_new_untracked if f in remark_files]
+    else:
+        # Pas de remarques inline : scope = tous les changements post-plan
+        workflow_tracked = all_workflow_tracked
+        new_untracked_for_commit = all_new_untracked
 
     # Vérifier l'absence de changements pré-stagés avant de toucher à l'index
     pre_staged = _git("diff", "--cached", "--name-only", check=False)
@@ -930,7 +971,9 @@ def run_finish() -> CycleResult:
     # Vérifier que le push a bien mis à jour la tête de la PR.
     # L'API GitHub peut mettre quelques secondes à propager — on retente 3 fois.
     for _attempt in range(3):
-        verify_pr = json.loads(_gh("pr", "view", str(pr.number), "--json", "headRefOid"))
+        verify_pr = json.loads(
+            _gh("pr", "view", str(pr.number), "--repo", pr.repo, "--json", "headRefOid")
+        )
         if verify_pr["headRefOid"] == sha:
             break
         if _attempt < 2:
