@@ -1,21 +1,19 @@
 """Orchestration du cycle de review Codex ↔ Claude Code.
 
-Phases :
-1. Identifier la PR et le repo
-2. Protection anti-boucle
-3. Récupérer les remarques Codex
-4. Afficher les corrections à appliquer (logique pilotée par Claude)
-5. Tests
-6. Commit et push
-7. Relancer Codex
-
-Usage : uv run --locked python scripts/handle_codex_review.py
+Flux en deux étapes :
+  1. uv run --locked python scripts/handle_codex_review.py
+       → Phases 1-4 : identifie la PR, vérifie l'anti-boucle, récupère et affiche
+         les remarques Codex. Enregistre l'état dans .hcr_state.json et s'arrête.
+  2. (Claude applique les corrections via ses outils natifs)
+  3. uv run --locked python scripts/handle_codex_review.py --finish
+       → Phases 5-7 : tests, commit/push, relance Codex.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import pathlib
 import shutil
 import subprocess
 import sys
@@ -31,6 +29,8 @@ if hasattr(sys.stderr, "reconfigure"):
 
 CODEX_BOT = "chatgpt-codex-connector[bot]"
 CODEX_TRIGGER = "@codex review"
+CODEX_INTRO_MARKER = "here are some automated review suggestions"
+STATE_FILE = pathlib.Path(".hcr_state.json")
 PYTEST_CMD = [
     "uv",
     "run",
@@ -149,10 +149,10 @@ def _latest_epoch(values: list[str]) -> int:
     return max((parse_iso_epoch(v) for v in values), default=0)
 
 
-def phase2_anti_loop(pr: PRInfo) -> tuple[bool, str]:
+def phase2_anti_loop(pr: PRInfo) -> tuple[bool, str, str]:
     """Vérifie si @Codex review a déjà été posté sans réponse depuis le dernier commit.
 
-    Retourne (should_stop, reason).
+    Retourne (should_stop, reason, t_trigger).
     """
     # T_TRIGGER : dernier commentaire dont le body est EXACTEMENT "@Codex review"
     trigger_dates = _gh(
@@ -203,7 +203,7 @@ def phase2_anti_loop(pr: PRInfo) -> tuple[bool, str]:
     t_codex_e = _latest_epoch(all_codex_dates)
 
     # T_COMMIT : date du dernier commit de la PR
-    # check=False car une erreur API transiente ne doit pas annuler le cycle entier
+    # try/except car une erreur API transiente ne doit pas annuler le cycle entier
     try:
         commit_raw = _gh(
             "api", f"repos/{pr.repo}/commits/{pr.head_sha}", "--jq", ".commit.committer.date"
@@ -232,7 +232,13 @@ def phase2_anti_loop(pr: PRInfo) -> tuple[bool, str]:
 
 
 def _parse_remarks_from_json(raw: str, source: str) -> list[CodexRemark]:
-    """Parse une sortie jq (un objet JSON par ligne) en liste de CodexRemark."""
+    """Parse une sortie jq (un objet JSON par ligne) en liste de CodexRemark.
+
+    Filtre :
+    - body vide ou égal au trigger "@codex review"
+    - messages d'intro standards de Codex (CODEX_INTRO_MARKER)
+    - utilisateurs autres que CODEX_BOT
+    """
     remarks = []
     for line in raw.strip().splitlines():
         line = line.strip()
@@ -245,10 +251,12 @@ def _parse_remarks_from_json(raw: str, source: str) -> list[CodexRemark]:
         body = obj.get("body", "").strip()
         if not body or body.lower() == CODEX_TRIGGER:
             continue
+        if CODEX_INTRO_MARKER in body.lower():
+            continue
         login = (obj.get("user") or {}).get("login", "")
         if login != CODEX_BOT:
             continue
-        file_ = obj.get("path") or obj.get("diff_hunk") and obj.get("path") or None
+        file_ = obj.get("path") or None
         line_num = obj.get("line") or obj.get("original_line") or None
         created_at = obj.get("created_at") or obj.get("submitted_at") or ""
         remarks.append(
@@ -258,7 +266,12 @@ def _parse_remarks_from_json(raw: str, source: str) -> list[CodexRemark]:
 
 
 def phase3_get_remarks(pr: PRInfo, since: str = "") -> list[CodexRemark]:
-    """Récupère les remarques Codex depuis les 3 endpoints GitHub, filtrées après `since`."""
+    """Récupère les remarques Codex depuis les 3 endpoints GitHub, filtrées après `since`.
+
+    Reviews acceptées : CHANGES_REQUESTED et COMMENTED (le corps peut contenir du feedback
+    actionnable même sans CHANGES_REQUESTED). Les messages d'intro sont filtrés dans
+    _parse_remarks_from_json.
+    """
     since_filter = f' | select(.created_at > "{since}")' if since else ""
     since_filter_r = f' | select(.submitted_at > "{since}")' if since else ""
 
@@ -267,7 +280,7 @@ def phase3_get_remarks(pr: PRInfo, since: str = "") -> list[CodexRemark]:
         "--paginate",
         f"repos/{pr.repo}/pulls/{pr.number}/reviews",
         "--jq",
-        f'.[] | select(.user.login == "{CODEX_BOT}") | select(.state == "CHANGES_REQUESTED"){since_filter_r}',
+        f'.[] | select(.user.login == "{CODEX_BOT}") | select(.state == "CHANGES_REQUESTED" or .state == "COMMENTED"){since_filter_r}',
     )
     raw_inline = _gh(
         "api",
@@ -306,7 +319,8 @@ def phase4_display_remarks(
     """Affiche les remarques à traiter et retourne les listes (applied, ignored).
 
     Cette phase ne modifie aucun fichier — elle présente le plan à l'opérateur
-    (Claude) qui applique ensuite les corrections via ses outils natifs.
+    (Claude) qui applique ensuite les corrections via ses outils natifs, puis
+    appelle le script avec --finish pour les phases 5-7.
 
     Un fichier dans dirty_files est signalé comme à ignorer pour éviter de
     mélanger les changements du workflow avec des modifications préexistantes.
@@ -326,20 +340,30 @@ def phase4_display_remarks(
             ignored.append((f"{loc} — {remark.body[:60]}", reason))
             print(f"  [{i}] IGNORÉ ({reason}) — {loc}")
         else:
-            print(f"  [{i}] {loc} — {remark.body[:80]}")
-            # `applied` reste vide ici — l'opérateur (Claude) applique les corrections
-            # via ses outils natifs, puis appelle phase5/6/7 séparément.
+            print(f"  [{i}] À appliquer : {loc}")
+            print(f"       {remark.body[:120]}")
+            # `applied` reste vide — l'opérateur applique via ses outils natifs.
 
     return applied, ignored
 
 
 def get_dirty_files() -> list[str]:
-    """Retourne la liste des fichiers modifiés dans le working tree."""
+    """Retourne la liste des fichiers modifiés dans le working tree.
+
+    Gère les enregistrements de renommage git (R  old.py -> new.py) en extrayant
+    les deux chemins séparément.
+    """
     output = _git("status", "--porcelain")
     files = []
     for line in output.splitlines():
         if len(line) >= 4:
-            files.append(line[3:].strip())
+            path = line[3:].strip()
+            if " -> " in path:
+                # Renommage : "old.py -> new.py"
+                old_path, new_path = path.split(" -> ", 1)
+                files.extend([old_path.strip(), new_path.strip()])
+            else:
+                files.append(path)
     return files
 
 
@@ -409,11 +433,16 @@ def phase6_commit_push(
 ) -> tuple[Optional[str], Optional[str], bool]:
     """Commit et push les fichiers produits par ce cycle. Retourne (sha, message, pushed).
 
-    Seuls les fichiers listés dans files_to_stage sont stagés pour éviter d'inclure
-    des changements pré-existants non liés au cycle Codex.
+    Réinitialise l'index avant de stager pour éviter d'inclure des changements
+    pré-existants non liés au cycle Codex dans le commit.
     """
     if not files_to_stage:
         return None, None, False
+
+    # Vider l'index pour ne committer que les fichiers du cycle
+    pre_staged = _git("diff", "--cached", "--name-only", check=False)
+    if pre_staged.strip():
+        _git("reset", "HEAD")
 
     for f in files_to_stage:
         _git("add", f)
@@ -450,11 +479,16 @@ def phase7_relaunch_codex(pr: PRInfo) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Orchestration principale
+# Orchestration — Étape 1 : phases 1-4
 # ---------------------------------------------------------------------------
 
 
 def run() -> CycleResult:
+    """Phases 1-4 : identifie PR, anti-boucle, récupère et affiche les remarques.
+
+    Enregistre l'état dans .hcr_state.json pour que run_finish() sache quels
+    fichiers étaient déjà modifiés avant les corrections de l'opérateur.
+    """
     result = CycleResult()
 
     # Phase 1
@@ -491,13 +525,61 @@ def run() -> CycleResult:
     result.applied = applied
     result.ignored = ignored
 
-    # Phase 5
-    print("\n## Phase 5 — Tests")
-    # Capturer les fichiers modifiés par ce workflow (pour rollback éventuel)
+    # Sauvegarder l'état pour run_finish()
+    state = {
+        "pre_dirty": pre_dirty,
+        "pr": {
+            "repo": pr.repo,
+            "number": pr.number,
+            "title": pr.title,
+            "head_branch": pr.head_branch,
+            "head_sha": pr.head_sha,
+        },
+        "ignored": [list(x) for x in ignored],
+    }
+    STATE_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+    result.stopped_early = True
+    result.stop_reason = (
+        "Corrections à appliquer. "
+        "Après modifications, relancer : "
+        "uv run --locked python scripts/handle_codex_review.py --finish"
+    )
+    print(f"\n→ {result.stop_reason}")
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Orchestration — Étape 2 : phases 5-7  (après corrections manuelles)
+# ---------------------------------------------------------------------------
+
+
+def run_finish() -> CycleResult:
+    """Phases 5-7 : tests, commit/push, relance Codex.
+
+    Lit .hcr_state.json pour déterminer quels fichiers étaient pré-existants
+    et ne committer que ceux produits par le cycle courant.
+    """
+    if not STATE_FILE.exists():
+        raise SystemExit(
+            "Aucun état de cycle (.hcr_state.json). Lancez d'abord le script sans --finish."
+        )
+
+    state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+    pr_data = state["pr"]
+    pr = PRInfo(**pr_data)
+    pre_dirty: list[str] = state["pre_dirty"]
+
+    result = CycleResult(pr=pr)
+    result.ignored = [tuple(x) for x in state.get("ignored", [])]
+
+    # Calculer les fichiers modifiés par le cycle courant
     post_dirty = get_dirty_files()
     workflow_tracked = [f for f in post_dirty if f not in pre_dirty]
     new_untracked = get_new_untracked_files(pre_dirty)
 
+    # Phase 5
+    print("\n## Phase 5 — Tests")
     passed, coverage = phase5_run_tests()
     result.tests_passed = passed
     result.coverage = coverage
@@ -507,7 +589,6 @@ def run() -> CycleResult:
     )
 
     if not passed:
-        # Max 2 tentatives
         print("Tentative 2/2...")
         passed, coverage = phase5_run_tests()
         result.tests_passed = passed
@@ -515,7 +596,6 @@ def run() -> CycleResult:
         if not passed:
             print("Tests toujours en échec — rollback des modifications de ce cycle.")
             rollback(workflow_tracked, new_untracked, pre_dirty)
-            result.applied = []
             result.skip_reason = "Tests en échec après 2 tentatives — rollback effectué."
             return result
 
@@ -525,6 +605,7 @@ def run() -> CycleResult:
     if not files_changed:
         result.skip_reason = "Aucune modification — pas de commit."
         print(result.skip_reason)
+        STATE_FILE.unlink(missing_ok=True)
         return result
 
     sha, message, pushed = phase6_commit_push(pr, files_changed)
@@ -533,8 +614,9 @@ def run() -> CycleResult:
     result.pushed = pushed
 
     if not sha:
-        result.skip_reason = "Aucun diff — pas de commit."
+        result.skip_reason = "Aucun diff stagé — pas de commit."
         print(result.skip_reason)
+        STATE_FILE.unlink(missing_ok=True)
         return result
 
     print(f"Commit : {sha[:8]} — {message}")
@@ -549,6 +631,7 @@ def run() -> CycleResult:
         result.skip_reason = "Anti-boucle post-push : @Codex review non posté."
         print(result.skip_reason)
 
+    STATE_FILE.unlink(missing_ok=True)
     return result
 
 
@@ -595,6 +678,11 @@ def print_summary(result: CycleResult) -> None:
 
 
 if __name__ == "__main__":
-    result = run()
+    if "--finish" in sys.argv:
+        result = run_finish()
+    else:
+        result = run()
     print_summary(result)
-    sys.exit(0)
+    # Code de sortie non-nul si les tests ont échoué (cycle incomplet sans arrêt anticipé)
+    failed = not result.tests_passed and not result.stopped_early
+    sys.exit(1 if failed else 0)

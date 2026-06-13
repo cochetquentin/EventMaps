@@ -14,6 +14,7 @@ import pytest
 import scripts.handle_codex_review as hcr
 from scripts.handle_codex_review import (
     CODEX_BOT,
+    CODEX_INTRO_MARKER,
     CodexRemark,
     CycleResult,
     PRInfo,
@@ -102,6 +103,16 @@ def test_parse_remarks_skips_empty_body():
 def test_parse_remarks_skips_codex_trigger():
     raw = _make_comment(CODEX_BOT, "@codex review")
     remarks = _parse_remarks_from_json(raw, "comment")
+    assert remarks == []
+
+
+def test_parse_remarks_skips_codex_intro_message():
+    """Le message d'intro standard de Codex est filtré."""
+    intro_body = (
+        "### 💡 Codex Review\n\nHere are some automated review suggestions for this pull request."
+    )
+    raw = _make_comment(CODEX_BOT, intro_body)
+    remarks = _parse_remarks_from_json(raw, "review")
     assert remarks == []
 
 
@@ -386,6 +397,15 @@ def test_get_dirty_files_parses_porcelain():
         files = get_dirty_files()
     assert "api/app.py" in files
     assert "new_file.py" in files
+
+
+def test_get_dirty_files_parses_rename_record():
+    """Les renommages 'R  old.py -> new.py' retournent les deux chemins séparément."""
+    with patch.object(hcr, "_git", return_value="R  old.py -> new.py"):
+        files = get_dirty_files()
+    assert "old.py" in files
+    assert "new.py" in files
+    assert "old.py -> new.py" not in files
 
 
 def test_get_new_untracked_files_excludes_pre_dirty():

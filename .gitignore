@@ -34,3 +34,6 @@ node_modules/
 # Coverage reports
 .coverage
 htmlcov/
+
+# handle-codex-review state
+.hcr_state.json
