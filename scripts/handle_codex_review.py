@@ -14,7 +14,6 @@ from __future__ import annotations
 import json
 import os
 import pathlib
-import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -67,10 +66,14 @@ def _gh(*args: str) -> str:
     return result.stdout.strip()
 
 
-def _git(*args: str, check: bool = True) -> str:
-    """Exécute git et retourne stdout (strip)."""
+def _git(*args: str, check: bool = True, raw: bool = False) -> str:
+    """Exécute git et retourne stdout.
+
+    Par défaut strip() le résultat. Passer raw=True pour conserver l'output
+    sans modification (nécessaire pour les formats NUL-délimités comme --porcelain -z).
+    """
     result = _run(["git", *args], check=check)
-    return result.stdout.strip()
+    return result.stdout if raw else result.stdout.strip()
 
 
 # ---------------------------------------------------------------------------
@@ -234,7 +237,7 @@ def _parse_remarks_from_json(raw: str, source: str) -> list[CodexRemark]:
     """Parse une sortie jq (un objet JSON par ligne) en liste de CodexRemark.
 
     Filtre :
-    - body vide ou égal au trigger "@codex review"
+    - body vide ou None ou égal au trigger "@codex review"
     - messages d'intro standards de Codex (CODEX_INTRO_MARKER)
     - utilisateurs autres que CODEX_BOT
     """
@@ -247,7 +250,8 @@ def _parse_remarks_from_json(raw: str, source: str) -> list[CodexRemark]:
             obj = json.loads(line)
         except json.JSONDecodeError:
             continue
-        body = obj.get("body", "").strip()
+        # Fix : obj.get("body") peut être None (champ présent mais null dans l'API)
+        body = (obj.get("body") or "").strip()
         if not body or body.lower() == CODEX_TRIGGER:
             continue
         if CODEX_INTRO_MARKER in body.lower():
@@ -340,7 +344,8 @@ def phase4_display_remarks(
             print(f"  [{i}] IGNORÉ ({reason}) — {loc}")
         else:
             print(f"  [{i}] À appliquer : {loc}")
-            print(f"       {remark.body[:120]}")
+            # Afficher le corps complet sans troncature
+            print(f"       {remark.body}")
             # `applied` reste vide — l'opérateur applique via ses outils natifs.
 
     return applied, ignored
@@ -349,30 +354,45 @@ def phase4_display_remarks(
 def get_dirty_files() -> list[str]:
     """Retourne la liste des fichiers modifiés dans le working tree.
 
-    Gère les enregistrements de renommage git (R  old.py -> new.py) en extrayant
-    les deux chemins séparément.
+    Utilise --porcelain -z (NUL-délimité) pour éviter le C-quoting des noms
+    de fichiers avec espaces ou caractères spéciaux.
+    Pour les renommages, retourne les deux chemins séparément.
     """
-    output = _git("status", "--porcelain")
-    files = []
-    for line in output.splitlines():
-        if len(line) >= 4:
-            path = line[3:].strip()
-            if " -> " in path:
-                # Renommage : "old.py -> new.py"
-                old_path, new_path = path.split(" -> ", 1)
-                files.extend([old_path.strip(), new_path.strip()])
-            else:
-                files.append(path)
+    output = _git("status", "--porcelain", "-z", raw=True)
+    files: list[str] = []
+    if not output:
+        return files
+    entries = output.split("\0")
+    i = 0
+    while i < len(entries):
+        entry = entries[i]
+        if not entry or len(entry) < 3:
+            i += 1
+            continue
+        status = entry[:2]
+        path = entry[3:]
+        if status[0] in ("R", "C") or status[1] in ("R", "C"):
+            # Renommage/copie : avec -z, l'entrée suivante est l'ancien chemin
+            files.append(path)
+            if i + 1 < len(entries) and entries[i + 1]:
+                files.append(entries[i + 1])
+            i += 2
+        else:
+            files.append(path)
+            i += 1
     return files
 
 
 def get_new_untracked_files(pre_dirty: list[str]) -> list[str]:
     """Retourne les fichiers non-trackés apparus APRÈS le début du workflow."""
-    output = _git("status", "--porcelain")
-    current_untracked = []
-    for line in output.splitlines():
-        if line.startswith("??"):
-            current_untracked.append(line[3:].strip())
+    output = _git("status", "--porcelain", "-z", raw=True)
+    current_untracked: list[str] = []
+    if output:
+        for entry in output.split("\0"):
+            if not entry or len(entry) < 3:
+                continue
+            if entry[:2] == "??":
+                current_untracked.append(entry[3:])
     return [f for f in current_untracked if f not in pre_dirty]
 
 
@@ -410,11 +430,25 @@ def rollback(
     """Annule les modifications apportées par le workflow (sauf pre_dirty)."""
     for f in tracked_modified:
         if f not in pre_dirty:
-            _git("checkout", "--", f, check=False)
+            # Restaure depuis HEAD (pas depuis l'index) pour éviter de restaurer
+            # un état intermédiaire stagé non committé
+            _git("checkout", "HEAD", "--", f, check=False)
     for f in new_untracked:
         try:
             if os.path.isdir(f):
-                shutil.rmtree(f)
+                # Énumérer et supprimer les fichiers individuellement
+                # plutôt que shutil.rmtree pour éviter d'effacer des fichiers
+                # ignorés par git qui auraient été dans ce répertoire avant le workflow
+                for root, _, dir_files in os.walk(f, topdown=False):
+                    for fname in dir_files:
+                        try:
+                            os.unlink(os.path.join(root, fname))
+                        except OSError:
+                            pass
+                    try:
+                        os.rmdir(root)
+                    except OSError:
+                        pass
             else:
                 os.unlink(f)
         except OSError:
@@ -432,16 +466,21 @@ def phase6_commit_push(
 ) -> tuple[str | None, str | None, bool]:
     """Commit et push les fichiers produits par ce cycle. Retourne (sha, message, pushed).
 
-    Réinitialise l'index avant de stager pour éviter d'inclure des changements
-    pré-existants non liés au cycle Codex dans le commit.
+    Refuse de committer s'il existe des changements pré-stagés non liés au cycle
+    pour éviter d'inclure accidentellement des modifications tierces.
     """
     if not files_to_stage:
         return None, None, False
 
-    # Vider l'index pour ne committer que les fichiers du cycle
+    # Refuser si des changements sont déjà stagés hors du cycle courant
     pre_staged = _git("diff", "--cached", "--name-only", check=False)
     if pre_staged.strip():
-        _git("reset", "HEAD")
+        print(
+            "ERREUR : des changements non liés au cycle sont déjà stagés dans l'index. "
+            "Déstagez-les (git restore --staged <fichier>) avant de relancer --finish.",
+            file=sys.stderr,
+        )
+        return None, None, False
 
     for f in files_to_stage:
         _git("add", f)
@@ -524,9 +563,13 @@ def run() -> CycleResult:
     result.applied = applied
     result.ignored = ignored
 
+    # Fichiers mentionnés dans les remarques (pour filtrer le commit dans run_finish)
+    remark_files = [r.file for r in remarks if r.file]
+
     # Sauvegarder l'état pour run_finish()
     state = {
         "pre_dirty": pre_dirty,
+        "remark_files": remark_files,
         "pr": {
             "repo": pr.repo,
             "number": pr.number,
@@ -568,6 +611,16 @@ def run_finish() -> CycleResult:
     pr_data = state["pr"]
     pr = PRInfo(**pr_data)
     pre_dirty: list[str] = state["pre_dirty"]
+    remark_files: list[str] = state.get("remark_files", [])
+
+    # Vérifier que l'on est sur la bonne branche
+    current_branch = _git("branch", "--show-current")
+    if current_branch != pr.head_branch:
+        raise SystemExit(
+            f"Mauvaise branche : branche courante {current_branch!r} ≠ "
+            f"branche PR {pr.head_branch!r}. "
+            "Basculez sur la bonne branche avant de relancer --finish."
+        )
 
     result = CycleResult(pr=pr)
     result.ignored = [tuple(x) for x in state.get("ignored", [])]
@@ -575,9 +628,13 @@ def run_finish() -> CycleResult:
     # Calculer les fichiers modifiés par le cycle courant
     post_dirty = get_dirty_files()
     workflow_tracked = [f for f in post_dirty if f not in pre_dirty]
+    # Restreindre aux fichiers mentionnés dans les remarques Codex (si des fichiers
+    # spécifiques ont été ciblés) pour éviter d'inclure des modifications sans rapport
+    if remark_files:
+        workflow_tracked = [f for f in workflow_tracked if f in remark_files]
     new_untracked = get_new_untracked_files(pre_dirty)
 
-    # Phase 5
+    # Phase 5 — un seul passage, rollback immédiat en cas d'échec
     print("\n## Phase 5 — Tests")
     passed, coverage = phase5_run_tests()
     result.tests_passed = passed
@@ -588,15 +645,10 @@ def run_finish() -> CycleResult:
     )
 
     if not passed:
-        print("Tentative 2/2...")
-        passed, coverage = phase5_run_tests()
-        result.tests_passed = passed
-        result.coverage = coverage
-        if not passed:
-            print("Tests toujours en échec — rollback des modifications de ce cycle.")
-            rollback(workflow_tracked, new_untracked, pre_dirty)
-            result.skip_reason = "Tests en échec après 2 tentatives — rollback effectué."
-            return result
+        print("Tests en échec — rollback des modifications de ce cycle.")
+        rollback(workflow_tracked, new_untracked, pre_dirty)
+        result.skip_reason = "Tests en échec — rollback effectué."
+        return result
 
     # Phase 6
     print("\n## Phase 6 — Commit et push")
@@ -619,6 +671,11 @@ def run_finish() -> CycleResult:
         return result
 
     print(f"Commit : {sha[:8]} — {message}")
+
+    # Mettre à jour l'état avec le SHA avant phase 7 — permet un push manuel
+    # si phase7 échoue alors que le commit est déjà dans l'historique
+    state["commit_sha"] = sha
+    STATE_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
     # Phase 7
     print("\n## Phase 7 — Relance Codex")

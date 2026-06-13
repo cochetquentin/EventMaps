@@ -321,7 +321,7 @@ def test_rollback_calls_git_checkout_for_tracked_files(tmp_path, monkeypatch):
             new_untracked=[str(untracked)],
             pre_dirty=[],
         )
-    mock_git.assert_called_once_with("checkout", "--", "api/app.py", check=False)
+    mock_git.assert_called_once_with("checkout", "HEAD", "--", "api/app.py", check=False)
     assert not untracked.exists()
 
 
@@ -366,10 +366,14 @@ def test_no_diff_skips_commit_when_nothing_staged():
 
 def test_commit_and_push_when_diff_exists():
     """Si diff --cached retourne des fichiers → commit + push."""
+    diff_calls = [0]
 
     def git_side_effect(*args, **kwargs):
         if args[0] == "diff":
-            return "api/app.py"
+            diff_calls[0] += 1
+            # 1er appel : vérification pré-stagé → vide (aucun pré-stagé)
+            # 2e appel : vérification post-add → fichier stagé
+            return "" if diff_calls[0] == 1 else "api/app.py"
         if args[0] == "rev-parse":
             return "deadbeef1234"
         return ""
@@ -382,29 +386,45 @@ def test_commit_and_push_when_diff_exists():
     assert "corrections Codex" in message
 
 
+def test_phase6_refuses_when_pre_staged():
+    """Si des changements sont déjà stagés, phase6 refuse de committer."""
+
+    def git_side_effect(*args, **kwargs):
+        if args[0] == "diff":
+            return "pre_existing.py"  # pré-stagé détecté
+        return ""
+
+    with patch.object(hcr, "_git", side_effect=git_side_effect):
+        sha, message, pushed = phase6_commit_push(PR, ["api/app.py"])
+
+    assert sha is None
+    assert pushed is False
+
+
 # ---------------------------------------------------------------------------
 # get_dirty_files / get_new_untracked_files
 # ---------------------------------------------------------------------------
 
 
 def test_get_dirty_files_parses_porcelain():
-    with patch.object(hcr, "_git", return_value=" M api/app.py\n?? new_file.py"):
+    # Format --porcelain -z : entrées séparées par NUL
+    with patch.object(hcr, "_git", return_value=" M api/app.py\x00?? new_file.py\x00"):
         files = get_dirty_files()
     assert "api/app.py" in files
     assert "new_file.py" in files
 
 
 def test_get_dirty_files_parses_rename_record():
-    """Les renommages 'R  old.py -> new.py' retournent les deux chemins séparément."""
-    with patch.object(hcr, "_git", return_value="R  old.py -> new.py"):
+    """Les renommages avec -z : 'R  new.py\0old.py\0' → deux chemins séparés."""
+    with patch.object(hcr, "_git", return_value="R  new.py\x00old.py\x00"):
         files = get_dirty_files()
     assert "old.py" in files
     assert "new.py" in files
-    assert "old.py -> new.py" not in files
 
 
 def test_get_new_untracked_files_excludes_pre_dirty():
-    with patch.object(hcr, "_git", return_value="?? new_file.py\n?? pre_existing.py"):
+    # Format --porcelain -z
+    with patch.object(hcr, "_git", return_value="?? new_file.py\x00?? pre_existing.py\x00"):
         new = get_new_untracked_files(pre_dirty=["pre_existing.py"])
     assert "new_file.py" in new
     assert "pre_existing.py" not in new
