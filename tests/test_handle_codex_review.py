@@ -23,7 +23,7 @@ from scripts.handle_codex_review import (
     phase3_get_remarks,
     phase4_display_remarks,
     phase5_run_tests,
-    phase6_commit_push,
+    phase6_commit,
     rollback,
 )
 
@@ -309,7 +309,7 @@ def test_phase5_returns_false_on_failure():
 
 
 def test_rollback_calls_git_checkout_for_tracked_files(tmp_path, monkeypatch):
-    """rollback() appelle git checkout -- <file> pour les fichiers trackés."""
+    """rollback() appelle git checkout HEAD -- <file> pour les fichiers trackés."""
     monkeypatch.chdir(tmp_path)
     # Créer un fichier non-tracké pour tester os.unlink
     untracked = tmp_path / "new_file.py"
@@ -344,9 +344,8 @@ def test_rollback_skips_pre_dirty_files():
 def test_no_diff_skips_commit_when_no_files():
     """Si files_to_stage est vide → pas de commit."""
     with patch.object(hcr, "_git", return_value=""):
-        sha, message, pushed = phase6_commit_push(PR, [])
+        sha, message = phase6_commit(PR, [])
     assert sha is None
-    assert pushed is False
 
 
 def test_no_diff_skips_commit_when_nothing_staged():
@@ -358,47 +357,26 @@ def test_no_diff_skips_commit_when_nothing_staged():
         return ""
 
     with patch.object(hcr, "_git", side_effect=git_side_effect):
-        sha, message, pushed = phase6_commit_push(PR, ["api/app.py"])
+        sha, message = phase6_commit(PR, ["api/app.py"])
 
     assert sha is None
-    assert pushed is False
 
 
-def test_commit_and_push_when_diff_exists():
-    """Si diff --cached retourne des fichiers → commit + push."""
-    diff_calls = [0]
+def test_commit_when_diff_exists():
+    """Si diff --cached retourne des fichiers → commit."""
 
     def git_side_effect(*args, **kwargs):
         if args[0] == "diff":
-            diff_calls[0] += 1
-            # 1er appel : vérification pré-stagé → vide (aucun pré-stagé)
-            # 2e appel : vérification post-add → fichier stagé
-            return "" if diff_calls[0] == 1 else "api/app.py"
+            return "api/app.py"
         if args[0] == "rev-parse":
             return "deadbeef1234"
         return ""
 
     with patch.object(hcr, "_git", side_effect=git_side_effect):
-        sha, message, pushed = phase6_commit_push(PR, ["api/app.py"])
+        sha, message = phase6_commit(PR, ["api/app.py"])
 
     assert sha == "deadbeef1234"
-    assert pushed is True
     assert "corrections Codex" in message
-
-
-def test_phase6_refuses_when_pre_staged():
-    """Si des changements sont déjà stagés, phase6 refuse de committer."""
-
-    def git_side_effect(*args, **kwargs):
-        if args[0] == "diff":
-            return "pre_existing.py"  # pré-stagé détecté
-        return ""
-
-    with patch.object(hcr, "_git", side_effect=git_side_effect):
-        sha, message, pushed = phase6_commit_push(PR, ["api/app.py"])
-
-    assert sha is None
-    assert pushed is False
 
 
 # ---------------------------------------------------------------------------

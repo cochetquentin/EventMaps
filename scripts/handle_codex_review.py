@@ -250,7 +250,7 @@ def _parse_remarks_from_json(raw: str, source: str) -> list[CodexRemark]:
             obj = json.loads(line)
         except json.JSONDecodeError:
             continue
-        # Fix : obj.get("body") peut être None (champ présent mais null dans l'API)
+        # obj.get("body") peut être None (champ présent mais null dans l'API)
         body = (obj.get("body") or "").strip()
         if not body or body.lower() == CODEX_TRIGGER:
             continue
@@ -354,11 +354,13 @@ def phase4_display_remarks(
 def get_dirty_files() -> list[str]:
     """Retourne la liste des fichiers modifiés dans le working tree.
 
-    Utilise --porcelain -z (NUL-délimité) pour éviter le C-quoting des noms
-    de fichiers avec espaces ou caractères spéciaux.
+    Utilise --porcelain -z --untracked-files=all pour :
+    - éviter le C-quoting des noms de fichiers avec caractères spéciaux (via -z)
+    - lister les fichiers individuellement plutôt que par répertoire (via --untracked-files=all)
+
     Pour les renommages, retourne les deux chemins séparément.
     """
-    output = _git("status", "--porcelain", "-z", raw=True)
+    output = _git("status", "--porcelain", "-z", "--untracked-files=all", raw=True)
     files: list[str] = []
     if not output:
         return files
@@ -384,8 +386,13 @@ def get_dirty_files() -> list[str]:
 
 
 def get_new_untracked_files(pre_dirty: list[str]) -> list[str]:
-    """Retourne les fichiers non-trackés apparus APRÈS le début du workflow."""
-    output = _git("status", "--porcelain", "-z", raw=True)
+    """Retourne les fichiers non-trackés apparus APRÈS le début du workflow.
+
+    Utilise --untracked-files=all pour obtenir les chemins de fichiers individuels
+    (pas de répertoires) et éviter de confondre un fichier nouveau dans un répertoire
+    pré-existant avec le répertoire lui-même.
+    """
+    output = _git("status", "--porcelain", "-z", "--untracked-files=all", raw=True)
     current_untracked: list[str] = []
     if output:
         for entry in output.split("\0"):
@@ -427,7 +434,12 @@ def rollback(
     new_untracked: list[str],
     pre_dirty: list[str],
 ) -> None:
-    """Annule les modifications apportées par le workflow (sauf pre_dirty)."""
+    """Annule les modifications apportées par le workflow (sauf pre_dirty).
+
+    Les fichiers non-trackés sont listés individuellement (grâce à --untracked-files=all
+    dans get_new_untracked_files) : on peut donc les supprimer un par un sans risquer
+    d'effacer des fichiers ignorés par git dans un répertoire pré-existant.
+    """
     for f in tracked_modified:
         if f not in pre_dirty:
             # Restaure depuis HEAD (pas depuis l'index) pour éviter de restaurer
@@ -435,67 +447,45 @@ def rollback(
             _git("checkout", "HEAD", "--", f, check=False)
     for f in new_untracked:
         try:
-            if os.path.isdir(f):
-                # Énumérer et supprimer les fichiers individuellement
-                # plutôt que shutil.rmtree pour éviter d'effacer des fichiers
-                # ignorés par git qui auraient été dans ce répertoire avant le workflow
-                for root, _, dir_files in os.walk(f, topdown=False):
-                    for fname in dir_files:
-                        try:
-                            os.unlink(os.path.join(root, fname))
-                        except OSError:
-                            pass
-                    try:
-                        os.rmdir(root)
-                    except OSError:
-                        pass
-            else:
-                os.unlink(f)
+            os.unlink(f)
         except OSError:
             pass
 
 
 # ---------------------------------------------------------------------------
-# Phase 6 — Commit et push
+# Phase 6 — Commit (le push est géré séparément dans run_finish)
 # ---------------------------------------------------------------------------
 
 
-def phase6_commit_push(
+def phase6_commit(
     pr: PRInfo,
     files_to_stage: list[str],
-) -> tuple[str | None, str | None, bool]:
-    """Commit et push les fichiers produits par ce cycle. Retourne (sha, message, pushed).
+) -> tuple[str | None, str | None]:
+    """Commite les fichiers produits par ce cycle. Retourne (sha, message).
 
-    Refuse de committer s'il existe des changements pré-stagés non liés au cycle
-    pour éviter d'inclure accidentellement des modifications tierces.
+    Ne pousse pas — le push est effectué dans run_finish après sauvegarde du sha
+    dans l'état, permettant une reprise en cas d'échec réseau.
+
+    L'appelant doit s'assurer qu'aucun changement pré-stagé n'est présent avant
+    d'appeler cette fonction.
     """
     if not files_to_stage:
-        return None, None, False
-
-    # Refuser si des changements sont déjà stagés hors du cycle courant
-    pre_staged = _git("diff", "--cached", "--name-only", check=False)
-    if pre_staged.strip():
-        print(
-            "ERREUR : des changements non liés au cycle sont déjà stagés dans l'index. "
-            "Déstagez-les (git restore --staged <fichier>) avant de relancer --finish.",
-            file=sys.stderr,
-        )
-        return None, None, False
+        return None, None
 
     for f in files_to_stage:
-        _git("add", f)
+        # -- sépare les options des chemins et prévient l'injection d'options
+        # (ex : un fichier nommé '--all' ne deviendrait pas git add --all)
+        _git("add", "--", f)
 
     # Vérifier qu'il y a effectivement quelque chose de stagé
     staged = _git("diff", "--cached", "--name-only", check=False)
     if not staged.strip():
-        return None, None, False
+        return None, None
 
     message = "fix: appliquer corrections Codex"
     _git("commit", "-m", message)
     sha = _git("rev-parse", "HEAD")
-
-    _git("push")
-    return sha, message, True
+    return sha, message
 
 
 # ---------------------------------------------------------------------------
@@ -504,12 +494,27 @@ def phase6_commit_push(
 
 
 def phase7_relaunch_codex(pr: PRInfo) -> bool:
-    """Re-vérifie l'anti-boucle puis poste @Codex review."""
+    """Re-vérifie l'anti-boucle (garde absolue) puis poste @Codex review.
+
+    La vérification ici est plus stricte que phase2 : refuse si un trigger
+    existe déjà après notre commit, même si Codex a déjà répondu — car un
+    acteur externe pourrait avoir posté un trigger entre notre push et phase7,
+    et poster un second trigger sans nouveau commit violerait la règle absolue.
+    """
     # Re-fetch HEAD après push
     pr_json = _gh("pr", "view", "--json", "headRefOid")
     pr.head_sha = json.loads(pr_json)["headRefOid"]
 
-    if phase2_anti_loop(pr)[0]:
+    # Récupérer la date de notre dernier commit
+    commit_date = _git("log", "-1", "--format=%cI")
+    t_commit_e = parse_iso_epoch(commit_date)
+
+    # Récupérer le trigger le plus récent
+    _, _, t_trigger = phase2_anti_loop(pr)
+    t_trigger_e = parse_iso_epoch(t_trigger)
+
+    # Garde absolue : si un trigger existe après notre commit → ne pas en poster un autre
+    if t_trigger_e > 0 and t_trigger_e > t_commit_e:
         return False
 
     _gh("pr", "comment", str(pr.number), "--body", "@Codex review")
@@ -563,13 +568,14 @@ def run() -> CycleResult:
     result.applied = applied
     result.ignored = ignored
 
-    # Fichiers mentionnés dans les remarques (pour filtrer le commit dans run_finish)
+    # Fichiers mentionnés dans les remarques inline (pour filtrer new_untracked dans run_finish)
     remark_files = [r.file for r in remarks if r.file]
 
     # Sauvegarder l'état pour run_finish()
     state = {
         "pre_dirty": pre_dirty,
         "remark_files": remark_files,
+        "remarks_found": len(remarks),
         "pr": {
             "repo": pr.repo,
             "number": pr.number,
@@ -601,6 +607,9 @@ def run_finish() -> CycleResult:
 
     Lit .hcr_state.json pour déterminer quels fichiers étaient pré-existants
     et ne committer que ceux produits par le cycle courant.
+
+    Reprend depuis la phase 7 si state["commit_sha"] est déjà renseigné
+    (cas où le commit a réussi mais le push ou la relance a échoué).
     """
     if not STATE_FILE.exists():
         raise SystemExit(
@@ -624,15 +633,60 @@ def run_finish() -> CycleResult:
 
     result = CycleResult(pr=pr)
     result.ignored = [tuple(x) for x in state.get("ignored", [])]
+    result.remarks_found = state.get("remarks_found", 0)
+
+    # --- Reprise : le commit a déjà été effectué lors d'un appel précédent ---
+    existing_sha = state.get("commit_sha")
+    if existing_sha:
+        print(f"Reprise : commit {existing_sha[:8]} déjà effectué.")
+        result.commit_sha = existing_sha
+        result.commit_message = state.get("commit_message")
+
+        # Vérifier si le commit a déjà été pushé
+        remote_sha = _git("rev-parse", f"origin/{pr.head_branch}", check=False)
+        local_sha = _git("rev-parse", "HEAD")
+        if local_sha == existing_sha and remote_sha != existing_sha:
+            print("Push en attente...")
+            _git("push")
+        result.pushed = True
+
+        print("\n## Phase 7 — Relance Codex")
+        relaunched = phase7_relaunch_codex(pr)
+        result.codex_relaunched = relaunched
+        if relaunched:
+            print("@Codex review posté.")
+        else:
+            result.skip_reason = "Anti-boucle post-push : @Codex review non posté."
+            print(result.skip_reason)
+
+        STATE_FILE.unlink(missing_ok=True)
+        return result
+
+    # --- Flux normal ---
 
     # Calculer les fichiers modifiés par le cycle courant
     post_dirty = get_dirty_files()
+    # Tracked : inclure tous les fichiers modifiés hors pre_dirty.
+    # Pas de filtre par remark_files : une correction inline peut nécessiter
+    # de mettre à jour un fichier de test ou un helper non mentionné dans la remarque.
     workflow_tracked = [f for f in post_dirty if f not in pre_dirty]
-    # Restreindre aux fichiers mentionnés dans les remarques Codex (si des fichiers
-    # spécifiques ont été ciblés) pour éviter d'inclure des modifications sans rapport
-    if remark_files:
-        workflow_tracked = [f for f in workflow_tracked if f in remark_files]
+    # Untracked : restreindre aux fichiers cités dans les remarques pour éviter
+    # de committer des fichiers générés ou personnels non liés au cycle.
     new_untracked = get_new_untracked_files(pre_dirty)
+    if remark_files:
+        new_untracked = [f for f in new_untracked if f in remark_files]
+
+    # Vérifier l'absence de changements pré-stagés avant de toucher à l'index
+    pre_staged = _git("diff", "--cached", "--name-only", check=False)
+    if pre_staged.strip():
+        print(
+            "ERREUR : des changements non liés au cycle sont déjà stagés dans l'index. "
+            "Déstagez-les (git restore --staged <fichier>) avant de relancer --finish.",
+            file=sys.stderr,
+        )
+        result.skip_reason = "Changements pré-stagés — état préservé pour retry."
+        # Ne pas supprimer le state : l'opérateur doit pouvoir relancer --finish après correction
+        return result
 
     # Phase 5 — un seul passage, rollback immédiat en cas d'échec
     print("\n## Phase 5 — Tests")
@@ -659,23 +713,26 @@ def run_finish() -> CycleResult:
         STATE_FILE.unlink(missing_ok=True)
         return result
 
-    sha, message, pushed = phase6_commit_push(pr, files_changed)
-    result.commit_sha = sha
-    result.commit_message = message
-    result.pushed = pushed
-
+    sha, message = phase6_commit(pr, files_changed)
     if not sha:
         result.skip_reason = "Aucun diff stagé — pas de commit."
         print(result.skip_reason)
         STATE_FILE.unlink(missing_ok=True)
         return result
 
+    result.commit_sha = sha
+    result.commit_message = message
+
+    # Sauvegarder le SHA dans l'état AVANT le push : si le push échoue (réseau),
+    # la prochaine exécution de --finish peut reprendre depuis phase 7 directement.
+    state["commit_sha"] = sha
+    state["commit_message"] = message
+    STATE_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
     print(f"Commit : {sha[:8]} — {message}")
 
-    # Mettre à jour l'état avec le SHA avant phase 7 — permet un push manuel
-    # si phase7 échoue alors que le commit est déjà dans l'historique
-    state["commit_sha"] = sha
-    STATE_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    _git("push")
+    result.pushed = True
 
     # Phase 7
     print("\n## Phase 7 — Relance Codex")
