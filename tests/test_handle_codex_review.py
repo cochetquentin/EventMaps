@@ -319,12 +319,11 @@ def test_rollback_calls_git_checkout_for_tracked_files(tmp_path, monkeypatch):
     untracked.write_text("temp")
 
     with patch.object(hcr, "_run", return_value=_make_completed_process(0)) as mock_run:
-        errors = rollback(
+        rollback(
             tracked_modified=["api/app.py"],
             new_untracked=[str(untracked)],
             pre_dirty=[],
         )
-    assert errors == []
     mock_run.assert_called_once_with(
         ["git", "checkout", "HEAD", "--", ":(literal)api/app.py"], check=False
     )
@@ -333,12 +332,13 @@ def test_rollback_calls_git_checkout_for_tracked_files(tmp_path, monkeypatch):
 
 def test_rollback_skips_pre_dirty_files():
     """Les fichiers qui étaient déjà sales avant le workflow ne sont pas touchés."""
-    errors = rollback(
-        tracked_modified=["pre_existing.py"],
-        new_untracked=[],
-        pre_dirty=["pre_existing.py"],
-    )
-    assert errors == []
+    with patch.object(hcr, "_run") as mock_run:
+        rollback(
+            tracked_modified=["pre_existing.py"],
+            new_untracked=[],
+            pre_dirty=["pre_existing.py"],
+        )
+    mock_run.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -349,7 +349,7 @@ def test_rollback_skips_pre_dirty_files():
 def test_no_diff_skips_commit_when_no_files():
     """Si files_to_stage est vide → pas de commit."""
     with patch.object(hcr, "_git", return_value=""):
-        sha, message = phase6_commit(PR, [])
+        sha, message = phase6_commit([])
     assert sha is None
 
 
@@ -362,7 +362,7 @@ def test_no_diff_skips_commit_when_nothing_staged():
         return ""
 
     with patch.object(hcr, "_git", side_effect=git_side_effect):
-        sha, message = phase6_commit(PR, ["api/app.py"])
+        sha, message = phase6_commit(["api/app.py"])
 
     assert sha is None
 
@@ -378,7 +378,7 @@ def test_commit_when_diff_exists():
         return ""
 
     with patch.object(hcr, "_git", side_effect=git_side_effect):
-        sha, message = phase6_commit(PR, ["api/app.py"])
+        sha, message = phase6_commit(["api/app.py"])
 
     assert sha == "deadbeef1234"
     assert "corrections Codex" in message
