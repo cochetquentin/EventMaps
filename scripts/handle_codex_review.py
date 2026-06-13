@@ -89,6 +89,8 @@ class PRInfo:
     title: str
     head_branch: str
     head_sha: str
+    head_ref_name: str = ""  # headRefName côté remote (= head_branch pour les non-forks)
+    push_remote: str = "origin"  # remote git vers lequel pousser (fork-aware)
 
 
 @dataclass
@@ -125,13 +127,28 @@ class CycleResult:
 def phase1_get_pr_info() -> PRInfo:
     """Récupère les métadonnées de la PR courante via gh CLI."""
     repo = _gh("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner")
-    pr_json = _gh("pr", "view", "--json", "number,title,state,headRefOid")
+    pr_json = _gh(
+        "pr", "view", "--json", "number,title,state,headRefOid,headRefName,headRepository"
+    )
     data = json.loads(pr_json)
 
     if data.get("state", "").upper() != "OPEN":
         raise SystemExit("PR fermée ou mergée — arrêt.")
 
     head_branch = _git("branch", "--show-current")
+    head_ref_name: str = data.get("headRefName") or head_branch
+
+    # Détecter les forks : si le dépôt de la tête diffère du dépôt de base,
+    # pousser directement vers l'URL SSH du fork plutôt que vers «origin».
+    head_repo = data.get("headRepository") or {}
+    head_repo_owner = (
+        (head_repo.get("owner") or {}).get("login", "") if isinstance(head_repo, dict) else ""
+    )
+    base_repo_owner = repo.split("/")[0] if "/" in repo else ""
+    if head_repo_owner and head_repo_owner.lower() != base_repo_owner.lower():
+        push_remote = head_repo.get("sshUrl") or head_repo.get("url") or "origin"
+    else:
+        push_remote = "origin"
 
     return PRInfo(
         repo=repo,
@@ -139,6 +156,8 @@ def phase1_get_pr_info() -> PRInfo:
         title=data["title"],
         head_branch=head_branch,
         head_sha=data["headRefOid"],
+        head_ref_name=head_ref_name,
+        push_remote=push_remote,
     )
 
 
@@ -498,6 +517,10 @@ def phase6_commit(
         return None, None
 
     for f in files_to_stage:
+        if not os.path.exists(f):
+            # Le fichier n'existe plus : c'est la source d'un renommage déjà capturée
+            # par le staging de la destination. Ignorer pour éviter une erreur git add.
+            continue
         # :(literal) désactive la magie pathspec + -- sépare options et chemins
         _git("add", "--", f":(literal){f}")
 
@@ -644,6 +667,8 @@ def run() -> CycleResult:
             "title": pr.title,
             "head_branch": pr.head_branch,
             "head_sha": pr.head_sha,
+            "head_ref_name": pr.head_ref_name,
+            "push_remote": pr.push_remote,
         },
         "ignored": [list(x) for x in ignored],
     }
@@ -729,7 +754,8 @@ def run_finish() -> CycleResult:
         if local_sha == existing_sha and push_sha != existing_sha:
             # Commit présent localement, pas encore pushé
             print("Push en attente...")
-            _git("push", "origin", f"HEAD:refs/heads/{pr.head_branch}")
+            push_branch = pr.head_ref_name or pr.head_branch
+            _git("push", pr.push_remote, f"HEAD:refs/heads/{push_branch}")
             result.pushed = True
         elif push_sha == existing_sha:
             # Commit déjà pushé (local HEAD peut avoir avancé)
@@ -773,6 +799,18 @@ def run_finish() -> CycleResult:
             f"Le HEAD local ({local_sha[:8]}) ne correspond plus au SHA de planification "
             f"({pr.head_sha[:8]}). Des commits ont été créés entre les deux étapes. "
             "Annulez-les ou relancez la planification (sans --finish) pour repartir d'un état propre."
+        )
+
+    # Revalider le SHA remote avant de committer : si un acteur externe a réinitialisé
+    # la branche, notre push serait un fast-forward valide qui restaure silencieusement
+    # l'historique supprimé intentionnellement.
+    remote_head_json = _gh("pr", "view", str(pr.number), "--json", "headRefOid")
+    remote_head_sha = json.loads(remote_head_json).get("headRefOid", "")
+    if remote_head_sha != pr.head_sha:
+        raise SystemExit(
+            f"Le SHA remote de la PR #{pr.number} ({remote_head_sha[:8]}) a changé depuis "
+            f"la planification ({pr.head_sha[:8]}). Un acteur externe a modifié la branche — "
+            "arrêt. Relancez la planification (sans --finish) pour repartir d'un état propre."
         )
 
     # Calculer les fichiers modifiés par le cycle courant
@@ -819,9 +857,15 @@ def run_finish() -> CycleResult:
 
     if not passed:
         print("Tests en échec — rollback des modifications de ce cycle.")
-        # Rollback uniquement les fichiers que l'on allait committer,
-        # pas l'ensemble de all_new_untracked qui pourrait contenir du travail concurrent.
-        rollback(workflow_tracked, new_untracked_for_commit, pre_dirty)
+        # Pour les fichiers non-trackés : ne supprimer que ceux cités dans les remarques inline.
+        # Les fichiers créés par l'opérateur entre les deux étapes (notes, artefacts) ne sont
+        # pas du domaine du workflow et ne doivent pas être effacés sans confirmation explicite.
+        untracked_to_rollback = (
+            [f for f in new_untracked_for_commit if f in remark_files]
+            if remark_files
+            else new_untracked_for_commit
+        )
+        rollback(workflow_tracked, untracked_to_rollback, pre_dirty)
         result.skip_reason = "Tests en échec — rollback effectué."
         # Supprimer le state : le rollback a annulé les corrections ;
         # la prochaine invocation sans --finish peut repartir de zéro.
@@ -856,7 +900,8 @@ def run_finish() -> CycleResult:
 
     print(f"Commit : {sha[:8]} — {message}")
 
-    _git("push", "origin", f"HEAD:refs/heads/{pr.head_branch}")
+    push_branch = pr.head_ref_name or pr.head_branch
+    _git("push", pr.push_remote, f"HEAD:refs/heads/{push_branch}")
     result.pushed = True
 
     # Vérifier que le push a bien mis à jour la tête de la PR.
