@@ -18,7 +18,7 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 - **Statut : Terminé**
 - **Priorité : P0**
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/50
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/50 — PR : https://github.com/cochetquentin/EventMaps/pull/90
 
 **Actions.** Documenter deux catégories : `real` pour captures réelles de contrat et `synthetic` pour cas unitaires minimaux ; définir les règles de provenance, date de capture, URL source, anonymisation, taille et mise à jour.
 
@@ -75,7 +75,7 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 - **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** TEST-003, TEST-004, TEST-005
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/61
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/61 — PR : https://github.com/cochetquentin/EventMaps/pull/88
 
 **Actions.** Pour chaque capture réelle, vérifier les champs essentiels et les erreurs attendues ; tester les taux d'extraction d'un listing et l'absence de perte silencieuse ; conserver séparément les tests unitaires de fonctions de parsing.
 
