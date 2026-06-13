@@ -428,6 +428,14 @@ def phase5_run_tests() -> tuple[bool, float | None]:
                         pass
                     break
 
+    if not passed:
+        # Afficher la sortie de pytest pour permettre le diagnostic avant rollback
+        output = (result.stdout or "") + (result.stderr or "")
+        if output.strip():
+            print("\n--- Sortie pytest (échec) ---")
+            print(output.rstrip())
+            print("--- Fin sortie pytest ---\n")
+
     return passed, coverage
 
 
@@ -450,6 +458,17 @@ def rollback(
             # :(literal) désactive la magie pathspec git pour les noms de fichiers
             # contenant des caractères spéciaux comme ':(top)*'.
             _git("checkout", "HEAD", "--", f":(literal){f}", check=False)
+            # Si le fichier existe encore après checkout, c'est qu'il n'existe pas dans HEAD
+            # (ex : destination d'un renommage). Le supprimer pour compléter le rollback.
+            if os.path.exists(f):
+                not_in_head = (
+                    _run(["git", "cat-file", "-e", f"HEAD:{f}"], check=False).returncode != 0
+                )
+                if not_in_head:
+                    try:
+                        os.unlink(f)
+                    except OSError:
+                        pass
     for f in new_untracked:
         try:
             os.unlink(f)
@@ -519,7 +538,8 @@ def phase7_relaunch_codex(pr: PRInfo) -> bool:
             ".commit.committer.date",
         )
     except subprocess.CalledProcessError:
-        commit_date = _git("log", "-1", "--format=%cI")
+        # Fallback : lire la date du SHA spécifique (pas HEAD qui peut avoir avancé localement)
+        commit_date = _git("log", "-1", "--format=%cI", pr.head_sha, check=False)
     t_commit_e = parse_iso_epoch(commit_date)
 
     # Récupérer le trigger le plus récent
@@ -530,6 +550,13 @@ def phase7_relaunch_codex(pr: PRInfo) -> bool:
     # GitHub a une précision à la seconde ; >= couvre le cas où le trigger et le commit
     # ont le même epoch (ex : retry après un timeout côté client).
     if t_trigger_e > 0 and t_trigger_e >= t_commit_e:
+        return False
+
+    # Revalider que la PR est toujours OPEN immédiatement avant de commenter
+    # (elle peut avoir été fermée pendant les tests ou le push)
+    pr_current = json.loads(_gh("pr", "view", str(pr.number), "--json", "state"))
+    if pr_current.get("state", "").upper() != "OPEN":
+        print("PR fermée ou mergée — @Codex review non posté.")
         return False
 
     _gh("pr", "comment", str(pr.number), "--body", "@Codex review")
@@ -755,19 +782,17 @@ def run_finish() -> CycleResult:
     # (get_dirty_files inclut aussi les ?? ; on soustrait all_new_untracked pour n'avoir
     # que les fichiers véritablement trackés et modifiés)
     workflow_tracked = [f for f in post_dirty if f not in pre_dirty and f not in all_new_untracked]
-    # Untracked à committer : restreindre aux fichiers cités dans les remarques inline
-    # pour éviter de committer ou de rollback des fichiers créés par l'opérateur entre
-    # les deux étapes et non liés au cycle (ex : notes, artefacts temporaires).
-    # Si aucun remark_file n'est présent (remarques générales uniquement), tout inclure.
-    new_untracked_for_commit = (
-        [f for f in all_new_untracked if f in remark_files] if remark_files else all_new_untracked
-    )
-    excluded_untracked = [f for f in all_new_untracked if f not in new_untracked_for_commit]
-    if excluded_untracked:
-        print(
-            f"  ⚠ Fichiers non-trackés exclus du commit (non cités dans les remarques) : "
-            f"{', '.join(excluded_untracked)}"
-        )
+    # Tous les fichiers non-trackés apparus pendant le cycle sont inclus dans le commit.
+    new_untracked_for_commit = all_new_untracked
+
+    # Avertir si des fichiers trackés modifiés sont hors du périmètre des remarques inline.
+    if remark_files:
+        out_of_scope_tracked = [f for f in workflow_tracked if f not in remark_files]
+        if out_of_scope_tracked:
+            print(
+                f"  ⚠ Fichiers trackés modifiés hors périmètre des remarques inline : "
+                f"{', '.join(out_of_scope_tracked)}"
+            )
 
     # Vérifier l'absence de changements pré-stagés avant de toucher à l'index
     pre_staged = _git("diff", "--cached", "--name-only", check=False)
@@ -830,8 +855,17 @@ def run_finish() -> CycleResult:
 
     print(f"Commit : {sha[:8]} — {message}")
 
-    _git("push")
+    _git("push", "origin", f"HEAD:refs/heads/{pr.head_branch}")
     result.pushed = True
+
+    # Vérifier que le push a bien mis à jour la tête de la PR
+    verify_pr = json.loads(_gh("pr", "view", str(pr.number), "--json", "headRefOid"))
+    if verify_pr["headRefOid"] != sha:
+        raise SystemExit(
+            f"Le push n'a pas mis à jour la tête de la PR #{pr.number} : "
+            f"attendu {sha[:8]}, obtenu {verify_pr['headRefOid'][:8]}. "
+            "Vérifiez la configuration remote.pushDefault ou branch.*.pushRemote."
+        )
 
     # Phase 7
     print("\n## Phase 7 — Relance Codex")

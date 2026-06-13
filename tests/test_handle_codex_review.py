@@ -287,10 +287,13 @@ def test_general_remark_is_displayed_not_applied():
 # ---------------------------------------------------------------------------
 
 
-def _make_completed_process(returncode: int, stdout: str = "") -> subprocess.CompletedProcess:
+def _make_completed_process(
+    returncode: int, stdout: str = "", stderr: str = ""
+) -> subprocess.CompletedProcess:
     cp = MagicMock(spec=subprocess.CompletedProcess)
     cp.returncode = returncode
     cp.stdout = stdout
+    cp.stderr = stderr
     return cp
 
 
