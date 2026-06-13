@@ -128,7 +128,10 @@ def phase1_get_pr_info() -> PRInfo:
     """Récupère les métadonnées de la PR courante via gh CLI."""
     repo = _gh("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner")
     pr_json = _gh(
-        "pr", "view", "--json", "number,title,state,headRefOid,headRefName,headRepository"
+        "pr",
+        "view",
+        "--json",
+        "number,title,state,headRefOid,headRefName,headRepositoryOwner,headRepository",
     )
     data = json.loads(pr_json)
 
@@ -138,15 +141,18 @@ def phase1_get_pr_info() -> PRInfo:
     head_branch = _git("branch", "--show-current")
     head_ref_name: str = data.get("headRefName") or head_branch
 
-    # Détecter les forks : si le dépôt de la tête diffère du dépôt de base,
-    # pousser directement vers l'URL SSH du fork plutôt que vers «origin».
-    head_repo = data.get("headRepository") or {}
+    # Détecter les forks : headRepositoryOwner expose directement le login de l'owner de la tête.
+    # headRepository expose nameWithOwner (disponible dans gh CLI), mais pas sshUrl/url.
+    # Pour les forks on construit l'URL SSH depuis nameWithOwner.
+    head_repo_owner_data = data.get("headRepositoryOwner") or {}
     head_repo_owner = (
-        (head_repo.get("owner") or {}).get("login", "") if isinstance(head_repo, dict) else ""
+        head_repo_owner_data.get("login", "") if isinstance(head_repo_owner_data, dict) else ""
     )
     base_repo_owner = repo.split("/")[0] if "/" in repo else ""
     if head_repo_owner and head_repo_owner.lower() != base_repo_owner.lower():
-        push_remote = head_repo.get("sshUrl") or head_repo.get("url") or "origin"
+        head_repo = data.get("headRepository") or {}
+        head_nwo = head_repo.get("nameWithOwner", "") if isinstance(head_repo, dict) else ""
+        push_remote = f"git@github.com:{head_nwo}.git" if head_nwo else "origin"
     else:
         push_remote = "origin"
 
@@ -463,21 +469,23 @@ def rollback(
     tracked_modified: list[str],
     new_untracked: list[str],
     pre_dirty: list[str],
-) -> None:
+) -> list[str]:
     """Annule les modifications apportées par le workflow (sauf pre_dirty).
 
-    new_untracked doit contenir TOUS les fichiers non-trackés apparus pendant le cycle
-    (pas seulement ceux ciblés par les remarques), afin de garantir un rollback complet.
-    Les fichiers non-trackés sont listés individuellement (grâce à --untracked-files=all)
-    ce qui évite d'effacer des fichiers ignorés par git dans un répertoire pré-existant.
+    Retourne la liste des erreurs rencontrées (chaînes descriptives).
+    Un rollback partiel est possible si des fichiers sont verrouillés ou protégés.
     """
+    errors: list[str] = []
     for f in tracked_modified:
         if f not in pre_dirty:
             # Restaure depuis HEAD (pas depuis l'index) pour éviter de restaurer
             # un état intermédiaire stagé non committé.
             # :(literal) désactive la magie pathspec git pour les noms de fichiers
             # contenant des caractères spéciaux comme ':(top)*'.
-            _git("checkout", "HEAD", "--", f":(literal){f}", check=False)
+            cp = _run(["git", "checkout", "HEAD", "--", f":(literal){f}"], check=False)
+            if cp.returncode != 0:
+                errors.append(f"git checkout {f!r} échoué (code {cp.returncode})")
+                continue
             # Si le fichier existe encore après checkout, c'est qu'il n'existe pas dans HEAD
             # (ex : destination d'un renommage). Le supprimer pour compléter le rollback.
             if os.path.exists(f):
@@ -487,13 +495,14 @@ def rollback(
                 if not_in_head:
                     try:
                         os.unlink(f)
-                    except OSError:
-                        pass
+                    except OSError as exc:
+                        errors.append(f"os.unlink {f!r} échoué : {exc}")
     for f in new_untracked:
         try:
             os.unlink(f)
-        except OSError:
-            pass
+        except OSError as exc:
+            errors.append(f"os.unlink {f!r} échoué : {exc}")
+    return errors
 
 
 # ---------------------------------------------------------------------------
@@ -517,12 +526,10 @@ def phase6_commit(
         return None, None
 
     for f in files_to_stage:
-        if not os.path.exists(f):
-            # Le fichier n'existe plus : c'est la source d'un renommage déjà capturée
-            # par le staging de la destination. Ignorer pour éviter une erreur git add.
-            continue
-        # :(literal) désactive la magie pathspec + -- sépare options et chemins
-        _git("add", "--", f":(literal){f}")
+        # git add -A -- <path> gère les ajouts, modifications ET suppressions d'un chemin donné.
+        # Nécessaire pour les fichiers trackés supprimés ou source d'un renommage :
+        # git add sans -A échoue sur un chemin absent du working tree.
+        _git("add", "-A", "--", f":(literal){f}")
 
     # Vérifier qu'il y a effectivement quelque chose de stagé
     staged = _git("diff", "--cached", "--name-only", check=False)
@@ -738,17 +745,11 @@ def run_finish() -> CycleResult:
         result.tests_passed = True  # Les tests ont déjà passé lors du cycle initial
 
         local_sha = _git("rev-parse", "HEAD")
-        # Utiliser git ls-remote pour vérifier l'état réel du remote push
-        # (plutôt que le tracking ref local @{push} qui peut être périmé si
-        # le remote a été force-pushé entre-temps)
-        push_ref = _git("rev-parse", "--abbrev-ref", "@{push}", check=False)
-        if push_ref:
-            # push_ref = "origin/branche" → on interroge origin directement
-            remote_name, _, remote_branch = push_ref.partition("/")
-            ls_out = _git("ls-remote", remote_name, f"refs/heads/{remote_branch}", check=False)
-        else:
-            # Fallback : origin/<branche>
-            ls_out = _git("ls-remote", "origin", f"refs/heads/{pr.head_branch}", check=False)
+        # Interroger directement le remote et la branche enregistrés dans l'état du cycle,
+        # plutôt que @{push} qui reflète la configuration locale et peut diverger dans
+        # les workflows en triangle ou les PRs depuis un fork.
+        push_branch = pr.head_ref_name or pr.head_branch
+        ls_out = _git("ls-remote", pr.push_remote, f"refs/heads/{push_branch}", check=False)
         push_sha = ls_out.split()[0] if ls_out.strip() else ""
 
         if local_sha == existing_sha and push_sha != existing_sha:
@@ -757,6 +758,19 @@ def run_finish() -> CycleResult:
             push_branch = pr.head_ref_name or pr.head_branch
             _git("push", pr.push_remote, f"HEAD:refs/heads/{push_branch}")
             result.pushed = True
+            # Vérifier que le push a bien mis à jour la tête de la PR (même retry que chemin normal)
+            for _attempt in range(3):
+                verify_pr = json.loads(_gh("pr", "view", str(pr.number), "--json", "headRefOid"))
+                if verify_pr["headRefOid"] == existing_sha:
+                    break
+                if _attempt < 2:
+                    time.sleep(3)
+            else:
+                raise SystemExit(
+                    f"Le push (reprise) n'a pas mis à jour la tête de la PR #{pr.number} après 3 "
+                    f"tentatives : attendu {existing_sha[:8]}, "
+                    f"obtenu {verify_pr['headRefOid'][:8]}."
+                )
         elif push_sha == existing_sha:
             # Commit déjà pushé (local HEAD peut avoir avancé)
             result.pushed = True
@@ -821,8 +835,14 @@ def run_finish() -> CycleResult:
     # (get_dirty_files inclut aussi les ?? ; on soustrait all_new_untracked pour n'avoir
     # que les fichiers véritablement trackés et modifiés)
     workflow_tracked = [f for f in post_dirty if f not in pre_dirty and f not in all_new_untracked]
-    # Tous les fichiers non-trackés apparus pendant le cycle sont inclus dans le commit.
-    new_untracked_for_commit = all_new_untracked
+    # Fichiers non-trackés à committer : restreindre aux fichiers cités dans les remarques inline
+    # pour éviter de publier des notes, artefacts ou fichiers sensibles créés par l'opérateur
+    # entre les deux étapes. Ce même scope est utilisé pour le rollback, garantissant la cohérence
+    # entre ce qui est commité et ce qui est annulé en cas d'échec.
+    # Si aucune remarque n'est inline (remarques générales uniquement), tout inclure.
+    new_untracked_for_commit = (
+        [f for f in all_new_untracked if f in remark_files] if remark_files else all_new_untracked
+    )
 
     # Avertir si des fichiers trackés modifiés sont hors du périmètre des remarques inline.
     if remark_files:
@@ -857,15 +877,18 @@ def run_finish() -> CycleResult:
 
     if not passed:
         print("Tests en échec — rollback des modifications de ce cycle.")
-        # Pour les fichiers non-trackés : ne supprimer que ceux cités dans les remarques inline.
-        # Les fichiers créés par l'opérateur entre les deux étapes (notes, artefacts) ne sont
-        # pas du domaine du workflow et ne doivent pas être effacés sans confirmation explicite.
-        untracked_to_rollback = (
-            [f for f in new_untracked_for_commit if f in remark_files]
-            if remark_files
-            else new_untracked_for_commit
-        )
-        rollback(workflow_tracked, untracked_to_rollback, pre_dirty)
+        # new_untracked_for_commit est déjà restreint au scope du cycle (remark_files).
+        # Le rollback utilise le même scope : cohérence entre commit et annulation.
+        rollback_errors = rollback(workflow_tracked, new_untracked_for_commit, pre_dirty)
+        if rollback_errors:
+            print(
+                f"  ⚠ Rollback partiel — {len(rollback_errors)} erreur(s) : "
+                + ", ".join(rollback_errors),
+                file=sys.stderr,
+            )
+            result.skip_reason = "Tests en échec — rollback partiel (erreurs ci-dessus)."
+            # Conserver le state : des modifications sont peut-être encore présentes
+            return result
         result.skip_reason = "Tests en échec — rollback effectué."
         # Supprimer le state : le rollback a annulé les corrections ;
         # la prochaine invocation sans --finish peut repartir de zéro.

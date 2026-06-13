@@ -312,31 +312,33 @@ def test_phase5_returns_false_on_failure():
 
 
 def test_rollback_calls_git_checkout_for_tracked_files(tmp_path, monkeypatch):
-    """rollback() appelle git checkout HEAD -- <file> pour les fichiers trackés."""
+    """rollback() appelle _run(git checkout HEAD -- <file>) pour les fichiers trackés."""
     monkeypatch.chdir(tmp_path)
     # Créer un fichier non-tracké pour tester os.unlink
     untracked = tmp_path / "new_file.py"
     untracked.write_text("temp")
 
-    with patch.object(hcr, "_git") as mock_git:
-        rollback(
+    with patch.object(hcr, "_run", return_value=_make_completed_process(0)) as mock_run:
+        errors = rollback(
             tracked_modified=["api/app.py"],
             new_untracked=[str(untracked)],
             pre_dirty=[],
         )
-    mock_git.assert_called_once_with("checkout", "HEAD", "--", ":(literal)api/app.py", check=False)
+    assert errors == []
+    mock_run.assert_called_once_with(
+        ["git", "checkout", "HEAD", "--", ":(literal)api/app.py"], check=False
+    )
     assert not untracked.exists()
 
 
 def test_rollback_skips_pre_dirty_files():
     """Les fichiers qui étaient déjà sales avant le workflow ne sont pas touchés."""
-    with patch.object(hcr, "_git") as mock_git:
-        rollback(
-            tracked_modified=["pre_existing.py"],
-            new_untracked=[],
-            pre_dirty=["pre_existing.py"],
-        )
-    mock_git.assert_not_called()
+    errors = rollback(
+        tracked_modified=["pre_existing.py"],
+        new_untracked=[],
+        pre_dirty=["pre_existing.py"],
+    )
+    assert errors == []
 
 
 # ---------------------------------------------------------------------------
