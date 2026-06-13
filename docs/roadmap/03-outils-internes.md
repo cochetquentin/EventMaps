@@ -33,14 +33,12 @@
 
 ## TOOL-003 — Extraire l'orchestration de review dans un programme testable
 
-- **Statut : À faire**
+- **Statut : Abandonné**
 - **Priorité : P1**
 - **Dépendances :** TOOL-002
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/62
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/62 — PR #93 fermée
 
-**Actions.** Remplacer la majorité du document de commande par un script/module versionné ; isoler l'accès GitHub, la sélection des remarques, l'anti-boucle et le résumé ; utiliser des structures de données plutôt que des variables shell interpolées.
-
-**Critères d'acceptation.** Le fichier de commande devient un point d'entrée court ; la logique de décision possède des tests sans appel GitHub réel ; les erreurs sont explicites et n'entraînent ni push ni commentaire involontaire ; une installation neuve peut autoriser cette seule commande de haut niveau et exécuter le cycle sans prompts répétitifs.
+**Raison d'abandon.** La commande Claude native fonctionne correctement. L'extraction dans un script Python de ~1000 lignes a généré une complexité disproportionnée (10+ cycles Codex, edge cases hypothétiques) pour une valeur marginale. On reste sur `.claude/commands/handle-codex-review.md`.
 
 ## TOOL-004 — Simplifier la stratégie de modification, commit et rollback
 
