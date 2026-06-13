@@ -16,6 +16,7 @@ import os
 import pathlib
 import subprocess
 import sys
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -728,7 +729,7 @@ def run_finish() -> CycleResult:
         if local_sha == existing_sha and push_sha != existing_sha:
             # Commit présent localement, pas encore pushé
             print("Push en attente...")
-            _git("push")
+            _git("push", "origin", f"HEAD:refs/heads/{pr.head_branch}")
             result.pushed = True
         elif push_sha == existing_sha:
             # Commit déjà pushé (local HEAD peut avoir avancé)
@@ -858,11 +859,17 @@ def run_finish() -> CycleResult:
     _git("push", "origin", f"HEAD:refs/heads/{pr.head_branch}")
     result.pushed = True
 
-    # Vérifier que le push a bien mis à jour la tête de la PR
-    verify_pr = json.loads(_gh("pr", "view", str(pr.number), "--json", "headRefOid"))
-    if verify_pr["headRefOid"] != sha:
+    # Vérifier que le push a bien mis à jour la tête de la PR.
+    # L'API GitHub peut mettre quelques secondes à propager — on retente 3 fois.
+    for _attempt in range(3):
+        verify_pr = json.loads(_gh("pr", "view", str(pr.number), "--json", "headRefOid"))
+        if verify_pr["headRefOid"] == sha:
+            break
+        if _attempt < 2:
+            time.sleep(3)
+    else:
         raise SystemExit(
-            f"Le push n'a pas mis à jour la tête de la PR #{pr.number} : "
+            f"Le push n'a pas mis à jour la tête de la PR #{pr.number} après 3 tentatives : "
             f"attendu {sha[:8]}, obtenu {verify_pr['headRefOid'][:8]}. "
             "Vérifiez la configuration remote.pushDefault ou branch.*.pushRemote."
         )
