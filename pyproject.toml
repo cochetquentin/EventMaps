@@ -5,7 +5,7 @@ description = "API et scrapers pour cartographier les événements autour de Tok
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "beautifulsoup4>=4.14.3",
+    "beautifulsoup4>=4.15.0",
     "fastapi>=0.115",
     "icalendar>=7.1.2",
     "pydantic>=2.0",
