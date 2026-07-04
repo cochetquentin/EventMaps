@@ -122,6 +122,9 @@ Pour chaque remarque (dans l'ordre de priorité) :
 3. Si **valide** → appliquer la correction, noter : `[APPLIQUÉ] fichier:ligne — description`.
 4. Si **invalide / non applicable** → ignorer avec justification courte.
 
+Collecter chaque entrée ignorée dans une liste `REMARQUES_IGNOREES` au format
+`| \`fichier:ligne\` — titre | justification |` (une ligne Markdown par entrée, prête pour le tableau).
+
 Ne pas modifier les tests pour faire passer une règle de coverage — corriger le code de production.
 
 ---
@@ -186,7 +189,21 @@ T_COMMIT_E=$(uv run python -c "from datetime import datetime,timezone; s='$T_COM
 T_TRIGGER_E=$(uv run python -c "from datetime import datetime,timezone; s='$T_TRIGGER'; print(int(datetime.fromisoformat(s.replace('Z','+00:00')).timestamp()) if s else 0)")
 ```
 
-Confirmer que `T_COMMIT_E > T_TRIGGER_E` (ou `T_TRIGGER_E == 0`), puis :
+Confirmer que `T_COMMIT_E > T_TRIGGER_E` (ou `T_TRIGGER_E == 0`).
+
+Si `REMARQUES_IGNOREES` n'est pas vide (au moins une remarque ignorée en Phase 4) :
+
+```bash
+CYCLE=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+  --jq '.[] | select(.body | ltrimstr("\n") | rtrimstr("\n") | ltrimstr("\r") | rtrimstr("\r") | ascii_downcase | . == "@codex review") | .id' | wc -l)
+gh pr comment "${PR_NUMBER}" --body "## Remarques Codex ignorées — cycle ${CYCLE}
+
+| Remarque | Raison |
+|---|---|
+${REMARQUES_IGNOREES}"
+```
+
+Puis :
 
 ```bash
 gh pr comment "${PR_NUMBER}" --body "@Codex review"
