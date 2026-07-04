@@ -10,22 +10,31 @@ L'historique local montre de nombreuses branches de fonctionnalités mergées vi
 
 ## GIT-001 — Inventorier les branches GitHub
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/69
+- **Livrable :** [docs/branches-inventory-2026-07-05.md](../branches-inventory-2026-07-05.md)
 
 **Actions.** Exporter nom, date du dernier commit, auteur, PR associée, état de merge, protection et divergence avec la branche par défaut ; identifier les branches sans PR et celles déjà mergées.
+
+**Résultat (2026-07-05).** 56 branches non-main auditées via `gh api` :
+- 48 `behind` main (PR mergées) → supprimées par GIT-002
+- 7 `diverged` avec PR ouverte (Dependabot actif) → conservées
+- 1 `diverged` avec PR fermée (`feat/tool-003`, TOOL-003 abandonné) → supprimée par GIT-002
 
 **Critères d'acceptation.** L'inventaire est daté et revu par un mainteneur ; aucune branche n'est supprimée seulement parce qu'elle paraît ancienne.
 
 ## GIT-002 — Supprimer les branches mergées et abandonnées confirmées
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** GIT-001
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/70
 
 **Actions.** Supprimer d'abord les branches entièrement mergées ; obtenir confirmation pour les branches non mergées ; conserver tags/releases et branches protégées.
+
+**Résultat (2026-07-05).** 49 branches supprimées (48 `behind` + `feat/tool-003` confirmée), 0 erreur.
+Les 7 branches Dependabot avec PR ouvertes ont été conservées.
 
 **Critères d'acceptation.** Chaque suppression est traçable ; aucune branche contenant un travail unique n'est perdue.
 
