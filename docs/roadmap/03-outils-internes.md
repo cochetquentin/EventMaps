@@ -67,7 +67,7 @@
 - **Statut : Terminé**
 - **Priorité : P2**
 - **Dépendances :** TOOL-002
-- **Suivi :** issue à créer — PR : à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/102 — PR : https://github.com/cochetquentin/EventMaps/pull/103
 
 **Contexte.** Lorsque le cycle ignore certaines remarques Codex, il relance immédiatement `@Codex review` sans expliquer pourquoi. Codex les ressort au cycle suivant et l'historique de la PR ne permet pas de distinguer un point délibérément ignoré d'un point oublié.
 
