@@ -42,10 +42,10 @@
 
 ## TOOL-004 — Améliorer la robustesse de la commande handle-codex-review
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** TOOL-002
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/63
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/63 — PR : https://github.com/cochetquentin/EventMaps/pull/101
 
 **Actions.** Dans `.claude/commands/handle-codex-review.md` : refuser proprement un working tree sale ; éviter les reconstructions de listes de fichiers avec `awk` ; rendre commit, push et relance Codex explicitement conditionnels au succès des tests et à la présence d'un diff.
 
@@ -53,10 +53,10 @@
 
 ## TOOL-005 — Nettoyer la duplication entre CLAUDE.md et la commande
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P2**
 - **Dépendances :** TOOL-002
-- **Suivi :** à renseigner
+- **Suivi :** PR : https://github.com/cochetquentin/EventMaps/pull/101
 
 **Actions.** Garder dans `CLAUDE.md` uniquement le lien vers la commande et la règle anti-boucle absolue ; placer le comportement détaillé et les prérequis (`gh`, authentification, remote Git) dans `handle-codex-review.md`.
 
