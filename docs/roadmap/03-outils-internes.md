@@ -29,7 +29,7 @@
 
 **Critères d'acceptation.** La politique distingue les permissions partagées des préférences locales ; elle définit la commande de haut niveau qui pourra être autorisée après TOOL-003 ; la proposition ne contient ni chemins personnels, ni suppressions ponctuelles, ni jokers plus larges que nécessaire.
 
-**Résultat.** `.claude/settings.json` créé et versionné. Politique minimale : uv (run, sync, lock), gh (PR view/list/comment, issue comment, API PR/issues/commits), git (status, log, diff, add, commit, push, stash, checkout, branch, rev-parse). Opérations destructrices (force push, git clean, reset --hard) explicitement refusées. Slot TOOL-003 documenté via clé `_comment_tool003_slot`.
+**Résultat.** `.claude/settings.json` créé et versionné. Politique minimale : uv (run, sync, lock), gh (PR view/list/comment, issue comment, API PR/issues/commits), git (status, log, diff, add, commit, push, stash, checkout, branch, rev-parse). Opérations destructrices (force push, git clean, reset --hard) explicitement refusées. La permission `Bash(uv run python -c*)` est maintenue pour les snippets de normalisation d'horodatage utilisés par `/handle-codex-review`.
 
 ## TOOL-003 — Extraire l'orchestration de review dans un programme testable
 
@@ -71,7 +71,7 @@
 
 **Contexte.** Lorsque le cycle ignore certaines remarques Codex, il relance immédiatement `@Codex review` sans expliquer pourquoi. Codex les ressort au cycle suivant et l'historique de la PR ne permet pas de distinguer un point délibérément ignoré d'un point oublié.
 
-**Actions.** Dans `.claude/commands/handle-codex-review.md`, juste avant de poster `@Codex review`, publier un commentaire GitHub via `gh pr comment` listant chaque remarque ignorée avec sa justification. Ne poster ce commentaire que s'il existe au moins une remarque ignorée dans le cycle courant.
+**Actions.** Dans `.claude/commands/handle-codex-review.md`, juste avant de poster `@Codex review`, publier un commentaire GitHub via `gh pr comment` listant chaque remarque ignorée avec sa justification. Ne poster ce commentaire que si les deux conditions sont réunies : au moins une remarque est ignorée ET au moins une correction a été appliquée et pushée (c'est-à-dire que `@Codex review` est effectivement relancé). Quand toutes les remarques sont ignorées, aucun diff n'est produit, Codex n'est pas relancé et ce commentaire n'est pas créé.
 
 **Format suggéré du commentaire :**
 
@@ -84,4 +84,4 @@
 | ... | ... |
 ```
 
-**Critères d'acceptation.** Si au moins une remarque est ignorée, un commentaire est posté avant `@Codex review` ; le commentaire liste chaque point avec une raison non vide ; si aucune remarque n'est ignorée, aucun commentaire supplémentaire n'est créé.
+**Critères d'acceptation.** Si au moins une remarque est ignorée ET que Codex est relancé, un commentaire est posté avant `@Codex review` ; le commentaire liste chaque point avec une raison non vide ; si aucune remarque n'est ignorée, ou si le cycle ne produit aucun diff (donc ne relance pas Codex), aucun commentaire supplémentaire n'est créé.
