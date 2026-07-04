@@ -18,7 +18,7 @@ EventMaps/
 ├── db/                # Persistance SQLite (EventStore, migrations)
 ├── api/               # API FastAPI (routes events, scrape, health)
 ├── frontend/          # UI carte interactive (Leaflet.js, ES modules)
-├── tests/             # 247 tests Python + tests frontend Vitest
+├── tests/             # Tests Python + tests frontend Vitest
 ├── docs/              # Documentation technique
 ├── data/              # Base de données et exports CSV (gitignored)
 └── main.py            # CLI de scraping
