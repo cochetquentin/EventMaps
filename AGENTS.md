@@ -18,7 +18,7 @@ La commande `/handle-codex-review` automatise le cycle complet :
 4. Commiter et pusher les correctifs
 5. Relancer Codex avec `@Codex review`
 
-Voir `.Codex/commands/handle-codex-review.md` pour les instructions d'exécution.
+Voir `.claude/commands/handle-codex-review.md` pour les instructions d'exécution.
 
 ### Règle anti-boucle absolue
 
