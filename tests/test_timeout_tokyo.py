@@ -275,6 +275,42 @@ def test_scrape_event_raises_on_no_title(tot, monkeypatch):
         tot.scrape_event("https://www.timeout.com/tokyo/art/unknown")
 
 
+def test_scrape_event_no_coordinates_returns_none(tot, monkeypatch):
+    """Event with valid JSON-LD but no data-zone-location-info → lat/lon = None."""
+    html_bytes = (FIXTURES_DIR / "tot/synthetic/event_no_coordinates.html").read_bytes()
+    soup = BeautifulSoup(html_bytes, "html.parser")
+    monkeypatch.setattr(tot, "get_event_page", lambda url: soup)
+
+    result = tot.scrape_event("https://www.timeout.com/tokyo/things-to-do/no-coords")
+
+    assert result["latitude"] is None
+    assert result["longitude"] is None
+    assert result["title"] == "No Coordinates Festival"
+    assert result["start_date"] == "2026-08-01"
+
+
+def test_scrape_event_incomplete_data_returns_none_fields(tot, monkeypatch):
+    """Event JSON-LD with only name → all optional fields return None."""
+    html_bytes = (FIXTURES_DIR / "tot/synthetic/event_incomplete_data.html").read_bytes()
+    soup = BeautifulSoup(html_bytes, "html.parser")
+    monkeypatch.setattr(tot, "get_event_page", lambda url: soup)
+
+    result = tot.scrape_event("https://www.timeout.com/tokyo/things-to-do/minimal")
+
+    assert result["title"] == "Minimal Incomplete Event"
+    assert result["start_date"] is None
+    assert result["end_date"] is None
+    assert result["times"] is None
+    assert result["price"] is None
+    assert result["venue_name"] is None
+    assert result["venue_address"] is None
+    assert result["latitude"] is None
+    assert result["longitude"] is None
+    assert result["image_url"] is None
+    assert result["categories"] == []
+    assert result["description"] is None
+
+
 # ── scrape_all ────────────────────────────────────────────────────────────────
 
 
@@ -502,3 +538,72 @@ def test_scrape_event_free_price(tot, monkeypatch):
     result = tot.scrape_event("https://www.timeout.com/tokyo/music/free-concert")
 
     assert result["price"] == "Free"
+
+
+# ── TEST-006 : assertions de contrat et qualité d'extraction ──────────────────
+
+_FIXTURE_TOT_LISTING = "tot/real/listing.html"
+_FIXTURE_TOT_EVENT_FULL = "tot/real/event_full.html"
+
+
+def test_contract_listing_rate_real(tot, monkeypatch):
+    """CONTRAT: tot/real/listing.html — ≥ 10 liens extraits (sélecteur cassé → échoue)."""
+    import requests as _requests
+
+    html_bytes = (FIXTURES_DIR / _FIXTURE_TOT_LISTING).read_bytes()
+
+    def fake_fetch(url, session, timeout):
+        r = _requests.Response()
+        r.status_code = 200
+        r._content = html_bytes
+        return r
+
+    monkeypatch.setattr("scrapers.timeout_tokyo._fetch", fake_fetch)
+    monkeypatch.setattr(
+        "scrapers.timeout_tokyo._listing_paths",
+        lambda n: ["/tokyo/things-to-do/things-to-do-this-week-in-tokyo"],
+    )
+
+    links = tot.get_event_links(max_pages=1)
+
+    # Baseline capturée : 31 liens. Bornes [25, 31] :
+    # - borne basse détecte une perte significative de sélecteur
+    # - borne haute détecte une sur-extraction (faux positifs via _is_event_href)
+    assert len(links) >= 25, (
+        f"[{_FIXTURE_TOT_LISTING}] {len(links)} liens extraits"
+        " — sélecteur probablement cassé (baseline : 31, seuil bas : 25)"
+    )
+    assert len(links) <= 31, (
+        f"[{_FIXTURE_TOT_LISTING}] {len(links)} liens extraits"
+        " — sur-extraction détectée (baseline : 31, seuil haut : 31)"
+    )
+
+
+def test_contract_essential_fields_real_event_full(tot, monkeypatch):
+    """CONTRAT: tot/real/event_full.html — champs essentiels non-vides, pas de perte silencieuse."""
+    html_bytes = (FIXTURES_DIR / _FIXTURE_TOT_EVENT_FULL).read_bytes()
+    soup = BeautifulSoup(html_bytes, "html.parser")
+    monkeypatch.setattr(tot, "get_event_page", lambda url: soup)
+
+    result = tot.scrape_event("https://www.timeout.com/tokyo/art/bunkyo-matsuri")
+    f = _FIXTURE_TOT_EVENT_FULL
+
+    # Ensemble fixe de clés contractuelles peuplées par la fixture réelle
+    # (résistant à l'ajout de nouveaux champs optionnels dans le scraper)
+    _EXPECTED_KEYS = {
+        "url",
+        "title",
+        "start_date",
+        "end_date",
+        "times",
+        "price",
+        "venue_name",
+        "venue_address",
+        "categories",
+        "description",
+        "image_url",
+        "latitude",
+        "longitude",
+    }
+    manquants = {k for k in _EXPECTED_KEYS if not result.get(k)}
+    assert not manquants, f"[{f}] champs contractuels absents : {sorted(manquants)}"

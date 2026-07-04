@@ -12,6 +12,7 @@ Ces entrées ne sont pas des tâches de stabilisation et n'utilisent donc pas le
 
 - **Décision : Différé après stabilisation ; périmètre à réévaluer**
 - **Origine :** FEAT-001
+- **Implémenté :** https://github.com/cochetquentin/EventMaps/pull/38
 - **Valeur historique :** élevée
 - **Complexité historique :** moyenne
 
@@ -25,6 +26,7 @@ Ces entrées ne sont pas des tâches de stabilisation et n'utilisent donc pas le
 
 - **Décision : Différé après stabilisation**
 - **Origine :** FEAT-003
+- **Implémenté :** https://github.com/cochetquentin/EventMaps/pull/39
 - **Valeur historique :** élevée
 - **Complexité historique :** moyenne
 
@@ -38,6 +40,7 @@ Ces entrées ne sont pas des tâches de stabilisation et n'utilisent donc pas le
 
 - **Décision : Différé après stabilisation ; périmètre à réévaluer**
 - **Origine :** FEAT-005
+- **Implémenté :** https://github.com/cochetquentin/EventMaps/pull/40
 - **Valeur historique :** moyenne
 - **Complexité historique :** moyenne
 

@@ -18,7 +18,7 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 - **Statut : Terminé**
 - **Priorité : P0**
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/50
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/50 — PR : https://github.com/cochetquentin/EventMaps/pull/90
 
 **Actions.** Documenter deux catégories : `real` pour captures réelles de contrat et `synthetic` pour cas unitaires minimaux ; définir les règles de provenance, date de capture, URL source, anonymisation, taille et mise à jour.
 
@@ -26,10 +26,10 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 ## TEST-002 — Réorganiser et inventorier les fixtures par source
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** TEST-001
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/57
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/83
 
 **Actions.** Créer une arborescence par source et catégorie, adopter des noms décrivant le cas, et ajouter un manifeste léger contenant URL, date de capture, structure couverte et éventuelles transformations.
 
@@ -37,10 +37,10 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 ## TEST-003 — Constituer un corpus réel Tokyo Cheapo
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** TEST-001, TEST-002
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/58
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/91
 
 **Corpus cible.** Environ cinq pages événement réelles et au moins deux listings : événement complet, sans description, dates floues ou multi-jour, plusieurs lieux, données optionnelles absentes, et variations de listing observées.
 
@@ -48,21 +48,23 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 ## TEST-004 — Constituer un corpus réel Hanabi Walker
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** TEST-001, TEST-002
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/59
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/91
 
 **Corpus cible.** Environ cinq événements réels issus de régions et structures différentes, avec leurs pages/fragments nécessaires : date valide, date reportée/annulée, coordonnées présentes/absentes, champs de tableau variables, et listings représentatifs.
 
 **Critères d'acceptation.** Les variantes réellement observées sont couvertes ; les fragments appartenant au même événement sont liés dans le manifeste.
 
+**Note.** La variante coord-absente n'a pas pu être constituée : tous les événements disponibles dans le corpus avaient des coordonnées Google Maps. La structure de test est prête (`_HANABI_EVENTS_NO_COORDS` dans `test_hanabi_walker.py`) pour accueillir cette variante dès qu'une fixture réelle appropriée sera identifiée.
+
 ## TEST-005 — Qualifier et compléter le corpus Time Out Tokyo
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** TEST-001, TEST-002
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/60
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/84
 
 **Actions.** Confirmer la provenance des captures existantes, ajouter les métadonnées manquantes et compléter jusqu'à environ cinq pages représentatives : événement JSON-LD, article, données incomplètes, coordonnées absentes et variation de listing.
 
@@ -70,10 +72,10 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 ## TEST-006 — Ajouter des assertions de contrat et de qualité d'extraction
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** TEST-003, TEST-004, TEST-005
-- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/61
+- **Suivi :** https://github.com/cochetquentin/EventMaps/issues/61 — PR : https://github.com/cochetquentin/EventMaps/pull/88
 
 **Actions.** Pour chaque capture réelle, vérifier les champs essentiels et les erreurs attendues ; tester les taux d'extraction d'un listing et l'absence de perte silencieuse ; conserver séparément les tests unitaires de fonctions de parsing.
 
@@ -81,10 +83,10 @@ Les fixtures synthétiques gardent une valeur pour tester un cas minimal précis
 
 ## TEST-007 — Définir le renouvellement contrôlé des captures
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P2**
 - **Dépendances :** TEST-001
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/89
 
 **Actions.** Fournir une procédure manuelle ou un script opt-in respectueux des sites, avec user-agent, délais, revue du diff et vérification des droits ; ne pas automatiser la collecte en CI.
 

@@ -26,6 +26,7 @@ fixtures:
       description et localisation JSON Apple Maps. Cas nominal du parseur.
     tests_consuming:
       - test_tokyo_cheapo.py::test_scrape_event_full_fixture
+      - test_tokyo_cheapo.py::test_contract_essential_fields_event_full
 
   - file: tc/synthetic/event_no_description.html
     category: synthetic
@@ -48,6 +49,53 @@ fixtures:
       "locations"). Couvre la création de plusieurs Event pour un même listing.
     tests_consuming:
       - test_tokyo_cheapo.py::test_scrape_event_multi_location_fixture
+
+  - file: tc/synthetic/event_cross_year.html
+    category: synthetic
+    source: tc
+    captured_at: null
+    url: null
+    purpose: >
+      Page événement Tokyo Cheapo avec deux div.date (Dec 31 + Jan 3).
+      Couvre le parsing cross-year : start → année précédente quand l'événement
+      est dans le futur lointain lors d'un scraping en janvier.
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_scrape_event_cross_year_dates
+
+  - file: tc/synthetic/event_fuzzy_date.html
+    category: synthetic
+    source: tc
+    captured_at: null
+    url: null
+    purpose: >
+      Page événement Tokyo Cheapo avec date floue ("Early July") dans div.date.
+      Couvre _parse_fuzzy_date_range : start=premier du mois, end=10e du mois.
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_scrape_event_fuzzy_date
+
+  - file: tc/synthetic/event_missing_optional.html
+    category: synthetic
+    source: tc
+    captured_at: null
+    url: null
+    purpose: >
+      Page événement Tokyo Cheapo sans div Apple Maps, sans lien externe et sans
+      prix. Vérifie que locations=[], official_link=None et price=None ne lèvent
+      pas d'exception.
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_scrape_event_missing_optional_fields
+
+  - file: tc/synthetic/listing_rich.html
+    category: synthetic
+    source: tc
+    captured_at: null
+    url: null
+    purpose: >
+      Listing Tokyo Cheapo avec 5 liens d'événements uniques, 1 doublon et
+      plusieurs liens de navigation exclus (_EXCLUDE_LINKS). Couvre la
+      déduplication par le set-comprehension du scraper.
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_get_event_links_deduplicates_and_excludes
 
   # ── Hanabi Walker ────────────────────────────────────────────────────────────
 
@@ -73,6 +121,7 @@ fixtures:
       japonais (nom, dates, horaires, prix, lieu). Premier onglet d'un événement.
     tests_consuming:
       - test_hanabi_walker.py::test_parse_event_table_from_fixture
+      - test_hanabi_walker.py::test_contract_essential_fields_event
 
   - file: hanabi/synthetic/event_map.html
     category: synthetic
@@ -85,6 +134,52 @@ fixtures:
       Utilisé avec hanabi/synthetic/event_data.html pour assembler un Event complet.
     tests_consuming:
       - test_hanabi_walker.py::test_parse_coordinates_from_fixture
+      - test_hanabi_walker.py::test_contract_essential_fields_event
+
+  - file: hanabi/synthetic/event_cancelled_data.html
+    category: synthetic
+    source: hanabi
+    captured_at: null
+    url: null
+    purpose: >
+      Tableau s_table Hanabi Walker avec date "中止（荒天のため）" non parseable.
+      Couvre le chemin _extract_dates → [] quand aucun motif de date n'est trouvé.
+    tests_consuming:
+      - test_hanabi_walker.py::test_parse_event_table_cancelled_returns_empty_dates
+
+  - file: hanabi/synthetic/event_no_map.html
+    category: synthetic
+    source: hanabi
+    captured_at: null
+    url: null
+    purpose: >
+      Page carte Hanabi Walker sans div.map_canvas ni iframe. Vérifie que
+      parse_coordinates retourne (None, None) quand la section carte est absente.
+    tests_consuming:
+      - test_hanabi_walker.py::test_parse_coordinates_returns_none_when_no_map
+
+  - file: hanabi/synthetic/event_slash_date_data.html
+    category: synthetic
+    source: hanabi
+    captured_at: null
+    url: null
+    purpose: >
+      Tableau s_table avec date en format slash/pointé "2026年7/15・16～20".
+      Couvre _parse_slash_dates : génère 6 dates du 15 au 20 juillet 2026.
+    tests_consuming:
+      - test_hanabi_walker.py::test_parse_event_table_slash_date
+
+  - file: hanabi/synthetic/listing_rich.html
+    category: synthetic
+    source: hanabi
+    captured_at: null
+    url: null
+    purpose: >
+      Listing Hanabi Walker avec 4 liens /detail/ uniques, 1 doublon et 2 liens
+      de pagination (/list/...). Couvre la déduplication par dict.fromkeys et
+      le filtrage des liens non-/detail/.
+    tests_consuming:
+      - test_hanabi_walker.py::test_get_event_links_deduplicates_from_fixture
 
   # ── Time Out Tokyo ───────────────────────────────────────────────────────────
 
@@ -100,6 +195,7 @@ fixtures:
     anonymized: false  # tokens côté client à examiner — voir TEST-005
     tests_consuming:
       - test_timeout_tokyo.py::test_get_event_links_extracts_and_deduplicates
+      - test_timeout_tokyo.py::test_contract_listing_rate_real
 
   - file: tot/real/event_full.html
     category: real
@@ -115,6 +211,7 @@ fixtures:
       - test_timeout_tokyo.py::test_parse_json_ld_finds_theater_event
       - test_timeout_tokyo.py::test_is_news_article_false_for_event
       - test_timeout_tokyo.py::test_scrape_event_full_from_fixture
+      - test_timeout_tokyo.py::test_contract_essential_fields_real_event_full
 
   - file: tot/real/event_news_article.html
     category: real
@@ -140,3 +237,277 @@ fixtures:
       Couvre le rejet du parseur quand le JSON-LD est absent.
     tests_consuming:
       - test_timeout_tokyo.py::test_scrape_event_raises_without_json_ld
+
+  - file: tot/synthetic/event_no_coordinates.html
+    category: synthetic
+    source: tot
+    captured_at: null
+    url: null
+    purpose: >
+      Événement Time Out Tokyo avec JSON-LD valide (nom, dates, lieu, prix)
+      mais sans div data-zone-location-info. Vérifie que latitude et longitude
+      retournent None quand les coordonnées géographiques sont absentes.
+    tests_consuming:
+      - test_timeout_tokyo.py::test_scrape_event_no_coordinates_returns_none
+
+  - file: tot/synthetic/event_incomplete_data.html
+    category: synthetic
+    source: tot
+    captured_at: null
+    url: null
+    purpose: >
+      Événement Time Out Tokyo avec JSON-LD contenant uniquement le champ name.
+      Vérifie la gestion gracieuse de tous les champs optionnels absents
+      (start_date, end_date, times, price, venue, coordinates, image).
+    tests_consuming:
+      - test_timeout_tokyo.py::test_scrape_event_incomplete_data_returns_none_fields
+
+  # ── Tokyo Cheapo — captures réelles (TEST-003) ───────────────────────────────
+
+  - file: tc/real/listing_1.html
+    category: real
+    source: tc
+    captured_at: "2026-06-08"
+    url: "https://tokyocheapo.com/events/this-week/"
+    purpose: >
+      Capture réelle de la première page de listing Tokyo Cheapo "this week".
+      Couvre l'extraction de liens d'événements depuis le DOM complet (~220 Ko).
+    anonymized: true  # am-api-token remplacé par REDACTED
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_real_listing_extracts_event_links[listing_1]
+      - test_tokyo_cheapo.py::test_real_listing_pagination
+
+  - file: tc/real/listing_2.html
+    category: real
+    source: tc
+    captured_at: "2026-06-08"
+    url: "https://tokyocheapo.com/events/this-week/page/2/"
+    purpose: >
+      Capture réelle de la deuxième page de listing Tokyo Cheapo.
+      Complète la couverture de la pagination (page 1 → page 2).
+    anonymized: true  # am-api-token remplacé par REDACTED
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_real_listing_extracts_event_links[listing_2]
+      - test_tokyo_cheapo.py::test_real_listing_pagination
+
+  - file: tc/real/event_katsushika_iris_festival.html
+    category: real
+    source: tc
+    captured_at: "2026-06-08"
+    url: "https://tokyocheapo.com/events/katsushika-iris-festival/"
+    purpose: >
+      Festival avec plusieurs lieux (2 entrées locations JSON Apple Maps).
+      Couvre la sérialisation multi-lieu sur un événement réel.
+    anonymized: true  # am-api-token remplacé par REDACTED
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_real_event_parses_title_and_url[event_katsushika_iris_festival]
+
+  - file: tc/real/event_candlelight_concert.html
+    category: real
+    source: tc
+    captured_at: "2026-06-08"
+    url: "https://tokyocheapo.com/events/candlelight-concert-a-collection-of-great-love-songs/"
+    purpose: >
+      Concert avec prix et localisation intérieure — aucune coordonnée Apple Maps.
+      Couvre le cas locations=[] sur un événement réel.
+    anonymized: true  # am-api-token remplacé par REDACTED
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_real_event_parses_title_and_url[event_candlelight_concert]
+
+  - file: tc/real/event_dagashiya_class.html
+    category: real
+    source: tc
+    captured_at: "2026-06-08"
+    url: "https://tokyocheapo.com/events/dagashiya-conversation-class-learn-japanese-with-retro-candy/"
+    purpose: >
+      Classe récurrente avec description longue et lien officiel.
+      Couvre le parsing de champs texte et de liens externes.
+    anonymized: true  # am-api-token remplacé par REDACTED
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_real_event_parses_title_and_url[event_dagashiya_class]
+
+  - file: tc/real/event_downtown_highball_festival.html
+    category: real
+    source: tc
+    captured_at: "2026-06-08"
+    url: "https://tokyocheapo.com/events/downtown-highball-festival/"
+    purpose: >
+      Festival pluri-jours avec dates de début et fin distinctes.
+      Couvre le parsing d'une plage de dates sur un événement réel.
+    anonymized: true  # am-api-token remplacé par REDACTED
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_real_event_parses_title_and_url[event_downtown_highball_festival]
+
+  - file: tc/real/event_torigoe_matsuri.html
+    category: real
+    source: tc
+    captured_at: "2026-06-08"
+    url: "https://tokyocheapo.com/events/torigoe-matsuri/"
+    purpose: >
+      Festival traditionnel japonais avec un seul lieu géolocalisé.
+      Cas nominal avec titre, date, description et coordonnées.
+    anonymized: true  # am-api-token remplacé par REDACTED
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_real_event_parses_title_and_url[event_torigoe_matsuri]
+
+  # ── Hanabi Walker — captures réelles (TEST-004) ──────────────────────────────
+
+  - file: hanabi/real/listing_ar0300.html
+    category: real
+    source: hanabi
+    captured_at: "2026-06-08"
+    url: "https://hanabi.walkerplus.com/list/ar0300/scheduled/1.html"
+    purpose: >
+      Capture réelle du listing Hanabi Walker région Kantō (ar0300), page 1.
+      Couvre l'extraction de liens /detail/ depuis le DOM complet.
+    anonymized: false
+    tests_consuming:
+      - test_hanabi_walker.py::test_real_listing_extracts_event_links[ar0300]
+
+  - file: hanabi/real/listing_ar0500.html
+    category: real
+    source: hanabi
+    captured_at: "2026-06-08"
+    url: "https://hanabi.walkerplus.com/list/ar0500/scheduled/1.html"
+    purpose: >
+      Capture réelle du listing Hanabi Walker région Kansai (ar0500), page 1.
+      Couvre une région différente d'ar0300 pour valider la généricité du parseur.
+    anonymized: false
+    tests_consuming:
+      - test_hanabi_walker.py::test_real_listing_extracts_event_links[ar0500]
+
+  - file: hanabi/real/event_ar0308e00896.html
+    category: real
+    source: hanabi
+    captured_at: "2026-06-08"
+    url: "https://hanabi.walkerplus.com/detail/ar0308e00896/data.html"
+    purpose: >
+      Fragment data réel : 第66回 水戸黄門まつり 水戸偕楽園花火大会 (ar0308, Ibaraki).
+      Couvre le parsing d'un tableau s_table réel avec date, horaires et lieu.
+    linked_fragments:
+      - hanabi/real/map_ar0308e00896.html
+    anonymized: false
+    tests_consuming:
+      - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0308e00896]
+
+  - file: hanabi/real/map_ar0308e00896.html
+    category: real
+    source: hanabi
+    captured_at: "2026-06-08"
+    url: "https://hanabi.walkerplus.com/detail/ar0308e00896/map.html"
+    purpose: >
+      Fragment map réel : carte Google Maps pour ar0308e00896.
+      Utilisé avec event_ar0308e00896.html pour assembler l'événement.
+    linked_fragments:
+      - hanabi/real/event_ar0308e00896.html
+    anonymized: true  # Google Maps key remplacée par AIzaSyREDACTED
+    tests_consuming:
+      - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0308e00896]
+
+  - file: hanabi/real/event_ar0311e00250.html
+    category: real
+    source: hanabi
+    captured_at: "2026-06-08"
+    url: "https://hanabi.walkerplus.com/detail/ar0311e00250/data.html"
+    purpose: >
+      Fragment data réel : 第78回 小川町七夕まつり (ar0311, Saitama).
+      Couvre un événement multi-jours (2 dates consécutives).
+    linked_fragments:
+      - hanabi/real/map_ar0311e00250.html
+    anonymized: false
+    tests_consuming:
+      - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0311e00250]
+
+  - file: hanabi/real/map_ar0311e00250.html
+    category: real
+    source: hanabi
+    captured_at: "2026-06-08"
+    url: "https://hanabi.walkerplus.com/detail/ar0311e00250/map.html"
+    purpose: >
+      Fragment map réel pour ar0311e00250.
+    linked_fragments:
+      - hanabi/real/event_ar0311e00250.html
+    anonymized: true  # Google Maps key remplacée par AIzaSyREDACTED
+    tests_consuming:
+      - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0311e00250]
+
+  - file: hanabi/real/event_ar0313e00858.html
+    category: real
+    source: hanabi
+    captured_at: "2026-06-08"
+    url: "https://hanabi.walkerplus.com/detail/ar0313e00858/data.html"
+    purpose: >
+      Fragment data réel : 第49回 隅田川花火大会 (ar0313, Tokyo).
+      Couvre l'un des plus grands festivals du Kantō.
+    linked_fragments:
+      - hanabi/real/map_ar0313e00858.html
+    anonymized: false
+    tests_consuming:
+      - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0313e00858]
+
+  - file: hanabi/real/map_ar0313e00858.html
+    category: real
+    source: hanabi
+    captured_at: "2026-06-08"
+    url: "https://hanabi.walkerplus.com/detail/ar0313e00858/map.html"
+    purpose: >
+      Fragment map réel pour ar0313e00858.
+    linked_fragments:
+      - hanabi/real/event_ar0313e00858.html
+    anonymized: true  # Google Maps key remplacée par AIzaSyREDACTED
+    tests_consuming:
+      - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0313e00858]
+
+  - file: hanabi/real/event_ar0516e00063.html
+    category: real
+    source: hanabi
+    captured_at: "2026-06-08"
+    url: "https://hanabi.walkerplus.com/detail/ar0516e00063/data.html"
+    purpose: >
+      Fragment data réel : 水橋橋まつり (ar0516, Toyama — région Kansai).
+      Couvre une région différente du Kantō (ar0500).
+    linked_fragments:
+      - hanabi/real/map_ar0516e00063.html
+    anonymized: false
+    tests_consuming:
+      - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0516e00063]
+
+  - file: hanabi/real/map_ar0516e00063.html
+    category: real
+    source: hanabi
+    captured_at: "2026-06-08"
+    url: "https://hanabi.walkerplus.com/detail/ar0516e00063/map.html"
+    purpose: >
+      Fragment map réel pour ar0516e00063.
+    linked_fragments:
+      - hanabi/real/event_ar0516e00063.html
+    anonymized: true  # Google Maps key remplacée par AIzaSyREDACTED
+    tests_consuming:
+      - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0516e00063]
+
+  - file: hanabi/real/event_ar0518e00070.html
+    category: real
+    source: hanabi
+    captured_at: "2026-06-08"
+    url: "https://hanabi.walkerplus.com/detail/ar0518e00070/data.html"
+    purpose: >
+      Fragment data réel : 若狭マリンピア2026 (ar0518, Fukui — région Kansai).
+      Couvre un festival côtier dans une sous-région peu représentée.
+    linked_fragments:
+      - hanabi/real/map_ar0518e00070.html
+    anonymized: false
+    tests_consuming:
+      - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0518e00070]
+
+  - file: hanabi/real/map_ar0518e00070.html
+    category: real
+    source: hanabi
+    captured_at: "2026-06-08"
+    url: "https://hanabi.walkerplus.com/detail/ar0518e00070/map.html"
+    purpose: >
+      Fragment map réel pour ar0518e00070.
+    linked_fragments:
+      - hanabi/real/event_ar0518e00070.html
+    anonymized: true  # Google Maps key remplacée par AIzaSyREDACTED
+    tests_consuming:
+      - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0518e00070]

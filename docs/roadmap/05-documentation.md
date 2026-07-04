@@ -16,7 +16,7 @@ Constats précis :
 
 ## DOC-001 — Corriger les faits périssables du README
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/66
 
@@ -36,18 +36,18 @@ Constats précis :
 
 ## DOC-003 — Réduire `CLAUDE.md` à des consignes spécifiques à l'agent
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
-- **Dépendances :** TOOL-003
+- **Dépendances :** TOOL-005
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/67
 
-**Actions.** Conserver uniquement les garde-fous et liens propres à Claude Code ; pointer vers CONTRIBUTING pour les conventions générales et vers l'implémentation testable pour la review Codex.
+**Actions.** Conserver uniquement les garde-fous et liens propres à Claude Code ; pointer vers CONTRIBUTING pour les conventions générales. TOOL-005 déplace le comportement détaillé de `/handle-codex-review` hors de `CLAUDE.md` ; DOC-003 finalise ensuite la réduction en retirant les commandes générales dupliquées.
 
 **Critères d'acceptation.** Aucune commande générale n'est maintenue en double ; supprimer `CLAUDE.md` reste possible uniquement si aucune consigne agent-spécifique utile ne subsiste.
 
 ## DOC-004 — Synchroniser la documentation d'architecture avec le code
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/68
 
