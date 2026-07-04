@@ -1,5 +1,4 @@
 {
-  "_comment_tool003_slot": "TOOL-003: une fois scripts/handle_codex_review.py créé, ajouter Bash(uv run --locked python scripts/handle_codex_review.py*) et supprimer Bash(uv run python -c*) — ce dernier est un compromis pré-TOOL-003 pour les snippets de normalisation d'horodatage",
   "permissions": {
     "allow": [
       "Bash(uv run --locked python -m pytest*)",

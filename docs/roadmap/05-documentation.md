@@ -38,10 +38,10 @@ Constats précis :
 
 - **Statut : À faire**
 - **Priorité : P1**
-- **Dépendances :** TOOL-003
+- **Dépendances :** TOOL-005
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/67
 
-**Actions.** Conserver uniquement les garde-fous et liens propres à Claude Code ; pointer vers CONTRIBUTING pour les conventions générales et vers l'implémentation testable pour la review Codex.
+**Actions.** Conserver uniquement les garde-fous et liens propres à Claude Code ; pointer vers CONTRIBUTING pour les conventions générales. TOOL-005 déplace le comportement détaillé de `/handle-codex-review` hors de `CLAUDE.md` ; DOC-003 finalise ensuite la réduction en retirant les commandes générales dupliquées.
 
 **Critères d'acceptation.** Aucune commande générale n'est maintenue en double ; supprimer `CLAUDE.md` reste possible uniquement si aucune consigne agent-spécifique utile ne subsiste.
 

@@ -41,9 +41,9 @@ Chaque ligne ne doit démarrer qu'après les dépendances déclarées dans les t
 2. **Stabiliser les noms des checks** : CI-001 et CI-002.
 3. **Configurer la protection de branche** : STAB-002 ✅ terminé. **CI-003, CI-004 et CI-005 ✅ terminés** ; poursuivre avec **TEST-001 à TEST-007**.
 4. **Renforcer les contrats des scrapers** : TEST-001 à TEST-007 dans l'ordre de leurs dépendances.
-5. **Simplifier le cœur de l'automatisation de review** : TOOL-002 à TOOL-004.
+5. **Améliorer l'automatisation de review** : TOOL-002 (terminé) et TOOL-004 (robustesse de la commande native). TOOL-003 est abandonné.
 6. **Traiter la structure, la documentation et les constats hérités** : TREE-001 à TREE-006, DOC-001 à DOC-004, et les tâches actives de [LEGACY-001 à LEGACY-011](07-registre-constats.md), selon leurs priorités.
-7. **Finaliser la documentation de l'outil** : TOOL-005, uniquement après TOOL-003 et DOC-003 ; puis DOC-005.
+7. **Finaliser la documentation de l'outil** : TOOL-005 (après TOOL-002), puis DOC-003 (après TOOL-005) ; puis DOC-005.
 8. **Nettoyer et gouverner les branches** : GIT-001 et GIT-002 ; GIT-003 après CI-001 et STAB-002 ; enfin GIT-004.
 9. **Clôturer la stabilisation** : STAB-004 après résolution ou acceptation explicite de toutes les autres tâches P0/P1.
 
@@ -53,7 +53,7 @@ Chaque ligne ne doit démarrer qu'après les dépendances déclarées dans les t
 - La CI est regroupée dans un seul workflow nommé `CI`. Ses jobs frontend et Docker sont explicites, mais le job backend générique `Tests` mélange audit de dépendances, lint, format et pytest.
 - Les fixtures Tokyo Cheapo et Hanabi Walker sont de très petits HTML manifestement reconstruits ; elles ne représentent pas suffisamment les pages réelles. Time Out Tokyo possède déjà plusieurs captures volumineuses qui semblent réelles, mais leur provenance n'est pas documentée.
 - `.claude/settings.local.json` n'est plus versionné et est ignoré. Sa dernière version historique contenait des permissions ponctuelles et obsolètes ; elle ne doit pas être restaurée telle quelle.
-- `/handle-codex-review` est décrit par un document de 201 lignes qui confie une orchestration complexe et un rollback fragile à l'agent. Une commande testable doit remplacer cette logique textuelle.
+- `/handle-codex-review` est décrit par un document Markdown qui confie l'orchestration à l'agent. La commande native est conservée (extraction Python abandonnée) ; TOOL-004 améliore sa robustesse, TOOL-005 et TOOL-006 réduisent la duplication et améliorent la traçabilité.
 - Le README annonce encore `247 tests Python`, alors que la baseline en exécute 309. `docs/ARCHITECTURE.md` ne documente pas tous les endpoints actuels, notamment les exports ICS.
 - L'ancien `REPO_ROADMAP_AUDIT.md` monolithique, long de 1 328 lignes et partiellement obsolète, a été remplacé par le présent ensemble modulaire ; ses propositions produit non terminées sont conservées dans une archive différée, hors du périmètre de stabilisation.
 - L'audit des branches GitHub n'a pas pu être réalisé depuis cette copie : aucun remote Git n'est configuré, aucune référence distante n'est disponible et `gh` n'est pas installé.
