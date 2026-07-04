@@ -64,10 +64,10 @@
 
 ## TOOL-006 — Publier un compte-rendu des remarques ignorées avant de relancer Codex
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P2**
 - **Dépendances :** TOOL-002
-- **Suivi :** à renseigner
+- **Suivi :** issue à créer — PR : à renseigner
 
 **Contexte.** Lorsque le cycle ignore certaines remarques Codex, il relance immédiatement `@Codex review` sans expliquer pourquoi. Codex les ressort au cycle suivant et l'historique de la PR ne permet pas de distinguer un point délibérément ignoré d'un point oublié.
 
