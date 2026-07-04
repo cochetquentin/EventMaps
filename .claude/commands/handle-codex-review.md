@@ -195,7 +195,7 @@ Si `REMARQUES_IGNOREES` n'est pas vide (au moins une remarque ignorée en Phase 
 
 ```bash
 CYCLE=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
-  --jq '[.[] | select(.body | ascii_downcase | ltrimstr("\n") | rtrimstr("\n") | . == "@codex review")] | length')
+  --jq '.[] | select(.body | ltrimstr("\n") | rtrimstr("\n") | ltrimstr("\r") | rtrimstr("\r") | ascii_downcase | . == "@codex review") | .id' | wc -l)
 gh pr comment "${PR_NUMBER}" --body "## Remarques Codex ignorées — cycle ${CYCLE}
 
 | Remarque | Raison |
