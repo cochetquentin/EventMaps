@@ -12,28 +12,28 @@ EventMaps est un agrégateur d'événements géolocalisés composé de trois par
 
 ```
 Sources tierces
-  tokyocheapo.com       hanabi.walkerplus.com
-       │                        │
-       ▼                        ▼
-  TokyoCheapo            HanabiWalker
-  (scrapers/)            (scrapers/)
-       │                        │
-       └──────────┬─────────────┘
-                  ▼
-           models/Event
-           (Pydantic model)
-                  │
-                  ▼
-           db/EventStore
-           (SQLite WAL)
-                  │
-                  ▼
-           api/routes/events.py
-           GET /events, GET /events/{id}
-                  │
-                  ▼
-           frontend/js/*.js
-           Leaflet + clustering
+  tokyocheapo.com    hanabi.walkerplus.com    timeout.com/tokyo
+       │                        │                     │
+       ▼                        ▼                     ▼
+  TokyoCheapo            HanabiWalker          TimeoutTokyo
+  (scrapers/)            (scrapers/)           (scrapers/)
+       │                        │                     │
+       └──────────────┬──────────────────────────────┘
+                      ▼
+               models/Event
+               (Pydantic model)
+                      │
+                      ▼
+               db/EventStore
+               (SQLite WAL)
+                      │
+                      ▼
+               api/routes/events.py
+               GET /events, GET /events/{id}
+                      │
+                      ▼
+               frontend/js/*.js
+               Leaflet + clustering
 ```
 
 Le scraping est déclenché manuellement (CLI `main.py`) ou via `POST /scrape` (API, protégé par token). Le résultat est persisté en SQLite, puis servi par l'API sans état.
@@ -49,6 +49,7 @@ Le scraping est déclenché manuellement (CLI `main.py`) ou via `POST /scrape` (
 | `base.py` | `BaseScraper` (interface), `ScrapeReport` (métriques) |
 | `tokyo_cheapo.py` | Scraper tokyocheapo.com → `Event` avec `TokyoCheapoAttributes` |
 | `hanabi_walker.py` | Scraper hanabi.walkerplus.com → `Event` avec `HanabiWalkerAttributes` |
+| `timeout_tokyo.py` | Scraper timeout.com/tokyo → `Event` avec `TimeoutTokyoAttributes` |
 
 Chaque scraper retourne `(list[Event], ScrapeReport)`. `ScrapeReport` comptabilise `links_seen`, `events_ok`, `events_skipped`, `errors[]`, `duration_s`.
 
@@ -59,7 +60,7 @@ Les retries HTTP sont gérés via **tenacity** (3 tentatives, backoff 2–10 s c
 | Fichier | Rôle |
 |---------|------|
 | `event.py` | Modèle canonical `Event` (Pydantic v2) |
-| `attributes.py` | `TokyoCheapoAttributes`, `HanabiWalkerAttributes` (Pydantic BaseModel) |
+| `attributes.py` | `TokyoCheapoAttributes`, `HanabiWalkerAttributes`, `TimeoutTokyoAttributes` (Pydantic BaseModel) |
 | `identity.py` | `make_event_id(parts)` — génère l'ID stable SHA-256 |
 
 ### `db/`
@@ -108,7 +109,7 @@ Modules ES (pas de bundler) chargés via `<script type="module">` :
 ```python
 class Event(BaseModel):
     id: str               # SHA-256 16 hex chars (stable, calculé avant insertion)
-    source: str           # "tc" | "hanabi"
+    source: str           # "tc" | "hanabi" | "tot"
     title: str
     url: str
     start_date: date | None
@@ -118,7 +119,7 @@ class Event(BaseModel):
     latitude: float | None
     longitude: float | None
     price: str | None
-    attributes: TokyoCheapoAttributes | HanabiWalkerAttributes
+    attributes: TokyoCheapoAttributes | HanabiWalkerAttributes | TimeoutTokyoAttributes
     created_at: datetime
 ```
 
@@ -156,6 +157,18 @@ class Event(BaseModel):
 
 `extra="allow"` : idem.
 
+#### `TimeoutTokyoAttributes` (source `"tot"`)
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| `categories` | `list[str]` | Catégories de l'événement |
+| `venue_name` | `str \| None` | Nom du lieu |
+| `venue_address` | `str \| None` | Adresse du lieu |
+| `image_url` | `str \| None` | URL de l'image |
+| `description` | `str \| None` | Description courte |
+
+`extra="allow"` : idem.
+
 ### Schéma SQLite
 
 #### Table `events`
@@ -163,7 +176,7 @@ class Event(BaseModel):
 ```sql
 CREATE TABLE IF NOT EXISTS events (
     id          TEXT PRIMARY KEY,   -- SHA-256 16 hex
-    source      TEXT NOT NULL,      -- "tc" | "hanabi"
+    source      TEXT NOT NULL,      -- "tc" | "hanabi" | "tot"
     title       TEXT NOT NULL,
     url         TEXT NOT NULL,
     start_date  TEXT,               -- ISO 8601 YYYY-MM-DD
@@ -183,7 +196,7 @@ CREATE TABLE IF NOT EXISTS events (
 ```sql
 CREATE TABLE IF NOT EXISTS scrape_jobs (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
-    source         TEXT,            -- "tc" | "hanabi" | "all"
+    source         TEXT,            -- "tc" | "hanabi" | "tot" | "all"
     status         TEXT,            -- "running" | "done" | "failed"
     started_at     TEXT,
     finished_at    TEXT,
@@ -211,6 +224,7 @@ def make_event_id(parts: list[str]) -> str:
 **Parties discriminantes par source :**
 - Tokyo Cheapo : `[url, location_name]`
 - Hanabi Walker : `[url, date_val]`
+- Timeout Tokyo : `[url]`
 
 L'algorithme est stable et ne doit **jamais être modifié** : les IDs persistés en DB en dépendent.
 
@@ -224,6 +238,7 @@ L'algorithme est stable et ne doit **jamais être modifié** : les IDs persisté
 | `GET` | `/events` | - | Liste des événements (filtres, pagination) |
 | `GET` | `/events/{id}` | - | Détail d'un événement |
 | `GET` | `/events/{id}.ics` | - | Export iCal d'un événement |
+| `GET` | `/events.ics` | - | Export iCal des événements filtrés (max 5 000 ; tronqué via `X-ICS-Truncated`) |
 | `POST` | `/scrape` | Bearer token (si `SCRAPE_TOKEN` configuré, sinon public) | Déclenche un job de scraping (async) |
 | `GET` | `/scrape/status` | - | Dernier job de scraping |
 | `GET` | `/scrape/config` | - | Indique si `/scrape` est public |
@@ -234,11 +249,13 @@ L'algorithme est stable et ne doit **jamais être modifié** : les IDs persisté
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `source` | `"tc" \| "hanabi"` | Filtre par source |
+| `source` | `"tc" \| "hanabi" \| "tot"` | Filtre par source |
 | `date` | `YYYY-MM-DD` | Filtre par chevauchement de date |
 | `bbox` | `min_lon,min_lat,max_lon,max_lat` | Filtre géographique |
 | `start_from` | `YYYY-MM-DD` | Borne basse sur `start_date` |
 | `start_to` | `YYYY-MM-DD` | Borne haute sur `start_date` |
+| `q` | `string` | Recherche textuelle (titre, lieu, access) |
+| `category` | `string` | Filtre par catégorie (`attributes.categories` — TC et TOT) |
 | `limit` | `int` (1–500, défaut 100) | Pagination |
 | `offset` | `int` (défaut 0) | Pagination |
 
@@ -264,6 +281,7 @@ Toutes les variables sont préfixées `EVENTMAPS_` et lues via `pydantic-setting
 | `EVENTMAPS_SCRAPE_REQUEST_TIMEOUT_SECONDS` | `10` | Timeout HTTP par requête |
 | `EVENTMAPS_SCRAPE_MAX_PAGES_TC` | `10` | Pages max Tokyo Cheapo |
 | `EVENTMAPS_SCRAPE_MAX_PAGES_HANABI` | `20` | Pages max Hanabi Walker |
+| `EVENTMAPS_SCRAPE_MAX_LISTING_PAGES_TOT` | `4` | Pages max scraper TimeoutTokyo |
 | `EVENTMAPS_SCRAPE_RETRY_ATTEMPTS` | `3` | Tentatives tenacity |
 | `EVENTMAPS_SCRAPE_RETRY_WAIT_MIN` | `2` | Backoff min (secondes) |
 | `EVENTMAPS_SCRAPE_RETRY_WAIT_MAX` | `10` | Backoff max (secondes) |

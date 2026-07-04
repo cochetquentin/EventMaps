@@ -16,7 +16,7 @@ Constats précis :
 
 ## DOC-001 — Corriger les faits périssables du README
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/66
 
@@ -36,7 +36,7 @@ Constats précis :
 
 ## DOC-003 — Réduire `CLAUDE.md` à des consignes spécifiques à l'agent
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** TOOL-005
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/67
@@ -47,7 +47,7 @@ Constats précis :
 
 ## DOC-004 — Synchroniser la documentation d'architecture avec le code
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/68
 
