@@ -6,8 +6,9 @@ Automatise le cycle de review Codex ↔ Claude Code sur la PR courante.
 
 ## Prérequis
 
-- `gh auth status` — gh authentifié et autorisé
-- `git remote -v` — remote Git configuré
+Conditions à réunir avant de lancer (vérification humaine — la commande ne les exécute pas) :
+- gh authentifié et autorisé (`gh auth status`)
+- remote Git configuré (`git remote -v`)
 - PR ouverte sur la branche courante
 
 ---
@@ -164,7 +165,10 @@ git push
 ```
 
 Si **`git push` échoue** → noter `Push : ÉCHEC` dans le résumé final, ne pas passer en Phase 7
-(même SHA en remote = review inutile + risque de boucle). S'arrêter.
+(même SHA en remote = review inutile + risque de boucle).
+Afficher : "Commit local préservé ({sha}). Récupération : `git push` pour retenter, ou
+`git reset HEAD~1` pour annuler et réappliquer lors du prochain cycle."
+S'arrêter.
 
 ---
 
