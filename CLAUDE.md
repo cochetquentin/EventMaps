@@ -6,6 +6,7 @@
 - **Tests** : `uv run pytest --cov=. --cov-fail-under=80 tests/ -v`
 - **Serveur dev** : `uv run uvicorn api.app:app --reload`
 - Toujours `uv run` — jamais `python` directement
+- Pour les conventions de commit et les règles de contribution : voir [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Workflow de review Codex
 
@@ -17,9 +18,3 @@ Voir `.claude/commands/handle-codex-review.md` pour le cycle complet.
 
 Ne jamais poster `@Codex review` si un commentaire `@Codex review` existe déjà
 et est **plus récent** que le dernier commit sur la branche.
-
-## Conventions de commit
-
-Format : `type(scope): message`
-Types : `fix`, `feat`, `test`, `refactor`, `chore`, `docs`, `ci`
-Exemple : `fix(scraper): corriger la validation des dates`
