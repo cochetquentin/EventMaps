@@ -34,3 +34,7 @@ node_modules/
 # Coverage reports
 .coverage
 htmlcov/
+
+# Linter / test caches
+.ruff_cache/
+.pytest_cache/

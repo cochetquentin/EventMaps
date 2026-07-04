@@ -12,21 +12,42 @@ Les répertoires locaux `.venv/` et `node_modules/` sont présents dans la copie
 
 ## TREE-001 — Maintenir un inventaire des fichiers racine
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/64
 
 **Actions.** Pour chaque fichier racine, confirmer propriétaire, rôle et audience ; supprimer ou déplacer uniquement les éléments sans rôle actuel ; vérifier les fichiers générés et les ignores Git/Docker.
 
+**Résultat.** Tous les fichiers racine sont justifiés et documentés (voir tableau ci-dessous). Aucun artefact temporaire n'est versionné. `.ruff_cache/` et `.pytest_cache/` ajoutés au `.gitignore` pour expliciter les exclusions déjà effectives en pratique.
+
+| Fichier / dossier | Rôle | Audience |
+|---|---|---|
+| `main.py` | CLI scraper (entry point `scrape`) | Développeurs, ops |
+| `config.py` | Configuration centralisée | Modules backend |
+| `pyproject.toml` | Manifeste Python | Python tooling |
+| `uv.lock` | Lock file uv | CI/CD |
+| `package.json` + `package-lock.json` | Manifeste npm (vitest frontend) | Devs frontend |
+| `vitest.config.js` | Config tests frontend | CI/CD |
+| `Makefile` | Cible `run` (serveur API dev) | Développeurs |
+| `Dockerfile` + `.dockerignore` | Image container | Ops / CI |
+| `.env.example` | Template variables d'environnement | Onboarding |
+| `.python-version` | Ancrage Python 3.13 | uv / pyenv |
+| `.gitattributes` | EOL LF forcé | Git |
+| `.gitignore` | Exclusions Git | Git |
+| `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, `CLAUDE.md` | Documentation racine | Tous |
+| `api/`, `db/`, `models/`, `scrapers/`, `frontend/`, `tests/`, `tools/`, `scripts/`, `docs/`, `data/` | Modules applicatifs | Développeurs |
+
 **Critères d'acceptation.** Aucun document d'audit temporaire ou artefact généré n'est versionné à la racine ; chaque fichier racine est justifié.
 
 ## TREE-002 — Corriger les métadonnées et points d'entrée du package
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/65
 
-**Constat.** `pyproject.toml` contient encore la description générique `Add your description here` et expose le script `scrape = "main:main"` sans que ce contrat soit clairement vérifié dans la documentation.
+**Constat.** `pyproject.toml` contenait la description générique `Add your description here`. Le script `scrape = "main:main"` était déjà testé (`tests/test_main.py::test_main_dispatch_tc`) et documenté (README, CONTRIBUTING, ARCHITECTURE) — il est conservé.
+
+**Résultat.** Description remplacée par `"API et scrapers pour cartographier les événements autour de Tokyo"`. Point d'entrée `scrape` conservé : contrat validé par les tests et la documentation existante.
 
 **Critères d'acceptation.** Les métadonnées décrivent réellement EventMaps ; le point d'entrée installé est testé et documenté, ou retiré s'il n'est pas supporté.
 
