@@ -11,14 +11,7 @@
 
 Ce repo utilise Codex (bot OpenAI) pour des reviews automatiques sur les PRs.
 
-La commande `/handle-codex-review` automatise le cycle complet :
-1. Récupérer les remarques Codex sur la PR courante
-2. Analyser et appliquer les corrections valides
-3. Lancer les tests (`uv run pytest`)
-4. Commiter et pusher les correctifs
-5. Relancer Codex avec `@Codex review`
-
-Voir `.claude/commands/handle-codex-review.md` pour les instructions d'exécution.
+Voir `.claude/commands/handle-codex-review.md` pour le cycle complet.
 
 ### Règle anti-boucle absolue
 

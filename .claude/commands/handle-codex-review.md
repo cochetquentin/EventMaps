@@ -4,6 +4,14 @@ Automatise le cycle de review Codex ↔ Claude Code sur la PR courante.
 
 ---
 
+## Prérequis
+
+- `gh auth status` — gh authentifié et autorisé
+- `git remote -v` — remote Git configuré
+- PR ouverte sur la branche courante
+
+---
+
 ## Phase 1 — Identifier la PR et le repo
 
 ```bash
@@ -16,6 +24,9 @@ HEAD_BRANCH=$(git branch --show-current)
 
 Extraire depuis ces résultats : `REPO`, `PR_NUMBER`, `HEAD_BRANCH`, `STATE`.
 Si `STATE != "OPEN"` → arrêter : "PR fermée ou mergée."
+Vérifier que l'arbre de travail est propre — si `git status --porcelain` retourne une sortie
+non vide → **STOP** : "Working tree non propre. Committez ou stashez vos changements avant
+de lancer la commande."
 Mémoriser ces variables pour toutes les étapes suivantes.
 
 ---
@@ -101,27 +112,14 @@ Sinon, **afficher un résumé des points à traiter** avant toute modification.
 
 ## Phase 4 — Appliquer les corrections
 
-**Avant toute modification**, enregistrer l'état du working tree :
-
-```bash
-DIRTY_FILES=$(git status --porcelain | awk '{print substr($0,4)}')
-NEW_FILES=$(git status --porcelain | awk '/^\?\?/{print substr($0,4)}')
-```
-
-Ces fichiers (`DIRTY_FILES`) étaient déjà modifiés avant ce workflow. `NEW_FILES` liste
-les fichiers non-trackés préexistants. Si Phase 5 échoue, le rollback :
-- **ne touche jamais** `DIRTY_FILES` ni `NEW_FILES`
-- supprime les nouveaux fichiers créés par ce workflow (`rm` sur les untracked post-workflow)
-- restaure les fichiers trackés modifiés par ce workflow (`git checkout -- <fichiers>`)
+L'arbre est garanti propre (vérifié en Phase 1) : toute modification présente ici est issue du workflow.
 
 Pour chaque remarque (dans l'ordre de priorité) :
 
 1. Lire le fichier concerné pour comprendre le contexte actuel.
 2. **Évaluer** : la remarque est-elle valide ? Déjà corrigée par un commit précédent ?
-3. Si le fichier à modifier est dans `DIRTY_FILES` → **ignorer** la correction (évite de
-   mélanger les changements du workflow avec des modifications locales préexistantes).
-4. Si **valide** → appliquer la correction, noter : `[APPLIQUÉ] fichier:ligne — description`.
-5. Si **invalide / non applicable** → ignorer avec justification courte.
+3. Si **valide** → appliquer la correction, noter : `[APPLIQUÉ] fichier:ligne — description`.
+4. Si **invalide / non applicable** → ignorer avec justification courte.
 
 Ne pas modifier les tests pour faire passer une règle de coverage — corriger le code de production.
 
@@ -136,8 +134,8 @@ uv run --locked python -m pytest --cov=. --cov-fail-under=80 tests/ -v
 - **Succès** → continuer.
 - **Échec** → diagnostiquer, corriger, relancer (max 2 tentatives).
   Si toujours KO après 2 tentatives : annuler les changements de ce cycle :
-  - `git checkout -- <fichiers trackés modifiés dans ce cycle sauf DIRTY_FILES>`
-  - `rm <fichiers non-trackés créés dans ce cycle sauf NEW_FILES>`
+  - `git checkout -- <fichiers trackés modifiés dans ce cycle>`
+  - `rm <fichiers non-trackés créés dans ce cycle>`
   noter les corrections non appliquées, continuer sans elles.
 - **Coverage < 80%** → ajouter des tests pour le code modifié.
 
@@ -145,17 +143,28 @@ uv run --locked python -m pytest --cov=. --cov-fail-under=80 tests/ -v
 
 ## Phase 6 — Commit et push
 
-Si des modifications ont été appliquées :
+```bash
+git add <fichiers modifiés spécifiquement>
+STAGED=$(git diff --cached --name-only)
+```
+
+Si `STAGED` est vide → ne pas commiter, **ne pas relancer Codex** (même SHA = review inutile).
+Afficher le résumé final avec `@Codex review relancé : NON (aucun diff stagé)` et s'arrêter.
+
+Sinon :
 
 ```bash
-git status
-git add <fichiers modifiés spécifiquement>
 git commit -m "fix: appliquer corrections Codex — {résumé 1 ligne}"
+```
+
+Puis tenter le push :
+
+```bash
 git push
 ```
 
-Si **aucune modification** → ne pas commiter, **ne pas relancer Codex** (même SHA = review
-inutile). Afficher le résumé final avec `@Codex review relancé : NON (aucun changement)` et s'arrêter.
+Si **`git push` échoue** → noter `Push : ÉCHEC` dans le résumé final, ne pas passer en Phase 7
+(même SHA en remote = review inutile + risque de boucle). S'arrêter.
 
 ---
 
@@ -195,7 +204,7 @@ Remarques Codex : N trouvées
 Corrections : X appliquées, Y ignorées
 Tests : PASS | FAIL (coverage : Z%)
 Commit : {sha} — "{message}"
-Push : OK | SKIPPED
+Push : OK | SKIPPED | ÉCHEC
 
 @Codex review relancé : OUI / NON (raison si NON)
 ```
