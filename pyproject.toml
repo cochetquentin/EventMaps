@@ -19,7 +19,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "httpx2>=0.28",
+    "httpx2>=2.5.0",
     "msgpack>=1.2.1",
     "pip-audit>=2.7",
     "pytest>=9.0.3",
