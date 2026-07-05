@@ -40,22 +40,30 @@ Les 7 branches Dependabot avec PR ouvertes ont été conservées.
 
 ## GIT-003 — Définir une stratégie de branches simple
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P1**
 - **Dépendances :** CI-001, STAB-002
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/71
 
 **Décision recommandée.** Utiliser une branche principale protégée et des branches courtes liées à une issue ; imposer PR + checks ; éviter une branche de développement longue tant qu'elle n'est pas nécessaire.
 
-**Critères d'acceptation.** La stratégie, les conventions de nommage, les règles de merge et les exceptions sont documentées dans CONTRIBUTING.
+**Résultat (2026-07-05).** Stratégie documentée dans `CONTRIBUTING.md` (section "Stratégie de branches") :
+- Branche `main` protégée : strict mode, enforce_admins, 6 checks CI requis, force-push interdit
+- Conventions de nommage : `type/issue-NNN-description-courte`
+- Règle squash merge ; suppression automatique des branches après merge (GIT-004)
+- Exceptions explicites : Dependabot et hotfix
+
+**Critères d'acceptation.** La stratégie, les conventions de nommage, les règles de merge et les exceptions sont documentées dans CONTRIBUTING. ✅
 
 ## GIT-004 — Activer l'hygiène automatique après merge
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P2**
 - **Dépendances :** GIT-003
-- **Suivi :** à renseigner
+- **Suivi :** (activé en même temps que GIT-003)
 
 **Actions.** Activer la suppression automatique des branches de head après merge si compatible avec les pratiques ; définir une revue périodique des branches non mergées et des protections.
 
-**Critères d'acceptation.** Les branches de PR mergées ne s'accumulent plus ; les exceptions sont explicites.
+**Résultat (2026-07-05).** Paramètre `delete_branch_on_merge` activé sur le dépôt GitHub (`gh api -X PATCH`). Les branches de PR sont désormais supprimées automatiquement après merge.
+
+**Critères d'acceptation.** Les branches de PR mergées ne s'accumulent plus ; les exceptions sont explicites. ✅

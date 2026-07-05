@@ -66,9 +66,55 @@ uv run python main.py all          # Les deux sources
 npx vitest run
 ```
 
+## Stratégie de branches
+
+### Principes
+
+- **`main` protégée** : aucun commit direct, toujours via PR
+- **Branches courtes** : une branche = une issue = une PR ; supprimée dès le merge
+- **Pas de branche longue permanente** : pas de `develop`, `staging` ou équivalent
+
+### Conventions de nommage
+
+| Format | Exemples |
+|--------|---------|
+| `type/issue-NNN-description-courte` | `fix/issue-42-cors-headers`, `docs/issue-71-branch-strategy` |
+| `type/description-courte` (sans issue dédiée) | `chore/update-deps` |
+| Dependabot | `dependabot/pip/…` (géré automatiquement) |
+
+Les types valides sont les mêmes que pour les commits : `fix`, `feat`, `test`, `refactor`, `chore`, `docs`, `ci`.
+
+### Protection de main
+
+Avant tout merge, la CI exige :
+
+| Check | Description |
+|-------|-------------|
+| `Python / Format` | Ruff format |
+| `Python / Lint` | Ruff lint |
+| `Python / Security` | Bandit |
+| `Python / Tests` | pytest + coverage ≥ 80 % |
+| `Frontend / Tests` | Vitest |
+| `Docker / Build and smoke test` | Build image + smoke |
+
+La branche doit également être **à jour avec `main`** (strict mode) et la règle s'applique **aux admins** (`enforce_admins`). Force-push et suppression directe de `main` sont interdits.
+
+### Règles de merge
+
+- Méthode : **squash merge** — un commit propre par PR dans `main`
+- Titre du commit squash = titre de la PR (conventions de commit appliquées)
+- Les branches de PR sont **supprimées automatiquement** après merge (paramètre dépôt activé)
+
+### Exceptions
+
+| Cas | Règle |
+|-----|-------|
+| Branches Dependabot | Nommage automatique `dependabot/…` ; merge dès que CI vert |
+| Hotfix urgent | Branche `fix/` courte — mêmes checks, aucune exception CI |
+
 ## Workflow PR
 
-1. Créer une branche depuis `main` : `git checkout -b type/description-courte`
+1. Créer une branche depuis `main` : `git checkout -b type/issue-NNN-description-courte`
 2. Faire les modifications
 3. Lancer Ruff avant tout commit : `uv run ruff check --fix . && uv run ruff format .`
 4. Vérifier que les tests passent avec coverage ≥ 80 %
