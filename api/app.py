@@ -62,6 +62,7 @@ if settings.request_logging:
 app.include_router(router, prefix="/events", tags=["events"])
 app.include_router(scrape_router, prefix="/scrape", tags=["scrape"])
 app.mount("/js", StaticFiles(directory="frontend/js"), name="js")
+app.mount("/css", StaticFiles(directory="frontend/css"), name="css")
 
 
 @app.get("/")
