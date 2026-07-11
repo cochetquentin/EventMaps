@@ -38,7 +38,7 @@ jobs:
         run: uv sync --all-groups --locked
 
       - name: Lint (Ruff)
-        run: uv run --locked ruff check .
+        run: make lint
 
   python-format:
     name: Python / Format
@@ -60,7 +60,7 @@ jobs:
         run: uv sync --all-groups --locked
 
       - name: Format (Ruff)
-        run: uv run --locked ruff format --check .
+        run: make format
 
   python-tests:
     name: Python / Tests
@@ -82,7 +82,7 @@ jobs:
         run: uv sync --all-groups --locked
 
       - name: Lancer les tests
-        run: uv run --locked python -m pytest --cov=. --cov-fail-under=80 tests/ -v
+        run: make test
 
   python-security:
     name: Python / Security
@@ -104,7 +104,7 @@ jobs:
         run: uv sync --all-groups --locked
 
       - name: Audit des dépendances
-        run: uv run --locked pip-audit
+        run: make security
 
   frontend-tests:
     name: Frontend / Tests
@@ -123,7 +123,7 @@ jobs:
         run: npm ci
 
       - name: Lancer les tests JS
-        run: npm test
+        run: make test-frontend
 
   docker-build:
     name: Docker / Build and smoke test

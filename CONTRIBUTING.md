@@ -49,13 +49,13 @@ uv run uvicorn api.app:app --reload
 # → http://localhost:8000
 
 # Tests Python (avec coverage ≥ 80 %)
-uv run python -m pytest --cov=. --cov-fail-under=80 tests/ -q
+make test
 
 # Tests Python filtrés
 uv run python -m pytest tests/test_api.py -v
 
-# Lint + format (Ruff)
-uv run ruff check --fix . && uv run ruff format .
+# Lint + format (Ruff) — corrige et écrit les fichiers
+make fix
 
 # CLI scraping (sans serveur)
 uv run python main.py tc           # Tokyo Cheapo → SQLite
@@ -63,7 +63,10 @@ uv run python main.py hanabi       # Hanabi Walker (région Kantō)
 uv run python main.py all          # Les deux sources
 
 # Tests frontend (Vitest)
-npx vitest run
+make test-frontend
+
+# Reproduire tous les checks CI en local (lint, format, tests, sécurité)
+make ci
 ```
 
 ## Stratégie de branches
@@ -116,9 +119,11 @@ La branche doit également être **à jour avec `main`** (strict mode) et la rè
 
 1. Créer une branche depuis `main` : `git checkout -b type/issue-NNN-description-courte`
 2. Faire les modifications
-3. Lancer Ruff avant tout commit : `uv run ruff check --fix . && uv run ruff format .`
-4. Vérifier que les tests passent avec coverage ≥ 80 %
+3. Lancer Ruff avant tout commit : `make fix`
+4. Vérifier que les tests passent avec coverage ≥ 80 % : `make test`
 5. Commiter et ouvrir une PR vers `main`
+
+Pour reproduire tous les checks requis par la CI avant de pousser : `make ci`.
 
 **Règle :** une PR = une tâche atomique. Ne pas regrouper des corrections sans rapport.
 
@@ -170,7 +175,7 @@ Ajouter une fixture :
 Le gate de coverage est **80 %** vérifié par la CI. Toute nouvelle fonctionnalité doit être couverte. Vérifier localement avant de pousser :
 
 ```bash
-uv run python -m pytest --cov=. --cov-fail-under=80 tests/ -q
+make test
 ```
 
 ### Tests frontend
@@ -178,7 +183,7 @@ uv run python -m pytest --cov=. --cov-fail-under=80 tests/ -q
 Les tests JS dans `frontend/tests/` sont exécutés avec Vitest. Ils couvrent les fonctions pures (helpers, escaping, parsing) — pas l'intégration Leaflet.
 
 ```bash
-npx vitest run
+make test-frontend
 ```
 
 ## Politique scraping respectueux
