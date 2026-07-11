@@ -829,6 +829,68 @@ def test_get_event_links_deduplicates_and_excludes(tc, monkeypatch):
         assert path not in _EXCLUDE_LINKS
 
 
+@pytest.mark.parametrize(
+    ("hrefs", "expected"),
+    [
+        (
+            ["/events/dated-with-base/20260608/", "/events/dated-with-base/"],
+            ["/events/dated-with-base/"],
+        ),
+        (
+            ["/events/dated-with-base/", "/events/dated-with-base/20260608/"],
+            ["/events/dated-with-base/"],
+        ),
+        (
+            ["/events/dated-only-no-base/20260613/"],
+            ["/events/dated-only-no-base/20260613/"],
+        ),
+        (
+            [
+                "/events/dated-with-base-two-dates/20260613/",
+                "/events/dated-with-base-two-dates/20260614/",
+                "/events/dated-with-base-two-dates/",
+            ],
+            ["/events/dated-with-base-two-dates/"],
+        ),
+    ],
+    ids=["dated-then-base", "base-then-dated", "dated-only-no-base", "two-dates-then-base"],
+)
+def test_dedupe_event_hrefs_scenarios(hrefs, expected):
+    """LEGACY-001 : regroupement des variantes datées par slug canonique."""
+    from scrapers.tokyo_cheapo import _dedupe_event_hrefs
+
+    assert _dedupe_event_hrefs(hrefs) == expected
+
+
+def test_get_event_links_prefers_base_over_dated_variant(tc, monkeypatch):
+    """LEGACY-001 : les variantes datées d'un même slug sont regroupées sous
+    l'URL de base quand elle existe sur la page ; sinon la variante datée
+    est conservée telle quelle."""
+    html_bytes = (FIXTURES_DIR / "tc/synthetic/listing_dated_variants.html").read_bytes()
+    call_count = 0
+
+    def mock_fetch(url, session, timeout=10):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            resp = MagicMock()
+            resp.content = html_bytes
+            return resp
+        raise _make_404_http_error()
+
+    monkeypatch.setattr("scrapers.tokyo_cheapo._fetch", mock_fetch)
+    links = tc.get_event_links(max_pages=5)
+
+    assert len(links) == 4
+    assert "https://tokyocheapo.com/events/dated-with-base/" in links
+    assert "https://tokyocheapo.com/events/dated-with-base/20260608/" not in links
+    assert "https://tokyocheapo.com/events/dated-only-no-base/20260613/" in links
+    assert "https://tokyocheapo.com/events/dated-with-base-two-dates/" in links
+    assert "https://tokyocheapo.com/events/dated-with-base-two-dates/20260613/" not in links
+    assert "https://tokyocheapo.com/events/dated-with-base-two-dates/20260614/" not in links
+    assert "https://tokyocheapo.com/events/normal-event-no-dates/" in links
+
+
 # ---------------------------------------------------------------------------
 # TEST-003 : corpus réel Tokyo Cheapo
 # ---------------------------------------------------------------------------
@@ -963,3 +1025,31 @@ def test_real_listing_pagination(tc, monkeypatch):
         "page 3 (/page/3/) non demandée (doit déclencher 404)"
     )
     assert all(link.startswith("https://tokyocheapo.com/events/") for link in links)
+
+
+def test_real_listing_known_duplicates_collapse_to_one_link(tc, monkeypatch):
+    """Régression LEGACY-001 : les 3 duplications connues du corpus réel
+    (URL de base + variante(s) datée(s) du même événement) ne produisent
+    chacune qu'un seul lien, y compris shimokitazawa-flea-market dont les
+    occurrences sont réparties sur listing_1.html (base + 20260613) et
+    listing_2.html (20260614 seul)."""
+    html_1 = (_REAL_TC_DIR / "listing_1.html").read_bytes()
+    html_2 = (_REAL_TC_DIR / "listing_2.html").read_bytes()
+
+    def mock_fetch(url, session, timeout=10):
+        resp = MagicMock()
+        resp.content = html_1 if "/page/1/" in url else html_2
+        return resp
+
+    monkeypatch.setattr("scrapers.tokyo_cheapo._fetch", mock_fetch)
+    links = tc.get_event_links(max_pages=2)
+
+    for slug in (
+        "ohi-racecourse-flea-market",
+        "geisha-ozashiki-odori-asakusa",
+        "shimokitazawa-flea-market",
+    ):
+        matching = [
+            link for link in links if link.startswith(f"https://tokyocheapo.com/events/{slug}/")
+        ]
+        assert len(matching) == 1, f"Attendu 1 lien pour {slug}, obtenu {matching}"

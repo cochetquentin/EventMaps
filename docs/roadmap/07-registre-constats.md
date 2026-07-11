@@ -56,7 +56,7 @@ Lorsqu'un constat classé terminé s'avère encore reproductible, il doit être 
 
 ## LEGACY-001 — Filtrer les liens d'événement Tokyo Cheapo
 
-- **Statut : À faire**
+- **Statut : Terminé par cette roadmap**
 - **Priorité : P1**
 - **Origine :** BUG-006
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/72
@@ -64,6 +64,8 @@ Lorsqu'un constat classé terminé s'avère encore reproductible, il doit être 
 **Problème.** `TokyoCheapo.get_event_links()` accepte encore largement les URLs sous `/events/`; une page de taxonomie ou de navigation peut donc provoquer des téléchargements inutiles et des événements ignorés.
 
 **Critères d'acceptation.** La règle d'acceptation repose sur des structures réellement observées ; des fixtures couvrent les URLs événement valides et les URLs de navigation/taxonomie rejetées ; aucun événement réel du corpus n'est perdu.
+
+**Résolution.** L'analyse du corpus réel a montré que `_EXCLUDE_LINKS` couvrait déjà correctement les URLs de navigation/taxonomie observées ; le vrai problème était la duplication d'un même événement sous une URL de base (`/events/{slug}/`) et une ou plusieurs URLs d'occurrence datée (`/events/{slug}/{YYYYMMDD}/`), provoquant des téléchargements redondants. `_dedupe_event_hrefs()` regroupe ces variantes sous l'URL de base quand elle est présente sur les pages parcourues, et conserve la variante datée telle quelle sinon (pour ne perdre aucun événement dont seule une occurrence datée est observée). Les 3 duplications connues du corpus réel (`ohi-racecourse-flea-market`, `geisha-ozashiki-odori-asakusa`, `shimokitazawa-flea-market`) sont verrouillées par un test de régression dédié.
 
 ## LEGACY-002 — Définir la résilience des assets CDN
 

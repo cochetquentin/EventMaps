@@ -65,6 +65,26 @@ _EXCLUDE_LINKS = {
     *[f"/events/{m}" for m in _MONTHS],
 }
 
+_EVENT_HREF_RE = re.compile(r"^/events/(?P<slug>[^/]+)/(?:(?P<date>\d{8})/)?$")
+
+
+def _dedupe_event_hrefs(hrefs: list[str]) -> list[str]:
+    """Regroupe les variantes datées (`/events/{slug}/{YYYYMMDD}/`) d'un même
+    événement sous une seule entrée par slug, en conservant l'ordre de
+    première apparition. L'URL de base est préférée dès qu'elle apparaît
+    n'importe où dans `hrefs`, même après une variante datée déjà vue. Si
+    seule une variante datée existe pour un slug, elle est conservée telle
+    quelle (LEGACY-001 : impossible de garantir que l'URL de base équivalente
+    résout en page valide)."""
+    chosen: dict[str, str] = {}
+    for href in hrefs:
+        match = _EVENT_HREF_RE.match(href)
+        key, is_base = (match.group("slug"), match.group("date") is None) if match else (href, True)
+        if is_base or key not in chosen:
+            chosen[key] = href
+    return list(chosen.values())
+
+
 BASE_URL = "https://tokyocheapo.com"
 
 _MONTH_ABBREVS = {
@@ -317,7 +337,7 @@ class TokyoCheapo(BaseScraper):
         """Retourne les URLs de tous les événements de la semaine."""
         if max_pages is None:
             max_pages = self._max_pages
-        links = []
+        all_hrefs: list[str] = []
         for i in range(1, max_pages + 1):
             url = f"{BASE_URL}/events/this-week/page/{i}/"
             try:
@@ -328,21 +348,21 @@ class TokyoCheapo(BaseScraper):
                 raise
 
             soup = BeautifulSoup(response.content, "html.parser")
-            page_links = {
+            page_hrefs = [
                 href
                 for a in soup.find_all("a")
                 if (href := a.get("href"))
                 and href.startswith("/events/")
                 and href not in _EXCLUDE_LINKS
                 and href != f"/events/this-week/page/{i}/"
-            }
+            ]
 
-            if page_links:
-                links += [BASE_URL + href for href in page_links]
+            if page_hrefs:
+                all_hrefs += page_hrefs
             else:
                 break
 
-        return links
+        return [BASE_URL + href for href in _dedupe_event_hrefs(all_hrefs)]
 
     def get_event_page(self, url: str) -> BeautifulSoup:
         """Télécharge et parse une page événement."""

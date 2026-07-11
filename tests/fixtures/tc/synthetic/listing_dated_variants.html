@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Events this week in Tokyo - Tokyo Cheapo</title></head>
+<body>
+<nav>
+  <a href="/events/">All Events</a>
+</nav>
+<main>
+  <!-- Scénario 1 : occurrence datée rencontrée AVANT l'URL de base du même
+       slug (reproduit l'ordre observé dans listing_1.html réel pour
+       ohi-racecourse-flea-market) → la base doit être préférée. -->
+  <a href="/events/dated-with-base/20260608/">Dated occurrence</a>
+  <a href="/events/dated-with-base/">Base occurrence</a>
+
+  <!-- Scénario 2 : uniquement une occurrence datée, aucune base sur la page
+       → la variante datée doit être conservée telle quelle. -->
+  <a href="/events/dated-only-no-base/20260613/">Dated-only occurrence</a>
+
+  <!-- Scénario 3 : deux dates différentes du même slug suivies de la base
+       → une seule URL (la base) doit survivre. -->
+  <a href="/events/dated-with-base-two-dates/20260613/">First date</a>
+  <a href="/events/dated-with-base-two-dates/20260614/">Second date</a>
+  <a href="/events/dated-with-base-two-dates/">Base occurrence</a>
+
+  <!-- Contrôle : événement simple non affecté par la règle. -->
+  <a href="/events/normal-event-no-dates/">Normal event</a>
+</main>
+</body>
+</html>
