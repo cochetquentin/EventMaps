@@ -245,14 +245,14 @@ L'image utilise un utilisateur non-root (`appuser`) et inclut un healthcheck sur
 ## Tests
 
 ```bash
-# Tous les tests Python
-uv run python -m pytest tests/ -q
-
-# Avec coverage (gate CI à 80 %)
-uv run python -m pytest --cov=. --cov-fail-under=80 tests/ -q
+# Tous les tests Python (avec coverage, gate CI à 80 %)
+make test
 
 # Tests frontend (Vitest)
-npx vitest run
+make test-frontend
+
+# Reproduire tous les checks CI en local (lint, format, tests, sécurité)
+make ci
 ```
 
 ## Documentation
