@@ -53,11 +53,11 @@ Les répertoires locaux `.venv/` et `node_modules/` sont présents dans la copie
 
 ## TREE-003 — Réduire progressivement `frontend/index.html`
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P2**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/108
 
-**Actions.** Extraire en priorité les styles statiques vers un fichier dédié ; ne pas introduire de framework ; conserver le comportement et ajouter les contrôles nécessaires au chargement des assets.
+**Résultat.** Le bloc `<style>` de 727 lignes a été extrait vers `frontend/css/style.css`. FastAPI sert le fichier via un mount `/css` (même pattern que `/js`). `index.html` est passé de 845 à ~115 lignes purement structurelles.
 
 **Critères d'acceptation.** `index.html` redevient principalement structurel ; aucun changement visuel ou fonctionnel involontaire.
 
