@@ -97,6 +97,22 @@ fixtures:
     tests_consuming:
       - test_tokyo_cheapo.py::test_get_event_links_deduplicates_and_excludes
 
+  - file: tc/synthetic/listing_dated_variants.html
+    category: synthetic
+    source: tc
+    captured_at: null
+    url: null
+    purpose: >
+      Listing Tokyo Cheapo couvrant LEGACY-001 : un slug avec occurrence
+      datée rencontrée avant sa base, un slug avec uniquement une occurrence
+      datée (sans base sur la page) et un slug avec deux dates différentes
+      suivies de sa base. Vérifie que _dedupe_event_hrefs() regroupe les
+      variantes datées sous l'URL de base quand elle existe sur la page, et
+      préserve la variante datée seule dans le cas contraire.
+    tests_consuming:
+      - test_tokyo_cheapo.py::test_dedupe_event_hrefs_scenarios
+      - test_tokyo_cheapo.py::test_get_event_links_prefers_base_over_dated_variant
+
   # ── Hanabi Walker ────────────────────────────────────────────────────────────
 
   - file: hanabi/synthetic/listing.html
