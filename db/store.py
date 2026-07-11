@@ -2,9 +2,6 @@ from db.events import EventsRepository
 from db.jobs import JobsRepository
 from db.migrations import init_schema
 from models.event import Event
-from models.identity import make_event_id
-
-_make_id = make_event_id  # backward-compatible alias for existing callers
 
 
 class EventStore:

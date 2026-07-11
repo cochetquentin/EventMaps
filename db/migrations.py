@@ -12,7 +12,7 @@ from db.schema import (
 )
 
 
-def _today_jst() -> str:
+def today_jst() -> str:
     """Return today's date in JST (UTC+9) as YYYY-MM-DD."""
     return datetime.now(_JST).date().isoformat()
 

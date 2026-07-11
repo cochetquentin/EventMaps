@@ -26,7 +26,7 @@ from tenacity import (
 
 from models.attributes import TimeoutTokyoAttributes
 from models.event import Event
-from models.identity import make_event_id as _make_id
+from models.identity import make_event_id
 from scrapers.base import BaseScraper, ScrapeReport
 
 logger = logging.getLogger(__name__)
@@ -488,7 +488,7 @@ class TimeoutTokyo(BaseScraper):
 
             events.append(
                 Event(
-                    id=_make_id([e["url"]]),
+                    id=make_event_id([e["url"]]),
                     source=SOURCE,
                     title=e.get("title", ""),
                     url=e["url"],

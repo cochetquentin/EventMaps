@@ -3,8 +3,8 @@ import sqlite3
 from datetime import date as _date
 from datetime import datetime
 
-from db.migrations import _today_jst
-from db.schema import _EVENTS_HEADERS
+from db.migrations import today_jst
+from db.schema import EVENTS_HEADERS
 from models.event import Event
 
 
@@ -60,7 +60,7 @@ class EventsRepository:
         elif upcoming:
             # Default: events that are not yet over as of today JST
             clauses.append("COALESCE(end_date, start_date) >= ?")
-            params.append(_today_jst())
+            params.append(today_jst())
         if bbox:
             min_lon, min_lat, max_lon, max_lat = bbox
             # Time Out Tokyo events without coordinates are always included so
@@ -122,7 +122,7 @@ class EventsRepository:
 
     @staticmethod
     def _event_from_row(row: tuple) -> Event:
-        col = {name: i for i, name in enumerate(_EVENTS_HEADERS)}
+        col = {name: i for i, name in enumerate(EVENTS_HEADERS)}
         raw_start = row[col["start_date"]]
         raw_end = row[col["end_date"]]
         return Event(

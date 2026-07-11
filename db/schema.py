@@ -43,7 +43,7 @@ _SCRAPE_JOBS_MIGRATIONS = [
     "ALTER TABLE scrape_jobs ADD COLUMN error_count INTEGER",
 ]
 
-_EVENTS_HEADERS = [
+EVENTS_HEADERS = [
     "id",
     "source",
     "title",

@@ -5,8 +5,9 @@ from unittest.mock import patch
 
 import pytest
 
-from db.store import EventStore, _make_id
+from db.store import EventStore
 from models.event import Event
+from models.identity import make_event_id
 from scrapers.base import ScrapeReport
 from scrapers.hanabi_walker import HanabiWalker
 from scrapers.timeout_tokyo import TimeoutTokyo
@@ -147,7 +148,7 @@ def _start_job(db_path, source):
 
 def _make_event():
     return Event(
-        id=_make_id(["https://example.com", ""]),
+        id=make_event_id(["https://example.com", ""]),
         source="tc",
         title="Test",
         url="https://example.com",

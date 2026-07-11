@@ -4,8 +4,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.app import app
-from db.store import EventStore, _make_id
+from db.store import EventStore
 from models.event import Event
+from models.identity import make_event_id
 
 _NOW = datetime(2026, 5, 16, 12, 0, 0, tzinfo=UTC)
 _TC_URL = "https://tokyocheapo.com/event/foo"
@@ -34,7 +35,8 @@ def make_tc(**kwargs) -> Event:
     )
     defaults.update(kwargs)
     defaults.setdefault(
-        "id", _make_id([defaults["url"], defaults.get("attributes", {}).get("location_name") or ""])
+        "id",
+        make_event_id([defaults["url"], defaults.get("attributes", {}).get("location_name") or ""]),
     )
     return Event(**defaults)
 
@@ -54,7 +56,7 @@ def make_hanabi(**kwargs) -> Event:
     defaults.update(kwargs)
     sd = defaults.get("start_date")
     raw_date = sd.strftime("%Y/%m/%d") if isinstance(sd, date) else str(sd) if sd else ""
-    defaults.setdefault("id", _make_id([defaults["url"], raw_date]))
+    defaults.setdefault("id", make_event_id([defaults["url"], raw_date]))
     return Event(**defaults)
 
 
