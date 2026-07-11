@@ -2,7 +2,7 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from db.store import EventStore, _make_id
+from db.store import EventStore
 from models.event import Event
 from models.identity import make_event_id
 
@@ -15,7 +15,7 @@ _HW_URL = "https://hanabi.walkerplus.com/detail/ar0300e001/"
 
 def make_tc(**kwargs) -> Event:
     defaults = dict(
-        id=_make_id([_TC_URL, "Yoyogi Park"]),
+        id=make_event_id([_TC_URL, "Yoyogi Park"]),
         source="tc",
         title="Foo Festival",
         url=_TC_URL,
@@ -36,13 +36,13 @@ def make_tc(**kwargs) -> Event:
     defaults.update(kwargs)
     if "id" not in kwargs:
         loc = defaults.get("attributes", {}).get("location_name") or ""
-        defaults["id"] = _make_id([defaults["url"], loc])
+        defaults["id"] = make_event_id([defaults["url"], loc])
     return Event(**defaults)
 
 
 def make_hanabi(**kwargs) -> Event:
     defaults = dict(
-        id=_make_id([_HW_URL, "2026/07/25"]),
+        id=make_event_id([_HW_URL, "2026/07/25"]),
         source="hanabi",
         title="Sumida River Fireworks",
         url=_HW_URL,
@@ -74,23 +74,20 @@ def make_hanabi(**kwargs) -> Event:
             raw_date = sd.strftime("%Y/%m/%d")
         else:
             raw_date = str(sd) if sd else ""
-        defaults["id"] = _make_id([defaults["url"], raw_date])
+        defaults["id"] = make_event_id([defaults["url"], raw_date])
     return Event(**defaults)
 
 
-# --- _make_id ---
+# --- make_event_id ---
 
 
 def test_make_id_stable():
-    # Test de la fonction canonique dans models.identity
     assert make_event_id(["https://example.com", "Yoyogi Park"]) == make_event_id(
         ["https://example.com", "Yoyogi Park"]
     )
     result = make_event_id(["https://example.com", "loc"])
     assert len(result) == 16
     assert result.isalnum()
-    # L'alias db.store doit produire des résultats identiques
-    assert _make_id(["https://example.com", "loc"]) == result
 
 
 # --- upsert_events (TC) ---

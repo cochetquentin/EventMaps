@@ -18,7 +18,7 @@ from tenacity import (
 
 from models.attributes import TokyoCheapoAttributes
 from models.event import Event
-from models.identity import make_event_id as _make_id
+from models.identity import make_event_id
 from scrapers.base import BaseScraper, ScrapeReport
 
 logger = logging.getLogger(__name__)
@@ -507,7 +507,7 @@ class TokyoCheapo(BaseScraper):
                 location_name = loc.get("name") or ""
                 events.append(
                     Event(
-                        id=_make_id([e["url"], location_name]),
+                        id=make_event_id([e["url"], location_name]),
                         source="tc",
                         title=e.get("title", ""),
                         url=e["url"],
