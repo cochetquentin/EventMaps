@@ -19,6 +19,8 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    # httpx2 n'est jamais importé directement : starlette.testclient l'utilise
+    # en interne (TestClient), donc les tests API en dépendent transitivement.
     "httpx2>=2.5.0",
     "msgpack>=1.2.1",
     "pip-audit>=2.7",

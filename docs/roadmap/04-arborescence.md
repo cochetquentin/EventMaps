@@ -63,30 +63,30 @@ Les répertoires locaux `.venv/` et `node_modules/` sont présents dans la copie
 
 ## TREE-004 — Fournir une interface unique pour les commandes courantes
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P2**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/115
 
-**Actions.** Décider si `Makefile` reste l'interface commune ; si oui, ajouter des cibles cohérentes pour tests, lint, format, frontend et CI locale ; sinon le supprimer et documenter l'alternative.
+**Résultat.** Le `Makefile` reste l'interface commune : cibles ajoutées (`test`, `test-frontend`, `lint`, `format`, `fix`, `security`, `ci`). `.github/workflows/ci.yml` appelle désormais ces mêmes cibles (au lieu de commandes `uv run`/`npm` dupliquées), et README/CONTRIBUTING référencent `make test`, `make fix`, `make test-frontend`, `make ci`.
 
 **Critères d'acceptation.** README, CONTRIBUTING et CI utilisent ou référencent les mêmes commandes canoniques.
 
 ## TREE-005 — Vérifier les frontières et imports internes
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P2**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/116
 
-**Actions.** Examiner les imports de symboles privés entre modules, notamment `_today_jst`, `_EVENTS_HEADERS` et les alias `_make_id`; décider lesquels doivent devenir API interne explicite ; éviter une refonte sans test de bénéfice.
+**Résultat.** Périmètre limité aux 3 symboles cités pour éviter une refonte disproportionnée : `_today_jst` (db/migrations.py) → `today_jst`, `_EVENTS_HEADERS` (db/schema.py) → `EVENTS_HEADERS`, et suppression de l'alias privé `_make_id` (db/store.py + 3 scrapers) au profit d'un import direct de `models.identity.make_event_id`, déjà public. La fonction homonyme et indépendante `scrapers/tokyo_cheapo.py::_today_jst` reste privée (usage strictement intra-module). Découvertes annexes (duplication de `_JST`, imports `_EVENTS_DDL`/`_SCRAPE_JOBS_*` internes au package `db`, accès de tests à des méthodes privées) volontairement laissées de côté.
 
 **Critères d'acceptation.** Les imports privés inter-modules sont supprimés ou justifiés ; les contrats internes importants sont testés.
 
 ## TREE-006 — Examiner les fichiers et dépendances devenus inutiles
 
-- **Statut : À faire**
+- **Statut : Terminé**
 - **Priorité : P3**
-- **Suivi :** à renseigner
+- **Suivi :** https://github.com/cochetquentin/EventMaps/pull/118
 
-**Actions.** Rechercher imports, fichiers de package vides, tests orphelins, dépendances runtime/dev inutilisées et exclusions obsolètes ; traiter chaque suppression dans une PR petite avec CI verte.
+**Résultat.** Audit complet (imports morts via `ruff check --select F401,F811,F841`, `__init__.py`, dépendances `pyproject.toml`/`package.json`, tests orphelins, `.gitignore`) : **aucun candidat à supprimer avec preuve d'absence d'usage** — cohérent avec le nettoyage `CLEAN-001` déjà effectué. Seule action : commentaire ajouté dans `pyproject.toml` près de `httpx2` (dépendance transitive de `starlette.testclient`, jamais importée par son nom) pour éviter une suppression erronée lors d'un futur audit.
 
 **Critères d'acceptation.** Toute suppression est accompagnée d'une preuve d'absence d'usage et n'altère pas les points d'entrée supportés.
