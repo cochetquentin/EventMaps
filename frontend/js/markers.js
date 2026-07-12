@@ -83,7 +83,17 @@ export function renderMarkers() {
 
   buildEventList(visible);
 
-  // Rouvrir la bulle préservée : même marqueur, même position → la bulle tient
-  // déjà dans le cadre, donc pas de nouvel autoPan ni de boucle de refetch.
-  if (reopenId && markerMap.has(reopenId)) markerMap.get(reopenId).openPopup();
+  // Rouvrir la bulle préservée, mais SANS autoPan : c'est une simple restauration
+  // après re-render, la carte ne doit pas se recentrer dessus (sinon elle « snap »
+  // sur la bulle à chaque déplacement de l'utilisateur). Seule l'ouverture initiale
+  // au clic recadre. On désactive donc temporairement l'autoPan de la bulle.
+  if (reopenId && markerMap.has(reopenId)) {
+    const popup = markerMap.get(reopenId).getPopup();
+    if (popup) {
+      const autoPan = popup.options.autoPan;
+      popup.options.autoPan = false;
+      markerMap.get(reopenId).openPopup();
+      popup.options.autoPan = autoPan;
+    }
+  }
 }
