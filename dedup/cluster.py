@@ -6,7 +6,7 @@ puis choix d'un représentant déterministe par cluster (le ``canonical_id``).
 
 from __future__ import annotations
 
-from dedup.matching import is_duplicate
+from dedup.matching import is_duplicate, same_source_same_event
 from dedup.normalize import event_coords, event_venue
 from models.event import Event
 
@@ -67,7 +67,9 @@ def assign_canonical_ids(events: list[Event]) -> dict[str, str]:
 
     for i in range(len(items)):
         for j in range(i + 1, len(items)):
-            if is_duplicate(items[i], items[j]):
+            # Deux règles complémentaires : identité intra-source (même page
+            # événement, dates ignorées) OU similarité floue cross-source.
+            if same_source_same_event(items[i], items[j]) or is_duplicate(items[i], items[j]):
                 uf.union(items[i].id, items[j].id)
 
     # Regroupe par racine, puis élit le représentant de chaque cluster.

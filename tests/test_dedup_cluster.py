@@ -93,6 +93,88 @@ def test_duplicate_ids_deduplicated():
     assert mapping == {"fixedid": "fixedid"}
 
 
+def test_intra_source_dated_variants_collapse_to_one():
+    # Cas réel Tokyo Cheapo : un même événement publié en plusieurs pages datées
+    # (même slug), dates disjointes → un seul cluster malgré les dates.
+    base = "https://tokyocheapo.com/events/geisha-ozashiki-odori-asakusa"
+    loc = "Asakusa Culture and Tourism Center"
+    variants = [
+        mk(
+            "tc",
+            id="v0",
+            title="Free Geisha Dances (Ozashiki Odori) in Asakusa",
+            url=f"{base}/",
+            start_date=date(2026, 4, 11),
+            end_date=date(2026, 7, 11),
+            latitude=35.710689,
+            longitude=139.79659,
+            attributes={"location_name": loc},
+        ),
+        mk(
+            "tc",
+            id="v1",
+            title="Free Geisha Dances (Ozashiki Odori) in Asakusa",
+            url=f"{base}/20260606/",
+            start_date=date(2026, 6, 6),
+            end_date=date(2026, 9, 5),
+            latitude=35.710689,
+            longitude=139.79659,
+            attributes={"location_name": loc},
+        ),
+        mk(
+            "tc",
+            id="v2",
+            title="Geisha Dances (Ozashiki Odori) in Asakusa",
+            url=f"{base}/20260711/",
+            start_date=date(2026, 7, 11),
+            end_date=date(2026, 7, 11),
+            latitude=35.710689,
+            longitude=139.79659,
+            attributes={"location_name": loc},
+        ),
+    ]
+    # Un événement voisin au MÊME lieu mais slug différent → doit rester séparé.
+    other = mk(
+        "tc",
+        id="other",
+        title="Asakusa Geisha Performance",
+        url="https://tokyocheapo.com/events/asakusa-geisha-performance/20260613/",
+        start_date=date(2026, 6, 13),
+        latitude=35.710689,
+        longitude=139.79659,
+        attributes={"location_name": loc},
+    )
+    mapping = assign_canonical_ids([*variants, other])
+    assert mapping["v0"] == mapping["v1"] == mapping["v2"]
+    assert mapping["other"] == "other"
+    assert mapping["other"] != mapping["v0"]
+
+
+def test_intra_source_multilocation_stays_separate():
+    # Même URL de base, deux lieux distincts (multi-lieux) → deux clusters.
+    base = "https://tokyocheapo.com/events/some-festival"
+    a = mk(
+        "tc",
+        id="locA",
+        title="Some Festival",
+        url=f"{base}/",
+        latitude=35.10,
+        longitude=139.10,
+        attributes={"location_name": "Place A"},
+    )
+    b = mk(
+        "tc",
+        id="locB",
+        title="Some Festival",
+        url=f"{base}/",
+        latitude=36.90,
+        longitude=140.90,
+        attributes={"location_name": "Place B"},
+    )
+    mapping = assign_canonical_ids([a, b])
+    assert mapping["locA"] != mapping["locB"]
+
+
 def test_representative_prefers_event_with_coords():
     # Dans un cluster, on garde comme canonique celui qui a des coordonnées
     # (pour conserver un point sur la carte).

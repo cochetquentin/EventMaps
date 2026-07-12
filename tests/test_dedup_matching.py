@@ -12,6 +12,7 @@ from dedup.matching import (
     VENUE_MIN_RATIO,
     classify_pair,
     is_duplicate,
+    same_source_same_event,
 )
 from models.event import Event
 from models.identity import make_event_id
@@ -153,6 +154,84 @@ def test_not_duplicate_close_geo_but_empty_titles():
     verdict = classify_pair(a, b)
     assert verdict.title_score == 0.0
     assert verdict.is_duplicate is False
+
+
+# --- same_source_same_event (identité intra-source par URL) ---
+
+_TC_BASE = "https://tokyocheapo.com/events/geisha-ozashiki-odori-asakusa/"
+_TC_DATED = "https://tokyocheapo.com/events/geisha-ozashiki-odori-asakusa/20260613/"
+_ASAKUSA = "Asakusa Culture and Tourism Center"
+
+
+def test_same_source_same_event_merges_dated_variants_despite_disjoint_dates():
+    # Le cas réel : même page événement, deux occurrences d'un jour DISJOINTES.
+    url_0704 = "https://tokyocheapo.com/events/geisha-ozashiki-odori-asakusa/20260704/"
+    url_0711 = "https://tokyocheapo.com/events/geisha-ozashiki-odori-asakusa/20260711/"
+    a = mk(
+        "tc",
+        title="Geisha Dances (Ozashiki Odori) in Asakusa",
+        url=url_0704,
+        start_date=date(2026, 7, 4),
+        end_date=date(2026, 7, 4),
+        latitude=35.710689,
+        longitude=139.79659,
+        attributes={"location_name": _ASAKUSA},
+    )
+    b = mk(
+        "tc",
+        title="Geisha Dances (Ozashiki Odori) in Asakusa",
+        url=url_0711,
+        start_date=date(2026, 7, 11),
+        end_date=date(2026, 7, 11),
+        latitude=35.710689,
+        longitude=139.79659,
+        attributes={"location_name": _ASAKUSA},
+    )
+    # La règle floue les rejette (dates disjointes)...
+    assert is_duplicate(a, b) is False
+    # ...mais l'identité intra-source les fusionne.
+    assert same_source_same_event(a, b) is True
+
+
+def test_same_source_same_event_requires_same_source():
+    a = mk("tc", url=_TC_BASE, latitude=35.71, longitude=139.79)
+    b = mk("hanabi", url=_TC_BASE, latitude=35.71, longitude=139.79)
+    assert same_source_same_event(a, b) is False
+
+
+def test_same_source_same_event_requires_same_canonical_url():
+    a = mk("tc", url="https://tokyocheapo.com/events/slug-a/", latitude=35.71, longitude=139.79)
+    b = mk("tc", url="https://tokyocheapo.com/events/slug-b/", latitude=35.71, longitude=139.79)
+    assert same_source_same_event(a, b) is False
+
+
+def test_same_source_same_event_requires_same_location():
+    # Même URL de base mais lieux distincts (multi-lieux) → conservés séparés.
+    a = mk(
+        "tc",
+        url=_TC_BASE,
+        latitude=35.10,
+        longitude=139.10,
+        attributes={"location_name": "Venue A"},
+    )
+    b = mk(
+        "tc",
+        url=_TC_DATED,
+        latitude=36.90,
+        longitude=140.90,
+        attributes={"location_name": "Venue B"},
+    )
+    assert same_source_same_event(a, b) is False
+
+
+def test_same_source_same_event_confirmed_by_venue_without_coords():
+    a = mk(
+        "tc", url=_TC_BASE, latitude=None, longitude=None, attributes={"location_name": _ASAKUSA}
+    )
+    b = mk(
+        "tc", url=_TC_DATED, latitude=None, longitude=None, attributes={"location_name": _ASAKUSA}
+    )
+    assert same_source_same_event(a, b) is True
 
 
 # --- Traçabilité du verdict ---

@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from rapidfuzz import fuzz
 
 from dedup.normalize import (
+    canonical_url,
     dates_compatible,
     event_coords,
     event_venue,
@@ -77,8 +78,42 @@ def _venue_similarity(a: Event, b: Event) -> float | None:
     return float(fuzz.token_set_ratio(norm_a, norm_b))
 
 
+def _location_confirmed(a: Event, b: Event) -> tuple[bool, float | None, float | None]:
+    """Confirmer que deux événements sont au même endroit.
+
+    Renvoie ``(confirmé, distance_km, score_lieu)``. Confirmé si les coordonnées
+    sont proches (canal géo) OU si les noms de lieu concordent (canal textuel,
+    indispensable pour Time Out Tokyo qui n'a pas de GPS)."""
+    geo_km = _geo_distance_km(a, b)
+    geo_ok = geo_km is not None and geo_km <= GEO_MAX_KM
+    venue_score = _venue_similarity(a, b)
+    venue_ok = venue_score is not None and venue_score >= VENUE_MIN_RATIO
+    return (geo_ok or venue_ok, geo_km, venue_score)
+
+
+def same_source_same_event(a: Event, b: Event) -> bool:
+    """Doublon *intra-source* à haute confiance : même site, même page événement.
+
+    Cas typique : Tokyo Cheapo publie une page par date d'occurrence
+    (``/events/{slug}/{YYYYMMDD}/``) d'un même événement. Ces variantes ont des
+    URLs — donc des IDs — différents mais désignent le même événement.
+
+    On fusionne si : même ``source`` ET même URL canonique (suffixe daté retiré)
+    ET même lieu. Contrairement à :func:`classify_pair`, la date n'est PAS
+    requise : l'identité de l'URL fait foi. Le garde-fou "même lieu" préserve les
+    événements multi-lieux (même URL mais coordonnées distinctes → non fusionnés).
+    """
+    if a.source != b.source:
+        return False
+    url_a = canonical_url(a)
+    if not url_a or url_a != canonical_url(b):
+        return False
+    confirmed, _, _ = _location_confirmed(a, b)
+    return confirmed
+
+
 def classify_pair(a: Event, b: Event) -> PairVerdict:
-    """Évaluer si ``a`` et ``b`` sont des doublons et renvoyer le détail."""
+    """Évaluer si ``a`` et ``b`` sont des doublons (règle floue cross-source)."""
     reasons: list[str] = []
 
     date_ok = dates_compatible(a, b)
@@ -90,19 +125,14 @@ def classify_pair(a: Event, b: Event) -> PairVerdict:
     if not title_ok:
         reasons.append(f"titres trop différents ({title_score:.0f} < {TITLE_MIN_RATIO:.0f})")
 
-    geo_km = _geo_distance_km(a, b)
-    geo_ok = geo_km is not None and geo_km <= GEO_MAX_KM
-
-    venue_score = _venue_similarity(a, b)
-    venue_ok = venue_score is not None and venue_score >= VENUE_MIN_RATIO
-
-    location_confirmed = geo_ok or venue_ok
+    location_confirmed, geo_km, venue_score = _location_confirmed(a, b)
     if not location_confirmed:
         reasons.append("lieu non confirmé (ni géo proche, ni nom de lieu concordant)")
 
     is_dup = date_ok and title_ok and location_confirmed
     if is_dup:
-        channel = "géo" if geo_ok else "lieu"
+        geo_confirms = geo_km is not None and geo_km <= GEO_MAX_KM
+        channel = "géo" if geo_confirms else "lieu"
         reasons.append(f"doublon confirmé (titre {title_score:.0f}, {channel})")
 
     return PairVerdict(

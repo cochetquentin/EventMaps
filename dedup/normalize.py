@@ -15,6 +15,9 @@ from models.event import Event
 
 _PUNCT_RE = re.compile(r"[^\w\s]", flags=re.UNICODE)
 _WS_RE = re.compile(r"\s+", flags=re.UNICODE)
+# Suffixe d'occurrence daté /YYYYMMDD(/) — convention Tokyo Cheapo qui publie
+# une page distincte par date pour un même événement (même slug).
+_DATE_SUFFIX_RE = re.compile(r"/\d{8}/?$")
 
 
 def normalize_text(text: str | None) -> str:
@@ -35,6 +38,22 @@ def normalize_text(text: str | None) -> str:
     without_accents = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
     no_punct = _PUNCT_RE.sub(" ", without_accents)
     return _WS_RE.sub(" ", no_punct).strip()
+
+
+def canonical_url(event: Event) -> str:
+    """Renvoyer l'URL de l'événement débarrassée de son suffixe d'occurrence daté.
+
+    Deux pages ``/events/{slug}/`` et ``/events/{slug}/20260613/`` du même site
+    désignent le même événement (dates d'occurrence différentes) → même URL
+    canonique. Le slash final est normalisé pour que la base et une variante
+    datée coïncident.
+
+    >>> # .../geisha-ozashiki-odori-asakusa/  et  .../geisha-.../20260613/
+    >>> # donnent tous deux  .../geisha-ozashiki-odori-asakusa
+    """
+    url = (event.url or "").strip()
+    url = _DATE_SUFFIX_RE.sub("", url)
+    return url.rstrip("/")
 
 
 def event_venue(event: Event) -> str | None:

@@ -5,6 +5,7 @@ from datetime import UTC, date, datetime
 import pytest
 
 from dedup.normalize import (
+    canonical_url,
     dates_compatible,
     event_coords,
     event_date_range,
@@ -67,6 +68,48 @@ def test_normalize_text_preserves_japanese():
 def test_normalize_text_idempotent():
     once = normalize_text("Fête—Été 2026!")
     assert normalize_text(once) == once
+
+
+# --- canonical_url ---
+
+
+@pytest.mark.parametrize(
+    "url,expected",
+    [
+        # Base et variante datée convergent vers la même URL canonique.
+        (
+            "https://tokyocheapo.com/events/geisha-ozashiki-odori-asakusa/",
+            "https://tokyocheapo.com/events/geisha-ozashiki-odori-asakusa",
+        ),
+        (
+            "https://tokyocheapo.com/events/geisha-ozashiki-odori-asakusa/20260613/",
+            "https://tokyocheapo.com/events/geisha-ozashiki-odori-asakusa",
+        ),
+        (
+            "https://tokyocheapo.com/events/geisha-ozashiki-odori-asakusa/20260704",
+            "https://tokyocheapo.com/events/geisha-ozashiki-odori-asakusa",
+        ),
+        # Slug différent → URL canonique différente.
+        (
+            "https://tokyocheapo.com/events/azuma-odori/",
+            "https://tokyocheapo.com/events/azuma-odori",
+        ),
+    ],
+)
+def test_canonical_url_strips_date_suffix(url, expected):
+    assert canonical_url(mk("tc", url=url)) == expected
+
+
+def test_canonical_url_leaves_non_date_paths_untouched():
+    # Un segment final qui n'est pas 8 chiffres n'est pas retiré (ex. Hanabi).
+    e = mk("hanabi", url="https://hanabi.walkerplus.com/detail/ar0300e001/")
+    assert canonical_url(e) == "https://hanabi.walkerplus.com/detail/ar0300e001"
+
+
+def test_canonical_url_different_slugs_do_not_collide():
+    a = mk("tc", url="https://tokyocheapo.com/events/geisha-ozashiki-odori-asakusa/20260613/")
+    b = mk("tc", url="https://tokyocheapo.com/events/asakusa-geisha-performance/20260613/")
+    assert canonical_url(a) != canonical_url(b)
 
 
 # --- event_venue ---
