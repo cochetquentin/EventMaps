@@ -2,6 +2,9 @@
 
 import warnings
 
+import pytest
+from pydantic import ValidationError
+
 from config import Settings
 
 # ---------------------------------------------------------------------------
@@ -82,6 +85,53 @@ def test_warning_when_mixed_origins_include_wildcard():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         Settings(allowed_origins=["*", "https://a.com"], scrape_token="secret", _env_file=None)
+    assert any("EVENTMAPS_ALLOWED_ORIGINS" in str(w.message) for w in caught)
+
+
+# ---------------------------------------------------------------------------
+# LEGACY-003 — EVENTMAPS_ENV et blocage CORS wildcard en production
+# ---------------------------------------------------------------------------
+
+
+def test_env_default_is_development(monkeypatch):
+    monkeypatch.delenv("EVENTMAPS_ENV", raising=False)
+    s = Settings(_env_file=None)
+    assert s.env == "development"
+
+
+def test_production_with_wildcard_origins_raises():
+    with pytest.raises(RuntimeError, match="EVENTMAPS_ENV=production"):
+        Settings(env="production", allowed_origins=["*"], _env_file=None)
+
+
+def test_production_with_wildcard_in_mixed_origins_raises():
+    with pytest.raises(RuntimeError, match="EVENTMAPS_ENV=production"):
+        Settings(env="production", allowed_origins=["*", "https://a.com"], _env_file=None)
+
+
+def test_production_with_explicit_origins_does_not_raise():
+    s = Settings(env="production", allowed_origins=["https://a.com"], _env_file=None)
+    assert s.env == "production"
+
+
+def test_production_env_var_with_wildcard_raises(monkeypatch):
+    monkeypatch.setenv("EVENTMAPS_ENV", "production")
+    monkeypatch.delenv("EVENTMAPS_ALLOWED_ORIGINS", raising=False)
+    with pytest.raises(RuntimeError, match="EVENTMAPS_ENV=production"):
+        Settings(_env_file=None)
+
+
+def test_invalid_env_value_rejected():
+    with pytest.raises(ValidationError):
+        Settings(env="staging", _env_file=None)
+
+
+def test_development_with_wildcard_and_token_still_warns():
+    """Le warning existant (dev + token + wildcard) reste inchangé — seule la
+    production bloque désormais le démarrage."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        Settings(env="development", allowed_origins=["*"], scrape_token="secret", _env_file=None)
     assert any("EVENTMAPS_ALLOWED_ORIGINS" in str(w.message) for w in caught)
 
 

@@ -1,5 +1,6 @@
 import json
 import warnings
+from typing import Literal
 
 from pydantic import field_validator
 from pydantic_settings import (
@@ -41,6 +42,7 @@ class _OriginsDotEnvSource(DotEnvSettingsSource):
 
 
 class Settings(BaseSettings):
+    env: Literal["development", "production"] = "development"
     db_path: str = "data/events.db"
     port: int = 8000
     allowed_origins: list[str] = ["*"]
@@ -73,7 +75,14 @@ class Settings(BaseSettings):
         return v
 
     def model_post_init(self, __context) -> None:
-        if "*" in self.allowed_origins and self.scrape_token is not None:
+        if "*" not in self.allowed_origins:
+            return
+        if self.env == "production":
+            raise RuntimeError(
+                "CORS wildcard ('*') is not allowed when EVENTMAPS_ENV=production. "
+                "Set EVENTMAPS_ALLOWED_ORIGINS to explicit origins."
+            )
+        if self.scrape_token is not None:
             warnings.warn(
                 "CORS wildcard ('*') is active while EVENTMAPS_SCRAPE_TOKEN is set. "
                 "Set EVENTMAPS_ALLOWED_ORIGINS to explicit origins in production.",

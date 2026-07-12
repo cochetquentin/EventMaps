@@ -80,7 +80,7 @@ Lorsqu'un constat classé terminé s'avère encore reproductible, il doit être 
 
 ## LEGACY-003 — Rendre la configuration CORS sûre en production
 
-- **Statut : À faire**
+- **Statut : Terminé par cette roadmap**
 - **Priorité : P1**
 - **Origine :** SEC-004
 - **Suivi :** https://github.com/cochetquentin/EventMaps/issues/73
@@ -88,6 +88,8 @@ Lorsqu'un constat classé terminé s'avère encore reproductible, il doit être 
 **Problème.** Le wildcard reste la valeur par défaut ; un warning existe avec un token, mais la posture de production dépend encore d'une configuration manuelle facile à oublier.
 
 **Critères d'acceptation.** Le comportement attendu en développement et production est explicite, testé et documenté ; une configuration sensible ne peut pas démarrer silencieusement avec un wildcard non souhaité.
+
+**Résolution.** Ajout d'une variable explicite `EVENTMAPS_ENV` (`development` par défaut, `production` en option — toute autre valeur est rejetée au démarrage). Quand `EVENTMAPS_ENV=production` et que `EVENTMAPS_ALLOWED_ORIGINS` contient encore le wildcard `*`, l'application refuse de démarrer (`RuntimeError`) au lieu d'un simple avertissement. Le comportement précédent (warning en développement quand un `EVENTMAPS_SCRAPE_TOKEN` est défini avec un wildcard) est conservé à l'identique. Documenté dans `.env.example` et `README.md`.
 
 ## LEGACY-004 — Réduire le couplage entre rendu HTML et données
 
