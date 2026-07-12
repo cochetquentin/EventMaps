@@ -198,6 +198,7 @@ Variables d'environnement préfixées `EVENTMAPS_` (fichier `.env` ou variables 
 
 | Variable | Défaut | Description |
 |---|---|---|
+| `EVENTMAPS_ENV` | `development` | `development` \| `production` — en production, un `EVENTMAPS_ALLOWED_ORIGINS` resté au wildcard (`*`) empêche le démarrage |
 | `EVENTMAPS_DB_PATH` | `data/events.db` | Chemin vers la base SQLite |
 | `EVENTMAPS_PORT` | `8000` | Port d'écoute uvicorn |
 | `EVENTMAPS_LOG_LEVEL` | `INFO` | Niveau de log (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
@@ -217,12 +218,13 @@ Variables d'environnement préfixées `EVENTMAPS_` (fichier `.env` ou variables 
 
 **Dev local :** copier `.env.example` en `.env` à la racine (chargé automatiquement).
 
-**Production :** restreindre `EVENTMAPS_ALLOWED_ORIGINS` à l'origine réelle du frontend :
+**Production :** définir `EVENTMAPS_ENV=production` et restreindre `EVENTMAPS_ALLOWED_ORIGINS` à l'origine réelle du frontend :
 ```
+EVENTMAPS_ENV=production
 EVENTMAPS_ALLOWED_ORIGINS=https://monapp.example.com
 EVENTMAPS_SCRAPE_TOKEN=un-token-secret-fort
 ```
-Si `EVENTMAPS_SCRAPE_TOKEN` est défini mais `EVENTMAPS_ALLOWED_ORIGINS` reste `*`, l'application émet un avertissement au démarrage.
+Si `EVENTMAPS_ENV=production` et `EVENTMAPS_ALLOWED_ORIGINS` reste au wildcard (`*`), l'application **refuse de démarrer** (`RuntimeError`). En développement (valeur par défaut), la même situation combinée à un `EVENTMAPS_SCRAPE_TOKEN` défini n'émet qu'un avertissement.
 
 ## Docker
 
@@ -230,8 +232,9 @@ Si `EVENTMAPS_SCRAPE_TOKEN` est défini mais `EVENTMAPS_ALLOWED_ORIGINS` reste `
 # Build
 docker build -t eventmaps .
 
-# Run (avec token de scraping)
+# Run (production, avec token de scraping)
 docker run -p 8000:8000 \
+  -e EVENTMAPS_ENV=production \
   -e EVENTMAPS_SCRAPE_TOKEN=mon-token \
   -e EVENTMAPS_ALLOWED_ORIGINS=https://monapp.example.com \
   -v $(pwd)/data:/app/data \
