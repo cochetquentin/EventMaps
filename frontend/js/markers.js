@@ -3,7 +3,6 @@ import { allEvents, showOnlyFavorites, clusterGroup, markerMap } from './state.j
 import { TC_EXCLUDED_CATS } from './config.js';
 import { getFavorites, getIcon } from './favorites.js';
 import { buildPopup } from './popups.js';
-import { openDrawer } from './drawer.js';
 import { getActivePills } from './filters.js';
 import { buildEventList } from './events-list.js';
 
@@ -46,7 +45,6 @@ export function renderMarkers() {
       const icon   = getIcon(ev, favs.has(ev.id));
       const marker = L.marker([ev.latitude, ev.longitude], { icon });
       marker.bindPopup(buildPopup(ev), { maxWidth: 300, minWidth: 280 });
-      marker.on('click', () => openDrawer(ev));
       clusterGroup.addLayer(marker);
       markerMap.set(ev.id, marker);
     }

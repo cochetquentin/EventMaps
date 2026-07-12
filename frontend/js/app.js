@@ -13,7 +13,7 @@ import {
   setFetchDebounceTimer,
 } from './api.js';
 import { setupGeolocation, cancelGeolocation } from './geolocation.js';
-import { initDrawer } from './drawer.js';
+import { initDrawer, openDrawer } from './drawer.js';
 import { updateURL, restoreFromURL } from './share.js';
 import { downloadICS } from './ics-export.js';
 
@@ -73,6 +73,18 @@ map.on('popupopen', (e) => {
 document.addEventListener('popup-fav-rebind', (e) => {
   const btn = e.detail.marker.getPopup().getElement().querySelector('[data-fav-id]');
   if (btn) attachFavHandler(btn);
+});
+
+// ── Popup « Plus d'infos » → drawer ────────────────────────────────────────
+// Écoute déléguée : survit au re-render du popup lors d'un toggle favori.
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.pop-info-btn');
+  if (!btn) return;
+  const ev = allEvents.find(ev => ev.id === btn.dataset.infoId);
+  if (ev) {
+    map.closePopup();
+    openDrawer(ev);
+  }
 });
 
 // ── Date presets ──────────────────────────────────────────────────────────
