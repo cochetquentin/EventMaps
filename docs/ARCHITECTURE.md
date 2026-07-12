@@ -238,14 +238,14 @@ L'algorithme est stable et ne doit **jamais être modifié** : les IDs persisté
 
 Le package **`dedup/`** (pur, sans I/O) rapproche le *même* événement listé sur plusieurs sites. Il n'écrit rien et ne supprime rien : la couche DB matérialise le résultat dans la colonne `events.canonical_id` (représentant du cluster ; `NULL` = non encore dédupliqué, traité comme canonique).
 
-Deux règles complémentaires décident si deux événements sont doublons (`dedup/matching.py`) :
+Un pin sur la carte = **un événement à un lieu donné**. Le clustering (`dedup/cluster.py`) applique **deux régimes disjoints** selon que les deux événements viennent de la même source ou non (`dedup/matching.py`) :
 
-**(a) Identité intra-source** — `same_source_same_event`. Même `source` ET même **URL canonique** (le suffixe d'occurrence daté `/YYYYMMDD/` est retiré par `canonical_url`) ET même lieu → doublon, **peu importe la date**. C'est le cas Tokyo Cheapo qui publie une page par date d'occurrence (`/events/{slug}/{YYYYMMDD}/`) : URLs — donc IDs — différents mais même événement. Le garde-fou "même lieu" préserve les événements multi-lieux (même URL, coordonnées distinctes → non fusionnés). L'identité de l'URL fait foi, donc la date n'est pas exigée ici.
+**(a) Même source → identité par (URL + nom de lieu)** — `same_source_same_event`. Fusion si même `source` ET même **URL canonique** (le suffixe d'occurrence daté `/YYYYMMDD/` est retiré par `canonical_url`) ET même **nom de lieu** (`location_name`/`venue` normalisé, égalité exacte). **La date n'est pas exigée** (l'URL fait foi) : c'est le cas Tokyo Cheapo qui publie une page par date d'occurrence, et Hanabi qui éclate un feu multi-nuits en une ligne par jour. Le lieu se juge sur le **nom**, pas sur la distance : au sein d'une source, le `location_name` est l'identité que le scraper utilise pour distinguer les rangs, donc un événement multi-lieux (même URL, plusieurs musées) reste **un pin par lieu**, même si deux venues sont à quelques centaines de mètres.
 
-**(b) Similarité floue cross-source** — `classify_pair` (logique **ET** conservatrice, pensée pour zéro faux positif). Deux événements de sources différentes sont doublons **seulement si** :
+**(b) Sources différentes → similarité floue** — `classify_pair` (logique **ET** conservatrice, pensée pour zéro faux positif). Doublon **seulement si** :
 1. leurs **plages de dates se chevauchent** (un même titre à deux dates disjointes = événement récurrent, jamais fusionné) ;
 2. leurs **titres normalisés** ont un `rapidfuzz.token_set_ratio ≥ 90` (`TITLE_MIN_RATIO`) ;
-3. le **lieu est confirmé** par au moins un canal : coordonnées présentes des deux côtés et distance `≤ 0.75 km` (`GEO_MAX_KM`), **ou** noms de lieu similaires à `≥ 88` (`VENUE_MIN_RATIO`) — ce second canal couvre Time Out Tokyo qui n'a jamais de GPS.
+3. le **lieu est confirmé** : **si les coordonnées sont présentes des deux côtés, la distance fait autorité** (`≤ 0.75 km`, `GEO_MAX_KM`) et les noms de lieu ne sont pas consultés — deux lieux éloignés aux noms proches ne fusionnent pas. Sinon (coordonnées manquantes, cas Time Out Tokyo) on se rabat sur la similarité des noms de lieu (`≥ 88`, `VENUE_MIN_RATIO`).
 
 Toute donnée manquante fait échouer sa porte → pas de fusion. `classify_pair` court-circuite dès que les dates ne se chevauchent pas (la partie fuzzy coûteuse n'est évaluée que sur des paires plausibles).
 

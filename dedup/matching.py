@@ -62,14 +62,6 @@ def _title_similarity(a: Event, b: Event) -> float:
     return float(fuzz.token_set_ratio(norm_a, norm_b))
 
 
-def _geo_distance_km(a: Event, b: Event) -> float | None:
-    coords_a = event_coords(a)
-    coords_b = event_coords(b)
-    if coords_a is None or coords_b is None:
-        return None
-    return haversine_km(coords_a[0], coords_a[1], coords_b[0], coords_b[1])
-
-
 def _venue_similarity(a: Event, b: Event) -> float | None:
     norm_a = normalize_text(event_venue(a))
     norm_b = normalize_text(event_venue(b))
@@ -81,35 +73,55 @@ def _venue_similarity(a: Event, b: Event) -> float | None:
 def _location_confirmed(a: Event, b: Event) -> tuple[bool, float | None, float | None]:
     """Confirmer que deux événements sont au même endroit.
 
-    Renvoie ``(confirmé, distance_km, score_lieu)``. Confirmé si les coordonnées
-    sont proches (canal géo) OU si les noms de lieu concordent (canal textuel,
-    indispensable pour Time Out Tokyo qui n'a pas de GPS)."""
-    geo_km = _geo_distance_km(a, b)
-    geo_ok = geo_km is not None and geo_km <= GEO_MAX_KM
+    Renvoie ``(confirmé, distance_km, score_lieu)``.
+
+    **La géo fait autorité dès qu'elle est disponible des deux côtés** : deux
+    événements sont au même endroit ssi leur distance est ``<= GEO_MAX_KM``. On
+    ne consulte alors PAS les noms de lieu — sinon des lieux physiquement
+    éloignés mais aux noms proches (ex. plusieurs musées « Tokyo Metropolitan …
+    Art Museum » distants de 10 km) seraient fusionnés à tort.
+
+    Le canal textuel (similarité des noms de lieu) ne sert qu'en dernier recours,
+    quand il manque les coordonnées d'au moins un côté (cas Time Out Tokyo)."""
+    coords_a = event_coords(a)
+    coords_b = event_coords(b)
+    if coords_a is not None and coords_b is not None:
+        geo_km = haversine_km(coords_a[0], coords_a[1], coords_b[0], coords_b[1])
+        return (geo_km <= GEO_MAX_KM, geo_km, None)
     venue_score = _venue_similarity(a, b)
     venue_ok = venue_score is not None and venue_score >= VENUE_MIN_RATIO
-    return (geo_ok or venue_ok, geo_km, venue_score)
+    return (venue_ok, None, venue_score)
 
 
 def same_source_same_event(a: Event, b: Event) -> bool:
-    """Doublon *intra-source* à haute confiance : même site, même page événement.
+    """Doublon *intra-source* à haute confiance : même site, même page, même lieu.
 
     Cas typique : Tokyo Cheapo publie une page par date d'occurrence
     (``/events/{slug}/{YYYYMMDD}/``) d'un même événement. Ces variantes ont des
     URLs — donc des IDs — différents mais désignent le même événement.
 
     On fusionne si : même ``source`` ET même URL canonique (suffixe daté retiré)
-    ET même lieu. Contrairement à :func:`classify_pair`, la date n'est PAS
-    requise : l'identité de l'URL fait foi. Le garde-fou "même lieu" préserve les
-    événements multi-lieux (même URL mais coordonnées distinctes → non fusionnés).
-    """
+    ET **même nom de lieu**. Contrairement à :func:`classify_pair`, la date n'est
+    PAS requise (l'URL fait foi), et le lieu se juge sur le **nom** et non sur la
+    distance : au sein d'une source, le ``location_name`` est l'identité que le
+    scraper utilise pour distinguer les rangs. Deux venues distinctes mais
+    proches (événement multi-lieux) ont des noms différents → pins séparés, même
+    à quelques centaines de mètres."""
     if a.source != b.source:
         return False
     url_a = canonical_url(a)
     if not url_a or url_a != canonical_url(b):
         return False
-    confirmed, _, _ = _location_confirmed(a, b)
-    return confirmed
+    venue_a = normalize_text(event_venue(a))
+    venue_b = normalize_text(event_venue(b))
+    if venue_a and venue_b:
+        return venue_a == venue_b
+    # Aucun nom de lieu exploitable : se rabattre sur des coordonnées identiques.
+    coords_a = event_coords(a)
+    coords_b = event_coords(b)
+    if coords_a is not None and coords_b is not None:
+        return haversine_km(coords_a[0], coords_a[1], coords_b[0], coords_b[1]) <= GEO_MAX_KM
+    return False
 
 
 def classify_pair(a: Event, b: Event) -> PairVerdict:

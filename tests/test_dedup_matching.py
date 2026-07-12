@@ -205,6 +205,55 @@ def test_same_source_same_event_requires_same_canonical_url():
     assert same_source_same_event(a, b) is False
 
 
+def test_same_source_same_event_different_museums_not_merged():
+    # Cas réel "Summer Night Museums" : même URL, mêmes dates, noms de lieu
+    # PROCHES ("Tokyo Metropolitan ... Art Museum") mais lieux à ~10 km.
+    # La géo doit primer sur la ressemblance des noms → NON fusionnés.
+    url = "https://tokyocheapo.com/events/summer-night-museums/"
+    a = mk(
+        "tc",
+        title="Summer Night Museums",
+        url=url,
+        latitude=35.7171959,
+        longitude=139.7727737,
+        attributes={"location_name": "Tokyo Metropolitan Art Museum"},
+    )
+    b = mk(
+        "tc",
+        title="Summer Night Museums",
+        url=url,
+        latitude=35.6368586,
+        longitude=139.7171918,
+        attributes={"location_name": "Tokyo Metropolitan Teien Art Museum"},
+    )
+    assert same_source_same_event(a, b) is False
+    # La règle floue non plus ne doit pas les fusionner (géo autoritaire).
+    assert is_duplicate(a, b) is False
+
+
+def test_geo_authoritative_over_similar_venue_names():
+    # Noms de lieu quasi identiques mais coords éloignées → lieu NON confirmé.
+    a = mk(
+        "tc",
+        title="X",
+        latitude=35.70,
+        longitude=139.70,
+        attributes={"location_name": "Tokyo Metropolitan Art Museum"},
+    )
+    b = mk(
+        "tc",
+        title="X",
+        latitude=35.60,
+        longitude=139.75,
+        attributes={"location_name": "Tokyo Metropolitan Teien Art Museum"},
+    )
+    verdict = classify_pair(a, b)
+    assert verdict.location_confirmed is False
+    # Coords présentes des deux côtés → le canal nom de lieu n'est pas consulté.
+    assert verdict.venue_score is None
+    assert verdict.geo_km is not None and verdict.geo_km > GEO_MAX_KM
+
+
 def test_same_source_same_event_requires_same_location():
     # Même URL de base mais lieux distincts (multi-lieux) → conservés séparés.
     a = mk(

@@ -150,6 +150,35 @@ def test_intra_source_dated_variants_collapse_to_one():
     assert mapping["other"] != mapping["v0"]
 
 
+def test_intra_source_multivenue_museums_stay_separate():
+    # Cas réel "Summer Night Museums" : même URL, mêmes dates, 4 musées distincts.
+    # Deux d'entre eux sont à ~0,6 km (Teien / Photographic) : la géo seule les
+    # fusionnerait à tort — le nom de lieu doit les garder séparés → 4 pins.
+    url = "https://tokyocheapo.com/events/summer-night-museums/"
+
+    def museum(mid, name, lat, lon):
+        return mk(
+            "tc",
+            id=mid,
+            title="Summer Night Museums",
+            url=url,
+            start_date=date(2026, 6, 7),
+            end_date=date(2026, 8, 28),
+            latitude=lat,
+            longitude=lon,
+            attributes={"location_name": name},
+        )
+
+    museums = [
+        museum("m1", "Tokyo Metropolitan Art Museum", 35.7171959, 139.7727737),
+        museum("m2", "Tokyo Metropolitan Teien Art Museum", 35.6368586, 139.7171918),
+        museum("m3", "Museum of Contemporary Art Tokyo", 35.679714, 139.808002),
+        museum("m4", "Tokyo Photographic Art Museum", 35.64159, 139.713278),
+    ]
+    mapping = assign_canonical_ids(museums)
+    assert len({mapping[m.id] for m in museums}) == 4
+
+
 def test_intra_source_multilocation_stays_separate():
     # Même URL de base, deux lieux distincts (multi-lieux) → deux clusters.
     base = "https://tokyocheapo.com/events/some-festival"

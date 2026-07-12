@@ -67,10 +67,13 @@ def assign_canonical_ids(events: list[Event]) -> dict[str, str]:
 
     for i in range(len(items)):
         for j in range(i + 1, len(items)):
-            # Deux règles complémentaires : identité intra-source (même page
-            # événement, dates ignorées) OU similarité floue cross-source.
-            if same_source_same_event(items[i], items[j]) or is_duplicate(items[i], items[j]):
-                uf.union(items[i].id, items[j].id)
+            a, b = items[i], items[j]
+            # Deux régimes disjoints : au sein d'une même source, l'identité par
+            # (URL + nom de lieu) fait foi (dates ignorées, géo non consultée) ;
+            # entre sources différentes, on applique la similarité floue stricte.
+            merge = same_source_same_event(a, b) if a.source == b.source else is_duplicate(a, b)
+            if merge:
+                uf.union(a.id, b.id)
 
     # Regroupe par racine, puis élit le représentant de chaque cluster.
     clusters: dict[str, list[Event]] = {}
