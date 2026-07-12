@@ -25,15 +25,32 @@ L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.pn
 }).addTo(map);
 setMap(map);
 
-const clusterGroup = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 });
+const clusterGroup = L.markerClusterGroup({
+  chunkedLoading: true,
+  maxClusterRadius: 50,
+  // Ne pas zoomer au clic sur un amas : des événements co-localisés (même lieu,
+  // plusieurs dates) ne se séparent jamais par le zoom, ce qui zoomait à l'infini
+  // cran par cran. On les étale sur place (spiderfy) à la place — voir clusterclick.
+  // spiderfyOnMaxZoom off : sinon markercluster déclenche aussi son propre spiderfy
+  // au zoom max, en doublon de notre handler.
+  zoomToBoundsOnClick: false,
+  spiderfyOnMaxZoom: false,
+});
 map.addLayer(clusterGroup);
 setClusterGroup(clusterGroup);
+clusterGroup.on('clusterclick', (e) => e.layer.spiderfy());
 initDrawer();
 
 // ── Debounced bbox fetch on map move ──────────────────────────────────────
 // bboxFetchEnabled is a live binding — false until initial load succeeds
+// L'autoPan d'une bulle émet aussi un moveend : on le saute pour ne pas
+// reconstruire tous les marqueurs (ce qui fermerait la bulle) alors que la zone
+// visible n'a pas réellement changé. autopanstart précède ce moveend-là.
+let skipFetchOnce = false;
+map.on('autopanstart', () => { skipFetchOnce = true; });
 map.on('moveend', () => {
   if (!bboxFetchEnabled) return;
+  if (skipFetchOnce) { skipFetchOnce = false; return; }
   clearTimeout(fetchDebounceTimer);
   setFetchDebounceTimer(setTimeout(fetchEventsByBbox, 300));
 });
