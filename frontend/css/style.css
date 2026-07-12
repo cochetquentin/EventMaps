@@ -454,6 +454,21 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
   box-shadow: 0 0 0 4px var(--shu-wash), 0 2px 10px -2px rgba(216, 58, 48, 0.6);
 }
 
+/* Étiquettes permanentes (nom de l'événement à côté du point) */
+.leaflet-tooltip.marker-label {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  box-shadow: var(--shadow-sm);
+  padding: 2px 7px;
+  font-family: var(--font-ui);
+  font-size: 11px; font-weight: 500; line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.leaflet-tooltip.marker-label::before { display: none; }  /* pas de flèche */
+
 /* ══ Clusters ═════════════════════════════════════════════════════════════ */
 .marker-cluster { background: rgba(36, 30, 24, 0.08) !important; }
 .marker-cluster div {

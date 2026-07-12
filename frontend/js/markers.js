@@ -1,6 +1,13 @@
 /* global L */
 import { allEvents, showOnlyFavorites, clusterGroup, markerMap } from './state.js';
+import { escapeHtml } from './utils.js';
 import { TC_EXCLUDED_CATS } from './config.js';
+
+// Extrait court du titre pour l'étiquette permanente sur la carte
+function labelText(title) {
+  const s = (title || '').trim();
+  return s.length > 22 ? `${s.slice(0, 21).trimEnd()}…` : s;
+}
 import { getFavorites, getIcon } from './favorites.js';
 import { buildPopup } from './popups.js';
 import { openDrawer } from './drawer.js';
@@ -46,6 +53,9 @@ export function renderMarkers() {
       const icon   = getIcon(ev, favs.has(ev.id));
       const marker = L.marker([ev.latitude, ev.longitude], { icon });
       marker.bindPopup(buildPopup(ev), { maxWidth: 300, minWidth: 280 });
+      marker.bindTooltip(escapeHtml(labelText(ev.title)), {
+        permanent: true, direction: 'right', offset: [10, 0], className: 'marker-label',
+      });
       marker.on('click', () => openDrawer(ev));
       clusterGroup.addLayer(marker);
       markerMap.set(ev.id, marker);
