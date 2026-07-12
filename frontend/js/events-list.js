@@ -5,7 +5,6 @@ import { TC_EXCLUDED_CATS, CAT_EMOJI } from './config.js';
 import { isFavorite, toggleFavorite, getIcon, updateFavPill } from './favorites.js';
 import { renderMarkers } from './markers.js';
 import { buildPopup } from './popups.js';
-import { openDrawer } from './drawer.js';
 
 function makeCard(ev, inProximity, cardsRow) {
   const card = document.createElement('div');
@@ -53,8 +52,9 @@ function makeCard(ev, inProximity, cardsRow) {
     if (ev.latitude != null && ev.longitude != null) {
       map.setView([ev.latitude, ev.longitude], 15, { animate: true });
     }
-    const m = markerMap.get(ev.id);
-    if (m) setTimeout(() => m.openPopup(), 350);
+    // Relire le marqueur au moment d'ouvrir : un refetch déclenché par le recentrage
+    // peut l'avoir reconstruit entre-temps (l'ancienne référence serait détachée).
+    setTimeout(() => { const m = markerMap.get(ev.id); if (m) m.openPopup(); }, 350);
     document.querySelectorAll('.event-card').forEach(c => c.classList.remove('highlighted'));
     card.classList.add('highlighted');
     if (cardsRow && cardsRow.classList.contains('hidden')) {
@@ -62,7 +62,6 @@ function makeCard(ev, inProximity, cardsRow) {
       cardsRow.previousElementSibling.classList.remove('collapsed');
     }
     card.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
-    openDrawer(ev);
   });
 
   return card;
