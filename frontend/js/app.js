@@ -119,8 +119,7 @@ document.getElementById('reset-filters').addEventListener('click', () => {
   setProximityMode(false);
   setUserPosition(null);
   const locBtn = document.getElementById('locate-btn');
-  locBtn.classList.remove('active');
-  locBtn.textContent = '📍';
+  locBtn.classList.remove('active', 'loading');
   locBtn.disabled = false;
   document.querySelectorAll('.pill').forEach(p => {
     if (p.classList.contains('fav-pill')) p.classList.remove('active');
@@ -192,13 +191,12 @@ document.getElementById('copy-link-btn').addEventListener('click', () => {
   updateURL();
   const btn = document.getElementById('copy-link-btn');
   const onSuccess = () => {
-    btn.textContent = '✓';
     btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = '🔗'; btn.classList.remove('copied'); }, 1500);
+    setTimeout(() => btn.classList.remove('copied'), 1500);
   };
   const onFailure = () => {
-    btn.textContent = '✗';
-    setTimeout(() => { btn.textContent = '🔗'; }, 1500);
+    btn.classList.add('failed');
+    setTimeout(() => btn.classList.remove('failed'), 1500);
   };
   if (navigator.clipboard) {
     navigator.clipboard.writeText(location.href).then(onSuccess).catch(onFailure);
