@@ -12,6 +12,12 @@ export function renderMarkers() {
   const toS    = document.getElementById('filter-date-to').value   || null;
   const favs   = getFavorites();
 
+  // Un refetch déclenché par l'autoPan de la bulle reconstruit tous les marqueurs
+  // (clearLayers), ce qui fermerait la bulle en cours d'affichage. On mémorise
+  // l'événement dont la bulle est ouverte pour la rouvrir après reconstruction.
+  let reopenId = null;
+  markerMap.forEach((m, id) => { if (m.isPopupOpen()) reopenId = id; });
+
   clusterGroup.clearLayers();
   markerMap.clear();
 
@@ -76,4 +82,8 @@ export function renderMarkers() {
     (tot ? ` &nbsp;<span style="color:var(--tot)">●</span> ${tot}` : '');
 
   buildEventList(visible);
+
+  // Rouvrir la bulle préservée : même marqueur, même position → la bulle tient
+  // déjà dans le cadre, donc pas de nouvel autoPan ni de boucle de refetch.
+  if (reopenId && markerMap.has(reopenId)) markerMap.get(reopenId).openPopup();
 }
