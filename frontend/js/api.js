@@ -29,7 +29,9 @@ export async function fetchEventsByBbox({ category = null } = {}) {
     const events = [];
     let offset = 0;
     while (true) {
-      const params = { limit: String(PAGE), offset: String(offset) };
+      // collapse=true : le serveur ne renvoie qu'un représentant par cluster de
+      // doublons cross-source, ce qui évite les amas d'événements identiques.
+      const params = { limit: String(PAGE), offset: String(offset), collapse: 'true' };
       if (bbox) params.bbox = bbox;
       const fromS = document.getElementById('filter-date-from').value;
       if (fromS) params.start_from = fromS;

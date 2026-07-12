@@ -121,6 +121,7 @@ class Event(BaseModel):
     price: str | None
     attributes: TokyoCheapoAttributes | HanabiWalkerAttributes | TimeoutTokyoAttributes
     created_at: datetime
+    canonical_id: str | None  # représentant du cluster de doublons (None = canonique)
 ```
 
 ### Contrat `attributes` par source
@@ -185,9 +186,10 @@ CREATE TABLE IF NOT EXISTS events (
     venue       TEXT,
     latitude    REAL,
     longitude   REAL,
-    price       TEXT,
-    attributes  TEXT,               -- JSON sérialisé
-    created_at  TEXT NOT NULL       -- ISO 8601 avec timezone
+    price        TEXT,
+    attributes   TEXT,              -- JSON sérialisé
+    created_at   TEXT NOT NULL,     -- ISO 8601 avec timezone
+    canonical_id TEXT               -- représentant du cluster de doublons (index idx_events_canonical)
 )
 ```
 
@@ -213,6 +215,10 @@ CREATE TABLE IF NOT EXISTS scrape_jobs (
 
 ## Déduplication
 
+Deux niveaux complémentaires : la déduplication **exacte** (identité) et la déduplication **floue cross-source** (clustering).
+
+### 1. Déduplication exacte (par ID)
+
 L'ID d'un événement est généré **avant l'insertion** dans la DB par `make_event_id(parts)` (`models/identity.py`) :
 
 ```python
@@ -226,7 +232,26 @@ def make_event_id(parts: list[str]) -> str:
 - Hanabi Walker : `[url, date_val]`
 - Timeout Tokyo : `[url]`
 
-L'algorithme est stable et ne doit **jamais être modifié** : les IDs persistés en DB en dépendent.
+L'algorithme est stable et ne doit **jamais être modifié** : les IDs persistés en DB en dépendent. Combiné à l'`ON CONFLICT(id) DO UPDATE` de `upsert_events`, il rend un re-scrape de la même URL idempotent. Il ne rapproche **pas** deux sources différentes (URLs différentes → IDs différents).
+
+### 2. Déduplication floue cross-source (colonne `canonical_id`)
+
+Le package **`dedup/`** (pur, sans I/O) rapproche le *même* événement listé sur plusieurs sites. Il n'écrit rien et ne supprime rien : la couche DB matérialise le résultat dans la colonne `events.canonical_id` (représentant du cluster ; `NULL` = non encore dédupliqué, traité comme canonique).
+
+**Règle de décision** — `dedup/matching.py::classify_pair` (logique **ET** conservatrice, pensée pour zéro faux positif). Deux événements sont doublons **seulement si** :
+1. leurs **plages de dates se chevauchent** (un même titre à deux dates disjointes = événement récurrent, jamais fusionné) ;
+2. leurs **titres normalisés** ont un `rapidfuzz.token_set_ratio ≥ 90` (`TITLE_MIN_RATIO`) ;
+3. le **lieu est confirmé** par au moins un canal : coordonnées présentes des deux côtés et distance `≤ 0.75 km` (`GEO_MAX_KM`), **ou** noms de lieu similaires à `≥ 88` (`VENUE_MIN_RATIO`) — ce second canal couvre Time Out Tokyo qui n'a jamais de GPS.
+
+Toute donnée manquante fait échouer sa porte → pas de fusion. `classify_pair` court-circuite dès que les dates ne se chevauchent pas (la partie fuzzy coûteuse n'est évaluée que sur des paires plausibles).
+
+**Clustering** — `dedup/cluster.py::assign_canonical_ids` fait un union-find sur les paires jugées doublons puis élit un représentant déterministe par cluster (priorité à l'événement **avec coordonnées**, pour garder un point sur la carte).
+
+**Points d'exécution :**
+- **Ingestion** : `EventsRepository.upsert_with_dedup` (appelé par `api/routes/scrape.py` et `main.py`) clusterise les nouveaux événements **avec** les événements à venir déjà en base — un doublon peut provenir d'un scrape antérieur d'une autre source — puis met à jour le `canonical_id` des nouveaux et des lignes existantes concernées.
+- **Backfill** : `uv run python -m tools.backfill_canonical [--db PATH] [--all]` recalcule les `canonical_id` sur une base existante (idempotent, ne touche à aucun autre champ).
+
+**Affichage** — le paramètre `?collapse=true` de `GET /events` ne renvoie qu'un représentant par cluster (`WHERE canonical_id IS NULL OR canonical_id = id`). Le frontend l'active pour la carte afin d'éviter les amas d'événements identiques ; les autres lignes restent en base et accessibles avec `collapse=false`.
 
 ---
 
@@ -258,6 +283,7 @@ L'algorithme est stable et ne doit **jamais être modifié** : les IDs persisté
 | `category` | `string` | Filtre par catégorie (`attributes.categories` — TC et TOT) |
 | `limit` | `int` (1–500, défaut 100) | Pagination |
 | `offset` | `int` (défaut 0) | Pagination |
+| `collapse` | `bool` (défaut `false`) | Regroupe les doublons cross-source : un seul représentant par cluster |
 
 Sans filtre de date, seuls les événements à venir sont retournés (`upcoming=True`).
 

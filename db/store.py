@@ -24,6 +24,15 @@ class EventStore:
     def upsert_events(self, events: list[Event]) -> None:
         return self._events.upsert_events(events)
 
+    def upsert_with_dedup(self, events: list[Event]) -> dict[str, str]:
+        return self._events.upsert_with_dedup(events)
+
+    def set_canonical_ids(self, mapping: dict[str, str]) -> None:
+        return self._events.set_canonical_ids(mapping)
+
+    def recompute_canonical(self, upcoming_only: bool = True) -> dict[str, str]:
+        return self._events.recompute_canonical(upcoming_only=upcoming_only)
+
     def get_events(
         self,
         source=None,
@@ -36,6 +45,7 @@ class EventStore:
         offset=0,
         q=None,
         category=None,
+        collapse=False,
     ) -> list[Event]:
         return self._events.get_events(
             source=source,
@@ -48,6 +58,7 @@ class EventStore:
             offset=offset,
             q=q,
             category=category,
+            collapse=collapse,
         )
 
     def get_event(self, event_id: str) -> Event | None:

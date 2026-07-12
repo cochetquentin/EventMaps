@@ -116,7 +116,7 @@ def _do_scrape(job_id: int, source: str, region: str) -> None:
                 None,
             )
 
-            store.upsert_events(events)
+            store.upsert_with_dedup(events)
 
             if failing_source is not None or (
                 links_seen > 0 and combined_error_rate > settings.scrape_error_threshold
