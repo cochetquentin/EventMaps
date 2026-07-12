@@ -10,6 +10,29 @@ export function getActivePills() {
   return s;
 }
 
+// Met à jour le libellé du bouton « Aucune / Toutes » selon l'état des pills catégories
+export function updateCatToggle() {
+  const btn = document.getElementById('toggle-cats');
+  if (!btn) return;
+  const catPills = document.querySelectorAll('#pills .pill:not(.fav-pill)');
+  const anyActive = [...catPills].some(p => p.classList.contains('active'));
+  btn.textContent = anyActive ? 'Aucune' : 'Toutes';
+  btn.classList.toggle('all-off', !anyActive);
+}
+
+// Bascule toutes les catégories (hanabi/tot/catégories) d'un coup — favoris exclu
+export function toggleAllCategoryPills() {
+  const catPills = [...document.querySelectorAll('#pills .pill:not(.fav-pill)')];
+  const anyActive = catPills.some(p => p.classList.contains('active'));
+  catPills.forEach(p => {
+    if (anyActive) { p.classList.remove('active'); deactivatedPills.add(p.dataset.type); }
+    else { p.classList.add('active'); deactivatedPills.delete(p.dataset.type); }
+  });
+  updateCatToggle();
+  renderMarkers();
+  updateURL();
+}
+
 export function buildPills() {
   const container = document.getElementById('pills');
   container.innerHTML = '';
@@ -45,6 +68,8 @@ export function buildPills() {
   container.querySelectorAll('.pill').forEach(p => {
     if (deactivatedPills.has(p.dataset.type)) p.classList.remove('active');
   });
+
+  updateCatToggle();
 }
 
 export function addPill(container, type, label, isHanabi = false) {
@@ -56,6 +81,7 @@ export function addPill(container, type, label, isHanabi = false) {
     btn.classList.toggle('active');
     if (btn.classList.contains('active')) deactivatedPills.delete(type);
     else deactivatedPills.add(type);
+    updateCatToggle();
     renderMarkers();
     updateURL();
   });

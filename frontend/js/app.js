@@ -4,7 +4,7 @@ import { isoDate, todayJST, computePresets } from './utils.js';
 import { toggleFavorite, isFavorite, getIcon, updateFavPill } from './favorites.js';
 import { buildPopup } from './popups.js';
 import { renderMarkers } from './markers.js';
-import { buildPills } from './filters.js';
+import { buildPills, toggleAllCategoryPills } from './filters.js';
 import {
   fetchEventsByBbox,
   setBboxFetchEnabled,
@@ -225,6 +225,9 @@ document.getElementById('copy-link-btn').addEventListener('click', () => {
 document.getElementById('export-ics-btn').addEventListener('click', () => {
   downloadICS();
 });
+
+// ── Toggle catégories (Aucune / Toutes) ───────────────────────────────────
+document.getElementById('toggle-cats').addEventListener('click', toggleAllCategoryPills);
 
 // ── Init ──────────────────────────────────────────────────────────────────
 async function loadEvents() {

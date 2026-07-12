@@ -296,8 +296,11 @@ body {
 }
 .pill:hover { border-color: var(--ink-3); color: var(--ink); }
 .pill.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-.pill.active.h { background: var(--hanabi); border-color: var(--hanabi); color: #3a2600; }
 .fav-pill.active { background: var(--gold) !important; border-color: var(--gold) !important; color: #2a2100 !important; }
+
+/* Bouton bascule catégories */
+#toggle-cats { font-weight: 600; }
+#toggle-cats.all-off { color: var(--shu); }
 
 /* Popover dates */
 #date-dropdown {
