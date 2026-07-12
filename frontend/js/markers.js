@@ -2,17 +2,16 @@
 import { allEvents, showOnlyFavorites, clusterGroup, markerMap } from './state.js';
 import { escapeHtml } from './utils.js';
 import { TC_EXCLUDED_CATS } from './config.js';
+import { getFavorites, getIcon } from './favorites.js';
+import { buildPopup } from './popups.js';
+import { getActivePills } from './filters.js';
+import { buildEventList } from './events-list.js';
 
-// Extrait court du titre pour l'étiquette permanente sur la carte
+// Extrait court du titre pour l'étiquette permanente affichée à côté du point
 function labelText(title) {
   const s = (title || '').trim();
   return s.length > 22 ? `${s.slice(0, 21).trimEnd()}…` : s;
 }
-import { getFavorites, getIcon } from './favorites.js';
-import { buildPopup } from './popups.js';
-import { openDrawer } from './drawer.js';
-import { getActivePills } from './filters.js';
-import { buildEventList } from './events-list.js';
 
 export function renderMarkers() {
   const active = getActivePills();
@@ -20,8 +19,30 @@ export function renderMarkers() {
   const toS    = document.getElementById('filter-date-to').value   || null;
   const favs   = getFavorites();
 
+  // Un refetch déclenché par l'autoPan de la bulle reconstruit tous les marqueurs
+  // (clearLayers), ce qui fermerait la bulle en cours d'affichage. On mémorise
+  // l'événement dont la bulle est ouverte pour la rouvrir après reconstruction.
+  let reopenId = null;
+  markerMap.forEach((m, id) => { if (m.isPopupOpen()) reopenId = id; });
+
   clusterGroup.clearLayers();
   markerMap.clear();
+
+  // Padding d'autoPan pour que la bulle ne soit pas clippée par les panneaux.
+  // Dans la refonte, header et sidebar sont des cellules de grille qui ne
+  // recouvrent pas la carte (desktop). Seul le panneau liste en mode
+  // « bottom-sheet » (mobile, position:fixed) recouvre le bas de la carte : on
+  // padde alors d'autant, mesuré ici pour s'adapter au viewport courant.
+  const listPanel = document.getElementById('list-panel');
+  const isBottomSheet = listPanel && getComputedStyle(listPanel).position === 'fixed';
+  const padTop    = 24;
+  const padBottom = (isBottomSheet ? listPanel.offsetHeight : 0) + 24;
+  const popupOpts = {
+    maxWidth: 300,
+    minWidth: 280,
+    autoPanPaddingTopLeft:     L.point(24, padTop),
+    autoPanPaddingBottomRight: L.point(24, padBottom),
+  };
 
   const visible = [];
 
@@ -52,11 +73,12 @@ export function renderMarkers() {
     if (hasCoords) {
       const icon   = getIcon(ev, favs.has(ev.id));
       const marker = L.marker([ev.latitude, ev.longitude], { icon });
-      marker.bindPopup(buildPopup(ev), { maxWidth: 300, minWidth: 280 });
+      // Clic marqueur → bulle (le grand panneau s'ouvre via « Plus d'infos »).
+      marker.bindPopup(buildPopup(ev), popupOpts);
+      // Étiquette permanente : lecture du nom d'un coup d'œil (masquée en cluster).
       marker.bindTooltip(escapeHtml(labelText(ev.title)), {
         permanent: true, direction: 'right', offset: [10, 0], className: 'marker-label',
       });
-      marker.on('click', () => openDrawer(ev));
       clusterGroup.addLayer(marker);
       markerMap.set(ev.id, marker);
     }
@@ -73,4 +95,18 @@ export function renderMarkers() {
     (tot ? ` &nbsp;<span style="color:var(--tot)">●</span> ${tot}` : '');
 
   buildEventList(visible);
+
+  // Rouvrir la bulle préservée, mais SANS autoPan : c'est une simple restauration
+  // après re-render, la carte ne doit pas se recentrer dessus (sinon elle « snap »
+  // sur la bulle à chaque déplacement de l'utilisateur). Seule l'ouverture initiale
+  // au clic recadre. On désactive donc temporairement l'autoPan de la bulle.
+  if (reopenId && markerMap.has(reopenId)) {
+    const popup = markerMap.get(reopenId).getPopup();
+    if (popup) {
+      const autoPan = popup.options.autoPan;
+      popup.options.autoPan = false;
+      markerMap.get(reopenId).openPopup();
+      popup.options.autoPan = autoPan;
+    }
+  }
 }

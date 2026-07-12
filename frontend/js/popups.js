@@ -37,6 +37,7 @@ export function buildPopup(ev) {
           <a class="pop-btn primary" href="${escapeHtml(safeUrl(ev.url))}" target="_blank" style="flex:1">Voir l'événement →</a>
           <button class="fav-btn pop-fav-btn ${isFavorite(ev.id) ? 'active' : ''}" data-fav-id="${ev.id}" title="Favoris">${isFavorite(ev.id) ? '★' : '☆'}</button>
         </div>
+        <button class="pop-btn secondary pop-info-btn" data-info-id="${ev.id}">ℹ️ Plus d'infos</button>
         ${directions}
         <a href="/events/${ev.id}.ics" style="font-size:11px;text-align:center;color:var(--muted);text-decoration:underline;">📅 Ajouter au calendrier</a>
       </div></div></div>`;
@@ -67,6 +68,7 @@ export function buildPopup(ev) {
           <a class="pop-btn primary" href="${escapeHtml(safeUrl(ev.url))}" target="_blank" style="flex:1">Voir l'événement →</a>
           <button class="fav-btn pop-fav-btn ${isFavorite(ev.id) ? 'active' : ''}" data-fav-id="${ev.id}" title="Favoris">${isFavorite(ev.id) ? '★' : '☆'}</button>
         </div>
+        <button class="pop-btn secondary pop-info-btn" data-info-id="${ev.id}">ℹ️ Plus d'infos</button>
         ${directions}
         <a href="/events/${ev.id}.ics" style="font-size:11px;text-align:center;color:var(--muted);text-decoration:underline;">📅 Ajouter au calendrier</a>
       </div></div></div>`;
@@ -102,6 +104,7 @@ export function buildPopup(ev) {
           <a class="pop-btn primary" href="${escapeHtml(safeUrl(ev.url))}" target="_blank" style="flex:1">Voir l'événement →</a>
           <button class="fav-btn pop-fav-btn ${isFavorite(ev.id) ? 'active' : ''}" data-fav-id="${ev.id}" title="Favoris">${isFavorite(ev.id) ? '★' : '☆'}</button>
         </div>
+        <button class="pop-btn secondary pop-info-btn" data-info-id="${ev.id}">ℹ️ Plus d'infos</button>
         ${directions}
         <a href="/events/${ev.id}.ics" style="font-size:11px;text-align:center;color:var(--muted);text-decoration:underline;">📅 Ajouter au calendrier</a>
       </div></div></div>`;
