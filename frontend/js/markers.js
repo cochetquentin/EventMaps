@@ -1,10 +1,17 @@
 /* global L */
 import { allEvents, showOnlyFavorites, clusterGroup, markerMap } from './state.js';
+import { escapeHtml } from './utils.js';
 import { TC_EXCLUDED_CATS } from './config.js';
 import { getFavorites, getIcon } from './favorites.js';
 import { buildPopup } from './popups.js';
 import { getActivePills } from './filters.js';
 import { buildEventList } from './events-list.js';
+
+// Extrait court du titre pour l'étiquette permanente affichée à côté du point
+function labelText(title) {
+  const s = (title || '').trim();
+  return s.length > 22 ? `${s.slice(0, 21).trimEnd()}…` : s;
+}
 
 export function renderMarkers() {
   const active = getActivePills();
@@ -21,14 +28,15 @@ export function renderMarkers() {
   clusterGroup.clearLayers();
   markerMap.clear();
 
-  // La carte occupe tout l'écran ; les barres flottent par-dessus. L'autoPan de
-  // Leaflet ne connaît que les bords du conteneur, donc la bulle finit clippée
-  // sous ces barres. On lui donne un padding égal à leur hauteur réelle (mesurée
-  // ici pour s'adapter au desktop/mobile) pour qu'il recentre correctement.
-  const topBar    = document.getElementById('top-bar');
-  const bottomBar = document.getElementById('bottom-bar');
-  const padTop    = (topBar    ? topBar.offsetHeight    : 100) + 24;
-  const padBottom = (bottomBar ? bottomBar.offsetHeight : 0)   + 24;
+  // Padding d'autoPan pour que la bulle ne soit pas clippée par les panneaux.
+  // Dans la refonte, header et sidebar sont des cellules de grille qui ne
+  // recouvrent pas la carte (desktop). Seul le panneau liste en mode
+  // « bottom-sheet » (mobile, position:fixed) recouvre le bas de la carte : on
+  // padde alors d'autant, mesuré ici pour s'adapter au viewport courant.
+  const listPanel = document.getElementById('list-panel');
+  const isBottomSheet = listPanel && getComputedStyle(listPanel).position === 'fixed';
+  const padTop    = 24;
+  const padBottom = (isBottomSheet ? listPanel.offsetHeight : 0) + 24;
   const popupOpts = {
     maxWidth: 300,
     minWidth: 280,
@@ -65,7 +73,12 @@ export function renderMarkers() {
     if (hasCoords) {
       const icon   = getIcon(ev, favs.has(ev.id));
       const marker = L.marker([ev.latitude, ev.longitude], { icon });
+      // Clic marqueur → bulle (le grand panneau s'ouvre via « Plus d'infos »).
       marker.bindPopup(buildPopup(ev), popupOpts);
+      // Étiquette permanente : lecture du nom d'un coup d'œil (masquée en cluster).
+      marker.bindTooltip(escapeHtml(labelText(ev.title)), {
+        permanent: true, direction: 'right', offset: [10, 0], className: 'marker-label',
+      });
       clusterGroup.addLayer(marker);
       markerMap.set(ev.id, marker);
     }

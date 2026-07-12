@@ -33,14 +33,14 @@ export function setupGeolocation() {
     }
     activeRequestId++;
     const myRequestId = activeRequestId;
-    btn.textContent = '⏳';
+    btn.classList.add('loading');
     btn.disabled = true;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         // Vérifier la fraîcheur AVANT de toucher le bouton — si Reset a invalidé la
         // requête entre-temps, la prochaine requête en cours doit garder son état ⏳
         if (myRequestId !== activeRequestId) return;
-        btn.textContent = '📍';
+        btn.classList.remove('loading');
         btn.disabled = false;
         const lat = pos.coords.latitude, lng = pos.coords.longitude;
         setUserPosition({ lat, lng });
@@ -54,7 +54,7 @@ export function setupGeolocation() {
       },
       (err) => {
         if (myRequestId !== activeRequestId) return;
-        btn.textContent = '📍';
+        btn.classList.remove('loading');
         btn.disabled = false;
         alert("Impossible d'obtenir votre position : " + err.message);
       },

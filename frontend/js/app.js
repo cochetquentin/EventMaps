@@ -4,7 +4,7 @@ import { isoDate, todayJST, computePresets } from './utils.js';
 import { toggleFavorite, isFavorite, getIcon, updateFavPill } from './favorites.js';
 import { buildPopup } from './popups.js';
 import { renderMarkers } from './markers.js';
-import { buildPills } from './filters.js';
+import { buildPills, toggleAllCategoryPills } from './filters.js';
 import {
   fetchEventsByBbox,
   setBboxFetchEnabled,
@@ -133,8 +133,24 @@ document.getElementById('filter-date-to').addEventListener('change', () => {
   setFetchDebounceTimer(setTimeout(fetchEventsByBbox, 300));
 });
 
+function positionDateDropdown() {
+  const dd = document.getElementById('date-dropdown');
+  const btn = document.getElementById('date-custom-btn');
+  const header = document.getElementById('app-header');
+  // Aligner le popover sous le bouton « Dates » (et non au bord gauche du header).
+  // getBoundingClientRect tient compte du scroll horizontal de la barre de filtres.
+  const btnRect = btn.getBoundingClientRect();
+  const headerRect = header.getBoundingClientRect();
+  const maxLeft = headerRect.width - dd.offsetWidth - 12;
+  const left = Math.max(12, Math.min(btnRect.left - headerRect.left, maxLeft));
+  dd.style.left = `${left}px`;
+}
+
 document.getElementById('date-custom-btn').addEventListener('click', () => {
-  document.getElementById('date-dropdown').classList.toggle('hidden');
+  const dd = document.getElementById('date-dropdown');
+  const willOpen = dd.classList.contains('hidden');
+  dd.classList.toggle('hidden');
+  if (willOpen) positionDateDropdown();  // offsetWidth requiert que le popover soit visible
 });
 
 // ── Reset ─────────────────────────────────────────────────────────────────
@@ -148,8 +164,7 @@ document.getElementById('reset-filters').addEventListener('click', () => {
   setProximityMode(false);
   setUserPosition(null);
   const locBtn = document.getElementById('locate-btn');
-  locBtn.classList.remove('active');
-  locBtn.textContent = '📍';
+  locBtn.classList.remove('active', 'loading');
   locBtn.disabled = false;
   document.querySelectorAll('.pill').forEach(p => {
     if (p.classList.contains('fav-pill')) p.classList.remove('active');
@@ -221,13 +236,12 @@ document.getElementById('copy-link-btn').addEventListener('click', () => {
   updateURL();
   const btn = document.getElementById('copy-link-btn');
   const onSuccess = () => {
-    btn.textContent = '✓';
     btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = '🔗'; btn.classList.remove('copied'); }, 1500);
+    setTimeout(() => btn.classList.remove('copied'), 1500);
   };
   const onFailure = () => {
-    btn.textContent = '✗';
-    setTimeout(() => { btn.textContent = '🔗'; }, 1500);
+    btn.classList.add('failed');
+    setTimeout(() => btn.classList.remove('failed'), 1500);
   };
   if (navigator.clipboard) {
     navigator.clipboard.writeText(location.href).then(onSuccess).catch(onFailure);
@@ -240,6 +254,9 @@ document.getElementById('copy-link-btn').addEventListener('click', () => {
 document.getElementById('export-ics-btn').addEventListener('click', () => {
   downloadICS();
 });
+
+// ── Toggle catégories (Aucune / Toutes) ───────────────────────────────────
+document.getElementById('toggle-cats').addEventListener('click', toggleAllCategoryPills);
 
 // ── Init ──────────────────────────────────────────────────────────────────
 async function loadEvents() {

@@ -8,7 +8,7 @@ import { buildPopup } from './popups.js';
 
 function makeCard(ev, inProximity, cardsRow) {
   const card = document.createElement('div');
-  card.className = 'event-card';
+  card.className = `event-card src-${ev.source}`;
 
   const date = fmtDate(ev.start_date || ev.date);
   const attrs = ev.attributes || {};
