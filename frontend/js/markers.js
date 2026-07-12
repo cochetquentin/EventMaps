@@ -15,6 +15,21 @@ export function renderMarkers() {
   clusterGroup.clearLayers();
   markerMap.clear();
 
+  // La carte occupe tout l'écran ; les barres flottent par-dessus. L'autoPan de
+  // Leaflet ne connaît que les bords du conteneur, donc la bulle finit clippée
+  // sous ces barres. On lui donne un padding égal à leur hauteur réelle (mesurée
+  // ici pour s'adapter au desktop/mobile) pour qu'il recentre correctement.
+  const topBar    = document.getElementById('top-bar');
+  const bottomBar = document.getElementById('bottom-bar');
+  const padTop    = (topBar    ? topBar.offsetHeight    : 100) + 24;
+  const padBottom = (bottomBar ? bottomBar.offsetHeight : 0)   + 24;
+  const popupOpts = {
+    maxWidth: 300,
+    minWidth: 280,
+    autoPanPaddingTopLeft:     L.point(24, padTop),
+    autoPanPaddingBottomRight: L.point(24, padBottom),
+  };
+
   const visible = [];
 
   allEvents.forEach(ev => {
@@ -44,7 +59,7 @@ export function renderMarkers() {
     if (hasCoords) {
       const icon   = getIcon(ev, favs.has(ev.id));
       const marker = L.marker([ev.latitude, ev.longitude], { icon });
-      marker.bindPopup(buildPopup(ev), { maxWidth: 300, minWidth: 280 });
+      marker.bindPopup(buildPopup(ev), popupOpts);
       clusterGroup.addLayer(marker);
       markerMap.set(ev.id, marker);
     }
