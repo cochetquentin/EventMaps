@@ -1,36 +1,36 @@
 /* ══════════════════════════════════════════════════════════════════════════
-   EventMaps — « Encre & Vermillon »
-   Direction éditoriale : papier chaud, encre sumi, un vermillon (朱) franc.
-   Fraunces pour le caractère, Inter pour la clarté.
+   EventMaps — « Matsuri » (rouge de fête)
+   Direction éditoriale estivale : papier chaud et lumineux, rouge des lanternes
+   & torii (朱/紅), or festif. Fraunces pour le caractère, Inter pour la clarté.
    ══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Papier & encre */
-  --paper:    #F2ECE1;
-  --paper-2:  #EBE3D5;
-  --surface:  #FBF8F2;
-  --sink:     #ECE5D8;
-  --ink:      #211D18;
-  --ink-2:    #5B5348;
-  --ink-3:    #948A79;
-  --line:     rgba(33, 29, 24, 0.12);
-  --line-2:   rgba(33, 29, 24, 0.06);
+  /* Papier & encre — chaud, lumineux (été) */
+  --paper:    #F4EEE2;
+  --paper-2:  #ECE3D3;
+  --surface:  #FCF9F3;
+  --sink:     #EFE7DA;
+  --ink:      #241E18;
+  --ink-2:    #5E554A;
+  --ink-3:    #978C7B;
+  --line:     rgba(36, 30, 24, 0.12);
+  --line-2:   rgba(36, 30, 24, 0.06);
 
-  /* Accent — vermillon 朱 */
-  --shu:      #D64A26;
-  --shu-600:  #BC3D1D;
-  --shu-wash: rgba(214, 74, 38, 0.11);
+  /* Accent — rouge de fête (lanterne / torii), chaud mais pas criard */
+  --shu:      #D83A30;
+  --shu-600:  #BE3227;
+  --shu-wash: rgba(216, 58, 48, 0.11);
 
   /* Sources, harmonisées */
   --tc:       #2F5D8A;   /* 藍 indigo — Tokyo Cheapo */
-  --hanabi:   #DE8A18;   /* or chaud — Hanabi */
-  --tot:      #C0384E;   /* 紅 beni — Time Out */
-  --gold:     #C79A3A;   /* favoris */
+  --hanabi:   #E0912A;   /* or chaud — Hanabi */
+  --tot:      #C23A57;   /* 紅 beni — Time Out */
+  --gold:     #C9962F;   /* or festif — favoris & accents */
 
   /* Élévation */
-  --shadow-sm: 0 1px 2px rgba(33, 29, 24, 0.06);
-  --shadow-md: 0 12px 30px -14px rgba(33, 29, 24, 0.24), 0 2px 6px rgba(33, 29, 24, 0.05);
-  --shadow-lg: 0 32px 70px -26px rgba(33, 29, 24, 0.38);
+  --shadow-sm: 0 1px 2px rgba(36, 30, 24, 0.06);
+  --shadow-md: 0 12px 30px -14px rgba(36, 30, 24, 0.24), 0 2px 6px rgba(36, 30, 24, 0.05);
+  --shadow-lg: 0 32px 70px -26px rgba(36, 30, 24, 0.38);
 
   --r-sm: 9px;  --r-md: 13px;  --r-lg: 18px;  --r-xl: 24px;
 
@@ -66,7 +66,7 @@ body {
   font-family: var(--font-ui);
   color: var(--ink);
   background-color: var(--paper);
-  background-image: radial-gradient(135% 100% at 8% -12%, #F8F3EB 0%, var(--paper) 46%, var(--paper-2) 100%);
+  background-image: radial-gradient(135% 100% at 8% -12%, #FCF4E7 0%, var(--paper) 46%, var(--paper-2) 100%);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-optical-sizing: auto;
@@ -102,7 +102,7 @@ body {
   min-width: 0;
 }
 
-/* Marque + sceau hanko */
+/* Marque + sceau (祭 matsuri, lanterne) */
 .brand {
   display: flex;
   align-items: baseline;
@@ -117,10 +117,10 @@ body {
   width: 30px; height: 30px;
   border-radius: 9px;
   background: var(--shu);
-  color: #FCEDE7;
+  color: #FDEEE8;
   font-family: "Noto Sans JP", var(--font-ui);
   font-size: 16px; font-weight: 600; line-height: 1;
-  box-shadow: 0 3px 10px -3px rgba(214, 74, 38, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  box-shadow: 0 3px 11px -3px rgba(216, 58, 48, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.3);
   transform: rotate(-3deg);
 }
 .brand-word {
@@ -133,7 +133,7 @@ body {
 .brand-sub {
   font-size: 10.5px; font-weight: 600;
   letter-spacing: 0.16em; text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--gold);
 }
 
 /* Recherche */
@@ -177,7 +177,7 @@ body {
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s, background 0.15s, transform 0.1s;
 }
-.icon-btn:hover { color: var(--shu); border-color: rgba(214, 74, 38, 0.4); }
+.icon-btn:hover { color: var(--shu); border-color: rgba(216, 58, 48, 0.4); }
 .icon-btn:active { transform: translateY(1px); }
 .icon-btn .ico {
   width: 19px; height: 19px;
@@ -196,14 +196,14 @@ body {
 /* Localisation : état actif + chargement */
 #locate-btn.active {
   background: var(--shu); border-color: var(--shu); color: #fff;
-  box-shadow: 0 3px 12px -3px rgba(214, 74, 38, 0.6);
+  box-shadow: 0 3px 12px -3px rgba(216, 58, 48, 0.6);
 }
 .icon-btn.loading { pointer-events: none; }
 .icon-btn.loading .ico { animation: spin 0.9s linear infinite; opacity: 0.55; }
 
 /* Scrape : rotation en cours */
 #scrape-btn.running {
-  color: var(--shu); border-color: rgba(214, 74, 38, 0.4);
+  color: var(--shu); border-color: rgba(216, 58, 48, 0.4);
   pointer-events: none;
 }
 #scrape-btn.running .ico { animation: spin 1s linear infinite; }
@@ -214,7 +214,7 @@ body {
 #copy-link-btn.copied { color: #2E7D4F; border-color: rgba(46, 125, 79, 0.4); }
 #copy-link-btn.copied .ico-link { display: none; }
 #copy-link-btn.copied .ico-check { display: block; }
-#copy-link-btn.failed { color: var(--tot); border-color: rgba(192, 56, 78, 0.4); }
+#copy-link-btn.failed { color: var(--tot); border-color: rgba(194, 58, 87, 0.4); }
 
 /* ── Rangée filtres ──────────────────────────────────────────────────────── */
 .header-filters {
@@ -247,7 +247,7 @@ body {
 .preset-btn:hover { color: var(--ink); background: rgba(255, 255, 255, 0.6); }
 .preset-btn.active {
   background: var(--shu); color: #fff;
-  box-shadow: 0 2px 8px -3px rgba(214, 74, 38, 0.55);
+  box-shadow: 0 2px 8px -3px rgba(216, 58, 48, 0.55);
 }
 
 /* Chips */
@@ -433,26 +433,26 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
 .m-tot {
   width: 14px; height: 14px; border-radius: 50%;
   background: var(--tot); border: 2.5px solid var(--surface);
-  box-shadow: 0 2px 7px -1px rgba(192, 56, 78, 0.55), 0 0 0 1px var(--line);
+  box-shadow: 0 2px 7px -1px rgba(194, 58, 87, 0.55), 0 0 0 1px var(--line);
 }
 .m-hanabi {
   width: 18px; height: 18px; border-radius: 50%;
   background: radial-gradient(circle, #FFF6E4 0%, #FBD489 35%, var(--hanabi) 78%);
-  box-shadow: 0 0 0 4px rgba(222, 138, 24, 0.14), 0 0 14px rgba(222, 138, 24, 0.5);
+  box-shadow: 0 0 0 4px rgba(224, 145, 42, 0.14), 0 0 14px rgba(224, 145, 42, 0.5);
   animation: hpulse 2.6s ease-in-out infinite;
 }
 @keyframes hpulse {
-  0%, 100% { transform: scale(1);    box-shadow: 0 0 0 4px rgba(222, 138, 24, 0.14), 0 0 14px rgba(222, 138, 24, 0.5); }
-  50%      { transform: scale(1.12); box-shadow: 0 0 0 7px rgba(222, 138, 24, 0.09), 0 0 22px rgba(222, 138, 24, 0.65); }
+  0%, 100% { transform: scale(1);    box-shadow: 0 0 0 4px rgba(224, 145, 42, 0.14), 0 0 14px rgba(224, 145, 42, 0.5); }
+  50%      { transform: scale(1.12); box-shadow: 0 0 0 7px rgba(224, 145, 42, 0.09), 0 0 22px rgba(224, 145, 42, 0.65); }
 }
 .m-user {
   width: 16px; height: 16px; border-radius: 50%;
   background: var(--shu); border: 3px solid var(--surface);
-  box-shadow: 0 0 0 4px var(--shu-wash), 0 2px 10px -2px rgba(214, 74, 38, 0.6);
+  box-shadow: 0 0 0 4px var(--shu-wash), 0 2px 10px -2px rgba(216, 58, 48, 0.6);
 }
 
 /* ══ Clusters ═════════════════════════════════════════════════════════════ */
-.marker-cluster { background: rgba(33, 29, 24, 0.08) !important; }
+.marker-cluster { background: rgba(36, 30, 24, 0.08) !important; }
 .marker-cluster div {
   background: var(--ink) !important;
   color: var(--paper) !important;
@@ -460,7 +460,7 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
   border-radius: 50% !important;
   font-family: var(--font-ui) !important;
   font-size: 13px !important; font-weight: 600 !important;
-  box-shadow: 0 3px 12px -2px rgba(33, 29, 24, 0.35) !important;
+  box-shadow: 0 3px 12px -2px rgba(36, 30, 24, 0.35) !important;
   font-variant-numeric: tabular-nums;
 }
 
@@ -514,7 +514,7 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
 .pop-btn:active { transform: translateY(1px); }
 .pop-btn.primary {
   background: var(--shu); color: #fff;
-  box-shadow: 0 3px 12px -4px rgba(214, 74, 38, 0.6);
+  box-shadow: 0 3px 12px -4px rgba(216, 58, 48, 0.6);
 }
 .pop-btn.primary:hover { background: var(--shu-600); }
 .pop-btn.secondary { background: var(--surface); color: var(--ink); border-color: var(--line); }
@@ -548,7 +548,7 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
 #event-drawer.open { visibility: visible; pointer-events: auto; }
 .drawer-backdrop {
   position: absolute; inset: 0;
-  background: rgba(33, 29, 24, 0.34);
+  background: rgba(36, 30, 24, 0.34);
   -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
   opacity: 0; transition: opacity 0.28s; cursor: pointer;
 }
@@ -627,7 +627,7 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
 }
 .leaflet-bar a:hover { background: var(--sink) !important; color: var(--shu) !important; }
 .leaflet-control-attribution {
-  background: rgba(251, 248, 242, 0.82) !important;
+  background: rgba(252, 249, 243, 0.82) !important;
   color: var(--ink-3) !important;
   font-family: var(--font-ui); font-size: 10px !important;
   border-radius: 8px; padding: 2px 7px !important;
