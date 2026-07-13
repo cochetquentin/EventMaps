@@ -22,6 +22,9 @@ class Event(BaseModel):
     price: str | None = None
     attributes: TokyoCheapoAttributes | HanabiWalkerAttributes | TimeoutTokyoAttributes
     created_at: datetime
+    # ID du représentant du cluster de doublons (None = non encore dédupliqué,
+    # traité comme canonique). Voir le package dedup/ et db/events.py.
+    canonical_id: str | None = None
 
     @model_validator(mode="before")
     @classmethod

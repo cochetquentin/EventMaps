@@ -63,7 +63,7 @@ def cmd_tc(args):
     )
     if args.output == "db":
         with EventStore(args.db) as store:
-            store.upsert_events(events)
+            store.upsert_with_dedup(events)
         logger.info("Tokyo Cheapo: %d rows → %s", len(events), args.db)
     else:
         _write_events_csv(events)
@@ -80,7 +80,7 @@ def cmd_hanabi(args):
     )
     if args.output == "db":
         with EventStore(args.db) as store:
-            store.upsert_events(events)
+            store.upsert_with_dedup(events)
         logger.info("Hanabi Walker: %d rows → %s", len(events), args.db)
     else:
         _write_events_csv(events)
@@ -97,7 +97,7 @@ def cmd_tot(args):
     )
     if args.output == "db":
         with EventStore(args.db) as store:
-            store.upsert_events(events)
+            store.upsert_with_dedup(events)
         logger.info("Time Out Tokyo: %d rows → %s", len(events), args.db)
     else:
         _write_events_csv(events)
@@ -130,9 +130,8 @@ def cmd_all(args):
     )
     if args.output == "db":
         with EventStore(args.db) as store:
-            store.upsert_events(tc_events)
-            store.upsert_events(hanabi_events)
-            store.upsert_events(tot_events)
+            # Un seul passage de dédup sur l'ensemble agrégé des 3 sources.
+            store.upsert_with_dedup(tc_events + hanabi_events + tot_events)
         logger.info(
             "Stored %d + %d + %d rows in %s",
             len(tc_events),

@@ -4,21 +4,27 @@ _JST = timezone(timedelta(hours=9))
 
 _EVENTS_DDL = """
 CREATE TABLE IF NOT EXISTS events (
-    id          TEXT PRIMARY KEY,
-    source      TEXT NOT NULL,
-    title       TEXT NOT NULL,
-    url         TEXT NOT NULL,
-    start_date  TEXT,
-    end_date    TEXT,
-    times       TEXT,
-    venue       TEXT,
-    latitude    REAL,
-    longitude   REAL,
-    price       TEXT,
-    attributes  TEXT,
-    created_at  TEXT NOT NULL
+    id           TEXT PRIMARY KEY,
+    source       TEXT NOT NULL,
+    title        TEXT NOT NULL,
+    url          TEXT NOT NULL,
+    start_date   TEXT,
+    end_date     TEXT,
+    times        TEXT,
+    venue        TEXT,
+    latitude     REAL,
+    longitude    REAL,
+    price        TEXT,
+    attributes   TEXT,
+    created_at   TEXT NOT NULL,
+    canonical_id TEXT
 )
 """
+
+# Migrations idempotentes pour les DB events existantes (ALTER si la colonne manque).
+_EVENTS_MIGRATIONS = [
+    "ALTER TABLE events ADD COLUMN canonical_id TEXT",
+]
 
 _SCRAPE_JOBS_DDL = """
 CREATE TABLE IF NOT EXISTS scrape_jobs (
@@ -57,4 +63,5 @@ EVENTS_HEADERS = [
     "price",
     "attributes",
     "created_at",
+    "canonical_id",
 ]

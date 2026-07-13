@@ -6,6 +6,7 @@ from datetime import datetime
 
 from db.schema import (
     _EVENTS_DDL,
+    _EVENTS_MIGRATIONS,
     _JST,
     _SCRAPE_JOBS_DDL,
     _SCRAPE_JOBS_MIGRATIONS,
@@ -32,6 +33,17 @@ def _safe_iso_date(raw: str | None) -> str | None:
 def _migrate_scrape_jobs(conn: sqlite3.Connection) -> None:
     """Add new metric columns to scrape_jobs if they don't exist yet (existing DBs)."""
     for sql in _SCRAPE_JOBS_MIGRATIONS:
+        try:
+            conn.execute(sql)
+            conn.commit()
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" not in str(exc).lower():
+                raise
+
+
+def _migrate_events(conn: sqlite3.Connection) -> None:
+    """Add new columns to events if they don't exist yet (existing DBs)."""
+    for sql in _EVENTS_MIGRATIONS:
         try:
             conn.execute(sql)
             conn.commit()
@@ -210,5 +222,8 @@ def init_schema(db_path: str) -> sqlite3.Connection:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_coords ON events(latitude, longitude)")
     conn.commit()
     _migrate_scrape_jobs(conn)
+    _migrate_events(conn)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_events_canonical ON events(canonical_id)")
+    conn.commit()
     _migrate(conn)
     return conn

@@ -15,17 +15,73 @@ class EventsRepository:
     def upsert_events(self, events: list[Event]) -> None:
         rows = [self._event_row(e) for e in events]
         self._conn.executemany(
-            """INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                ON CONFLICT(id) DO UPDATE SET
                    title=excluded.title, start_date=excluded.start_date,
                    end_date=excluded.end_date, times=excluded.times,
                    venue=excluded.venue, latitude=excluded.latitude,
                    longitude=excluded.longitude, price=excluded.price,
-                   attributes=excluded.attributes, created_at=excluded.created_at
+                   attributes=excluded.attributes, created_at=excluded.created_at,
+                   canonical_id=excluded.canonical_id
             """,
             rows,
         )
         self._conn.commit()
+
+    def set_canonical_ids(self, mapping: dict[str, str]) -> None:
+        """Mettre à jour ``canonical_id`` de lignes existantes (id → canonical_id)."""
+        if not mapping:
+            return
+        self._conn.executemany(
+            "UPDATE events SET canonical_id = ? WHERE id = ?",
+            [(canonical, event_id) for event_id, canonical in mapping.items()],
+        )
+        self._conn.commit()
+
+    def recompute_canonical(self, upcoming_only: bool = True) -> dict[str, str]:
+        """Recalculer les ``canonical_id`` sur les événements déjà en base (backfill).
+
+        Ne touche à aucun autre champ, ne supprime rien. Par défaut ne traite que
+        les événements à venir (les seuls affichés sur la carte)."""
+        from dedup import assign_canonical_ids
+
+        events = self.get_events(upcoming=upcoming_only, limit=1000000)
+        mapping = assign_canonical_ids(events)
+        self.set_canonical_ids(mapping)
+        return mapping
+
+    def upsert_with_dedup(self, events: list[Event]) -> dict[str, str]:
+        """Insérer des événements en leur assignant un ``canonical_id`` cross-source.
+
+        Les nouveaux événements sont clusterisés AVEC les événements à venir déjà
+        en base : un doublon peut provenir d'un scrape antérieur d'une autre
+        source. On met à jour le ``canonical_id`` des nouveaux (avant upsert) et
+        des lignes existantes dont le représentant a changé. Rien n'est supprimé.
+
+        Renvoie le mapping complet id → canonical_id (utile pour les tests/logs).
+        """
+        from dedup import assign_canonical_ids
+
+        existing = self.get_events(upcoming=True, limit=100000)
+        # Union par id : les nouveaux événements priment sur la version en base.
+        new_ids = {e.id for e in events}
+        union = [e for e in existing if e.id not in new_ids] + list(events)
+
+        mapping = assign_canonical_ids(union)
+
+        # Assigne le canonical aux nouveaux événements avant insertion.
+        for event in events:
+            event.canonical_id = mapping.get(event.id, event.id)
+        self.upsert_events(events)
+
+        # Met à jour uniquement les lignes existantes dont le canonical a changé.
+        changed = {
+            e.id: mapping[e.id]
+            for e in existing
+            if e.id not in new_ids and mapping.get(e.id, e.id) != e.canonical_id
+        }
+        self.set_canonical_ids(changed)
+        return mapping
 
     def get_events(
         self,
@@ -39,9 +95,15 @@ class EventsRepository:
         offset: int = 0,
         q: str | None = None,
         category: str | None = None,
+        collapse: bool = False,
     ) -> list[Event]:
         clauses: list[str] = []
         params: list = []
+        if collapse:
+            # Ne garder qu'un représentant par cluster de doublons. Les lignes
+            # non encore dédupliquées (canonical_id NULL) sont leur propre
+            # représentant.
+            clauses.append("(canonical_id IS NULL OR canonical_id = id)")
         if source:
             clauses.append("source = ?")
             params.append(source)
@@ -118,6 +180,7 @@ class EventsRepository:
             e.price,
             json.dumps(e.attributes.model_dump()),
             e.created_at.isoformat(),
+            e.canonical_id,
         )
 
     @staticmethod
@@ -139,4 +202,5 @@ class EventsRepository:
             price=row[col["price"]],
             attributes=json.loads(row[col["attributes"]] or "{}"),
             created_at=datetime.fromisoformat(row[col["created_at"]]),
+            canonical_id=row[col["canonical_id"]],
         )

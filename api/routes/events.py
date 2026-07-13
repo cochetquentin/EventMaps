@@ -137,6 +137,9 @@ def list_events(
     offset: int = Query(0, ge=0),
     q: str | None = Query(None, description="Recherche texte sur le titre (LIKE)"),
     category: str | None = Query(None, description="Filtre par catégorie (événements TC)"),
+    collapse: bool = Query(
+        False, description="Regrouper les doublons : un seul représentant par cluster"
+    ),
 ):
     date_str = date.isoformat() if date else None
     start_from_str = start_from.isoformat() if start_from else None
@@ -155,6 +158,7 @@ def list_events(
             offset=offset,
             q=q or None,
             category=category or None,
+            collapse=collapse,
         )
 
 
