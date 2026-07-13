@@ -24,7 +24,7 @@ dev = [
     # en interne (TestClient), donc les tests API en dépendent transitivement.
     "httpx2>=2.5.0",
     "msgpack>=1.2.1",
-    "pip-audit>=2.7",
+    "pip-audit>=2.10.1",
     "pytest>=9.1.1",
     "pytest-cov>=4.0",
     "pyyaml>=6.0",
