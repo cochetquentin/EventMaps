@@ -80,6 +80,13 @@ function onPointerUp(e) {
   if (!dragging) return;
   dragging = false;
   const delta = e.clientY - startY;
+  // Geste quasi immobile = tap sur la poignée : on passe au cran suivant
+  // (peek → half → full → peek). Fallback si le glissement est capricieux.
+  if (Math.abs(delta) < 6) {
+    const idx = SNAP.indexOf(currentSnap);
+    applySnap(SNAP[(idx + 1) % SNAP.length]);
+    return;
+  }
   const finalT = Math.min(
     Math.max(0, panelHeight - PEEK_VISIBLE),
     Math.max(0, startTranslate + delta),

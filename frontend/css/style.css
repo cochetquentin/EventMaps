@@ -713,6 +713,10 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 1200;
     will-change: transform;
+    /* Position « peek » par défaut, sans dépendre du JS : même si le script ne
+       tourne pas (cache, erreur), la liste reste repliée et laisse voir la carte.
+       Le JS ne fait qu'ajuster ensuite ce translateY (drag / snap). */
+    transform: translateY(calc(88vh - 76px));
   }
   .sheet-handle {
     display: flex; align-items: center; justify-content: center;
