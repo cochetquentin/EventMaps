@@ -16,6 +16,7 @@ import { setupGeolocation, cancelGeolocation } from './geolocation.js';
 import { initDrawer, openDrawer } from './drawer.js';
 import { updateURL, restoreFromURL } from './share.js';
 import { downloadICS } from './ics-export.js';
+import { initMobileUI } from './mobile-ui.js';
 
 // ── Map init ──────────────────────────────────────────────────────────────
 const map = L.map('map').setView([35.68, 139.69], 11);
@@ -230,6 +231,9 @@ initScrapeButton();
 
 // ── Geolocation ───────────────────────────────────────────────────────────
 setupGeolocation();
+
+// ── UI mobile (bottom-sheet + en-tête repliable) ──────────────────────────
+initMobileUI();
 
 // ── Copy-link button ──────────────────────────────────────────────────────
 document.getElementById('copy-link-btn').addEventListener('click', () => {

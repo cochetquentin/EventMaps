@@ -653,29 +653,84 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
 .leaflet-control-attribution a { color: var(--ink-2) !important; }
 
 /* ══ Responsive ═══════════════════════════════════════════════════════════ */
+/* Éléments réservés au mobile — invisibles en desktop */
+.mobile-only { display: none; }
+.sheet-handle { display: none; }
+
+/* ── Mobile & tablette (< 860px) : carte plein écran, header + liste flottants ── */
 @media (max-width: 860px) {
+  /* Carte edge-to-edge : la grille se réduit à la seule zone carte,
+     header et liste sortent du flux (position: fixed) et flottent par-dessus. */
   body {
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
-    grid-template-areas: "header" "map";
-    padding: 10px; gap: 10px;
+    grid-template-rows: 1fr;
+    grid-template-areas: "map";
+    padding: 0; gap: 0;
+  }
+  #map { border-radius: 0; box-shadow: none; }
+
+  /* Décale les contrôles de zoom Leaflet sous le header flottant */
+  .leaflet-top.leaflet-right { top: 68px; right: 10px; }
+
+  /* ── En-tête compact flottant ── */
+  #app-header {
+    position: fixed;
+    top: 8px; left: 8px; right: 8px;
+    padding: 8px 10px;
+    z-index: 1000;
   }
   .brand-sub { display: none; }
-  #list-panel {
-    position: fixed; left: 10px; right: 10px; bottom: 10px; top: auto;
-    max-height: 46vh; z-index: 1200;
-    box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  .mobile-only { display: inline-flex; }
+  .header-main { flex-wrap: wrap; gap: 8px; }
+  .header-actions { margin-left: auto; gap: 6px; }
+
+  /* Boutons secondaires retirés sur mobile (place gagnée) */
+  #copy-link-btn, #export-ics-btn { display: none; }
+
+  /* Recherche repliée par défaut, déployée en 2ᵉ ligne via la loupe */
+  .search-wrap { display: none; }
+  #app-header.search-open .search-wrap {
+    display: block;
+    order: 10; flex-basis: 100%;
+    margin-top: 8px;
   }
-  .icon-btn.has-label span { display: none; }
-  .icon-btn.has-label { width: 38px; padding: 0; }
+  .search-wrap input { font-size: 16px; }  /* évite le zoom iOS */
+
+  /* Filtres repliés par défaut, déployés en panneau via le bouton filtres */
+  .header-filters { display: none; }
+  #app-header.filters-open .header-filters {
+    display: flex; flex-wrap: wrap;   /* tout voir : plus de scroll horizontal */
+    overflow: visible;
+  }
+  .filters-spacer { display: none; }
+
+  /* ── Bottom-sheet glissable pour la liste ── */
+  #list-panel {
+    position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+    width: auto; height: 88vh; max-height: none;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1200;
+    will-change: transform;
+  }
+  .sheet-handle {
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    padding: 9px 0 5px;
+    cursor: grab; touch-action: none;
+  }
+  .sheet-grip {
+    width: 40px; height: 5px;
+    border-radius: 999px;
+    background: var(--line);
+  }
+  #stats { touch-action: none; }
 }
 
 @media (max-width: 560px) {
   .brand-word { display: none; }
-  .search-wrap input { font-size: 16px; }  /* évite le zoom iOS */
-  #app-header { padding: 11px 12px; }
-  .header-main { gap: 8px; }
-  .header-actions { gap: 6px; }
+  #app-header { padding: 8px 10px; }
   .icon-btn { width: 34px; height: 34px; }
   .drawer-panel {
     top: auto; width: 100vw; height: 82vh;
