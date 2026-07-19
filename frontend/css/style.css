@@ -337,14 +337,35 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
   overflow: hidden;
 }
 
-#stats {
+.list-head {
   flex-shrink: 0;
-  padding: 15px 18px 13px;
-  font-size: 12px; color: var(--ink-2);
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--line-2);
+}
+#stats {
+  flex: 1; min-width: 0;
+  font-size: 12px; color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
 #stats strong { color: var(--ink); font-weight: 600; }
+
+/* Toggle portée de la liste : zone visible ↔ tous les événements filtrés */
+.scope-toggle {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center;
+  height: 28px; padding: 0 11px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 999px;
+  font-size: 11.5px; font-weight: 600; color: var(--ink-2);
+  cursor: pointer; white-space: nowrap; line-height: 1;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.scope-toggle:hover { color: var(--ink); border-color: var(--ink-3); }
+.scope-toggle[aria-pressed="true"] {
+  background: var(--ink); color: var(--paper); border-color: var(--ink);
+}
 
 #event-list {
   flex: 1; min-height: 0;
@@ -680,6 +701,9 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
     z-index: 1000;
   }
   .brand-sub { display: none; }
+  /* Sous-titre « Tokyo » masqué : on centre le nom avec le sceau et les boutons
+     (baseline le faisait remonter trop haut dans la barre). */
+  .brand { align-items: center; }
   .mobile-only { display: inline-flex; }
   .header-main { flex-wrap: wrap; gap: 8px; }
   .header-actions { margin-left: auto; gap: 6px; }

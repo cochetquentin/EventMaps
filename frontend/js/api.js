@@ -1,4 +1,4 @@
-import { map, setAllEvents } from './state.js';
+import { map, setAllEvents, showAllEvents } from './state.js';
 import { buildPills } from './filters.js';
 import { renderMarkers } from './markers.js';
 import { updateURL } from './share.js';
@@ -21,10 +21,13 @@ export async function fetchEventsByBbox({ category = null } = {}) {
     const b = map.getBounds(), sw = b.getSouthWest(), ne = b.getNorthEast();
     const minLon = Math.max(-180, sw.lng), maxLon = Math.min(180, ne.lng);
     const minLat = Math.max(-90,  sw.lat), maxLat = Math.min(90,  ne.lat);
-    // Degenerate bbox (whole-world zoom) → no bbox filter, server returns all upcoming
-    const bbox = (minLon < maxLon && minLat < maxLat)
-      ? `${minLon},${minLat},${maxLon},${maxLat}`
-      : null;
+    // Pas de bbox si :
+    //  - l'utilisateur a choisi « Tous » (liste = tous les événements filtrés), ou
+    //  - bbox dégénérée (zoom monde) → le serveur renvoie tous les événements à venir.
+    const degenerate = !(minLon < maxLon && minLat < maxLat);
+    const bbox = (showAllEvents || degenerate)
+      ? null
+      : `${minLon},${minLat},${maxLon},${maxLat}`;
     const PAGE = 500;
     const events = [];
     let offset = 0;

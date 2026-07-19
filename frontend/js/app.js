@@ -1,5 +1,5 @@
 /* global L */
-import { setMap, setClusterGroup, deactivatedPills, setShowOnlyFavorites, showOnlyFavorites, markerMap, allEvents, setUserPosition, setProximityMode } from './state.js';
+import { setMap, setClusterGroup, deactivatedPills, setShowOnlyFavorites, showOnlyFavorites, markerMap, allEvents, setUserPosition, setProximityMode, showAllEvents, setShowAllEvents } from './state.js';
 import { isoDate, todayJST, computePresets } from './utils.js';
 import { toggleFavorite, isFavorite, getIcon, updateFavPill } from './favorites.js';
 import { buildPopup } from './popups.js';
@@ -51,6 +51,8 @@ let skipFetchOnce = false;
 map.on('autopanstart', () => { skipFetchOnce = true; });
 map.on('moveend', () => {
   if (!bboxFetchEnabled) return;
+  // En mode « Tous », la liste ne dépend pas de la zone visible : inutile de recharger.
+  if (showAllEvents) return;
   if (skipFetchOnce) { skipFetchOnce = false; return; }
   clearTimeout(fetchDebounceTimer);
   setFetchDebounceTimer(setTimeout(fetchEventsByBbox, 300));
@@ -234,6 +236,20 @@ setupGeolocation();
 
 // ── UI mobile (bottom-sheet + en-tête repliable) ──────────────────────────
 initMobileUI();
+
+// ── Portée de la liste : zone visible vs tous les événements filtrés ───────
+const scopeToggle = document.getElementById('scope-toggle');
+function updateScopeToggle() {
+  scopeToggle.setAttribute('aria-pressed', String(showAllEvents));
+  scopeToggle.querySelector('.scope-label').textContent = showAllEvents ? '🌐 Tous' : '📍 Zone visible';
+}
+scopeToggle.addEventListener('click', () => {
+  setShowAllEvents(!showAllEvents);
+  updateScopeToggle();
+  clearTimeout(fetchDebounceTimer);
+  setFetchDebounceTimer(setTimeout(fetchEventsByBbox, 50));
+});
+updateScopeToggle();
 
 // ── Copy-link button ──────────────────────────────────────────────────────
 document.getElementById('copy-link-btn').addEventListener('click', () => {

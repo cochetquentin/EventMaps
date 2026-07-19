@@ -119,7 +119,13 @@
 <!-- ── Panneau liste ── -->
 <aside id="list-panel">
   <div class="sheet-handle" aria-hidden="true"><span class="sheet-grip"></span></div>
-  <div id="stats">Chargement…</div>
+  <div class="list-head">
+    <div id="stats">Chargement…</div>
+    <button id="scope-toggle" class="scope-toggle" type="button" aria-pressed="false"
+            title="Basculer entre les événements de la zone visible et tous les événements filtrés">
+      <span class="scope-label">📍 Zone visible</span>
+    </button>
+  </div>
   <div id="event-list"></div>
 </aside>
 
