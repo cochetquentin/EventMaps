@@ -669,8 +669,8 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
   }
   #map { border-radius: 0; box-shadow: none; }
 
-  /* Décale les contrôles de zoom Leaflet sous le header flottant */
-  .leaflet-top.leaflet-right { top: 68px; right: 10px; }
+  /* Zoom +/- inutile au doigt (pinch-to-zoom) et masqué par le header flottant : on le retire */
+  .leaflet-control-zoom { display: none; }
 
   /* ── En-tête compact flottant ── */
   #app-header {
@@ -696,13 +696,18 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
   }
   .search-wrap input { font-size: 16px; }  /* évite le zoom iOS */
 
-  /* Filtres repliés par défaut, déployés en panneau via le bouton filtres */
+  /* Filtres repliés par défaut, déployés en liste déroulante verticale via le bouton filtres.
+     Chaque groupe occupe la largeur et passe à la ligne au lieu de déborder du cadre. */
   .header-filters { display: none; }
   #app-header.filters-open .header-filters {
-    display: flex; flex-wrap: wrap;   /* tout voir : plus de scroll horizontal */
-    overflow: visible;
+    display: flex; flex-direction: column; align-items: stretch;
+    gap: 12px;
+    max-height: 62vh; overflow-y: auto;   /* scroll vertical si beaucoup de filtres */
   }
-  .filters-spacer { display: none; }
+  #app-header.filters-open .segmented { flex-wrap: wrap; border-radius: var(--r-md); }
+  #app-header.filters-open .pills-row { flex-wrap: wrap; }
+  /* Spacer/divider n'ont plus de sens en colonne */
+  .filters-spacer, .filters-divider { display: none; }
 
   /* ── Bottom-sheet glissable pour la liste ── */
   #list-panel {
@@ -733,7 +738,7 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
 }
 
 @media (max-width: 560px) {
-  .brand-word { display: none; }
+  .brand-word { font-size: 18px; }   /* nom conservé, un peu réduit pour tenir */
   #app-header { padding: 8px 10px; }
   .icon-btn { width: 34px; height: 34px; }
   .drawer-panel {
