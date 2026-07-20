@@ -1,0 +1,211 @@
+import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
+import { pickNext, createScheduler, initTokyoLive } from '../js/tokyo-live.js';
+import { seasonFor, describeDistrict, nearestDistrict } from '../js/tokyo-live-data.js';
+import { fetchWeather } from '../js/weather.js';
+
+// ── Ordonnanceur ────────────────────────────────────────────────────────────
+
+const PROVIDERS = [
+  { id: 'weather', category: 'weather', priority: 10, importance: 'normal' },
+  { id: 'time',    category: 'time',    priority: 8,  importance: 'normal' },
+  { id: 'season',  category: 'season',  priority: 3,  importance: 'low' },
+];
+
+describe('createScheduler', () => {
+  test('ne répète jamais deux fois la même carte d\'affilée', () => {
+    const s = createScheduler(PROVIDERS);
+    const all = new Set(['weather', 'time', 'season']);
+    let prev = null;
+    for (let i = 0; i < 200; i++) {
+      const id = s.next(all);
+      expect(id).not.toBe(prev);
+      prev = id;
+    }
+  });
+
+  test('les hautes priorités apparaissent plus souvent (jeu nominal)', () => {
+    // Avec assez de providers (comme en conditions réelles), le cooldown de catégorie
+    // n'impose plus un round-robin strict : la priorité départage réellement.
+    const p5 = [
+      { id: 'weather', category: 'weather', priority: 10, importance: 'normal' },
+      { id: 'time',    category: 'time',    priority: 8,  importance: 'normal' },
+      { id: 'sun',     category: 'sun',     priority: 6,  importance: 'low' },
+      { id: 'season',  category: 'season',  priority: 3,  importance: 'low' },
+      { id: 'place',   category: 'place',   priority: 2,  importance: 'normal' },
+    ];
+    const s = createScheduler(p5);
+    const all = new Set(p5.map((p) => p.id));
+    const count = Object.fromEntries(p5.map((p) => [p.id, 0]));
+    for (let i = 0; i < 1000; i++) count[s.next(all)]++;
+    expect(count.weather).toBeGreaterThan(count.season);
+    expect(count.time).toBeGreaterThan(count.season);
+    expect(count.weather).toBeGreaterThan(count.place);
+  });
+
+  test('exclut les providers dont la carte est indisponible', () => {
+    const s = createScheduler(PROVIDERS);
+    const onlyTime = new Set(['time']);
+    for (let i = 0; i < 20; i++) expect(s.next(onlyTime)).toBe('time');
+  });
+});
+
+describe('pickNext', () => {
+  const state = () => ({ credits: {}, recent: [], lastId: null, forcedId: undefined });
+
+  test('le forçage gagne quand la carte est disponible', () => {
+    const st = state(); st.forcedId = 'season';
+    expect(pickNext(PROVIDERS, new Set(['weather', 'time', 'season']), st)).toBe('season');
+  });
+
+  test('un forçage indisponible est ignoré', () => {
+    const st = state(); st.forcedId = 'season';
+    const id = pickNext(PROVIDERS, new Set(['weather', 'time']), st);
+    expect(id).not.toBe('season');
+  });
+
+  test('une carte critique préempte la rotation normale', () => {
+    const providers = [
+      ...PROVIDERS,
+      { id: 'alert', category: 'alert', priority: 1, importance: 'critical' },
+    ];
+    const id = pickNext(providers, new Set(['weather', 'time', 'alert']), state());
+    expect(id).toBe('alert');
+  });
+
+  test('le fallback est choisi quand il est seul disponible', () => {
+    const providers = [...PROVIDERS, { id: 'fallback', category: 'fallback', priority: 0, importance: 'low' }];
+    expect(pickNext(providers, new Set(['fallback']), state())).toBe('fallback');
+  });
+
+  test('la catégorie récente est évitée si une alternative existe', () => {
+    const st = state(); st.recent = ['weather']; st.credits = { weather: 100, time: 1, season: 1 };
+    // weather a le plus gros crédit mais est en cooldown → on prend un autre
+    expect(pickNext(PROVIDERS, new Set(['weather', 'time', 'season']), st)).not.toBe('weather');
+  });
+});
+
+// ── Saisons ──────────────────────────────────────────────────────────────────
+
+describe('seasonFor', () => {
+  const on = (m, d) => seasonFor(new Date(Date.UTC(2026, m - 1, d)));
+
+  test.each([
+    [1, 15, 'Winter'],
+    [3, 19, 'Winter'],
+    [3, 20, 'Sakura'],
+    [4, 10, 'Sakura'],
+    [4, 11, 'Fresh green'],
+    [6, 15, 'Tsuyu'],
+    [8, 1, 'Hanabi'],
+    [10, 1, 'Autumn'],
+    [11, 15, 'Momiji'],
+    [12, 25, 'Illuminations'],
+  ])('%i/%i → %s', (m, d, label) => {
+    expect(on(m, d).label).toBe(label);
+  });
+});
+
+// ── Quartiers ────────────────────────────────────────────────────────────────
+
+describe('nearestDistrict', () => {
+  test('trouve le quartier le plus proche', () => {
+    const { district } = nearestDistrict(35.6595, 139.7005); // Shibuya exact
+    expect(district.name).toBe('Shibuya');
+  });
+});
+
+describe('describeDistrict', () => {
+  test('vue trop large (zoom < 12) → null', () => {
+    expect(describeDistrict(35.6595, 139.7005, 10)).toBeNull();
+  });
+
+  test('point trop loin de tout quartier → null', () => {
+    expect(describeDistrict(34.6937, 135.5023, 14)).toBeNull(); // Osaka
+  });
+
+  test('centré sur un quartier → formulation "Exploring"', () => {
+    const r = describeDistrict(35.6595, 139.7005, 14); // Shibuya
+    expect(r.name).toBe('Shibuya');
+    expect(r.natural.text).toBe('Exploring Shibuya');
+  });
+
+  test('un peu décentré → "Around"', () => {
+    // ~1.4 km au sud d'Odaiba (quartier isolé → pas d'ambiguïté de voisinage)
+    const r = describeDistrict(35.6170, 139.7752, 14);
+    expect(r.name).toBe('Odaiba');
+    expect(r.natural.text.startsWith('Around')).toBe(true);
+  });
+
+  test('quartier tagué → carte éditoriale disponible', () => {
+    const r = describeDistrict(35.7141, 139.7774, 14); // Ueno
+    expect(r.tag).not.toBeNull();
+    expect(r.tag.text).toBe('Ueno is entering peak bloom.');
+  });
+});
+
+// ── Montage (smoke test du moteur avec un DOM minimal) ───────────────────────
+
+function fakeEl() {
+  return {
+    innerHTML: '', hidden: true, offsetWidth: 0, _card: null,
+    classList: { add() {}, remove() {}, contains: () => false },
+    addEventListener() {},
+    querySelector(sel) {
+      if (sel === '.tlive-card') { this._card = this._card || fakeEl(); return this._card; }
+      return null;
+    },
+  };
+}
+
+describe('initTokyoLive (montage)', () => {
+  let host;
+  beforeEach(() => {
+    vi.useFakeTimers();
+    host = fakeEl();
+    vi.stubGlobal('document', { getElementById: (id) => (id === 'tokyo-live' ? host : null), addEventListener() {}, hidden: false });
+    vi.stubGlobal('matchMedia', () => ({ matches: true })); // reduce-motion → rendu synchrone
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
+
+  test('affiche une carte immédiatement (fallback) sans lever d\'erreur', () => {
+    expect(() => initTokyoLive()).not.toThrow();
+    expect(host.hidden).toBe(false);
+    // Le premier advance() rend une carte : le conteneur interne n'est plus vide.
+    expect(host._card.innerHTML).toContain('tlive-l1');
+    expect(host._card.innerHTML).toContain('Tokyo'); // fallback garanti hors réseau
+  });
+});
+
+// ── fetchWeather ──────────────────────────────────────────────────────────────
+
+describe('fetchWeather', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  test('normalise le payload Open-Meteo (dont daily sunrise/sunset)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        current: { temperature_2m: 22.6, weather_code: 0 },
+        hourly: { time: [], precipitation_probability: [] },
+        daily: { sunrise: ['2026-07-20T04:39'], sunset: ['2026-07-20T18:56'] },
+      }),
+    })));
+    const w = await fetchWeather();
+    expect(w.temp).toBe(23);
+    expect(w.emoji).toBe('☀️');
+    expect(w.daily.sunrise).toBe('2026-07-20T04:39');
+    expect(w.daily.sunset).toBe('2026-07-20T18:56');
+    expect(typeof w.message).toBe('string');
+  });
+
+  test('renvoie null si les données sont incomplètes', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ current: {} }) })));
+    expect(await fetchWeather()).toBeNull();
+  });
+
+  test('renvoie null en cas d\'échec réseau', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
+    expect(await fetchWeather()).toBeNull();
+  });
+});

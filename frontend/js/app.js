@@ -16,7 +16,7 @@ import { setupGeolocation, cancelGeolocation } from './geolocation.js';
 import { initDrawer, openDrawer } from './drawer.js';
 import { updateURL, restoreFromURL } from './share.js';
 import { initMobileUI } from './mobile-ui.js';
-import { initWeather } from './weather.js';
+import { initTokyoLive } from './tokyo-live.js';
 
 // ── Map init ──────────────────────────────────────────────────────────────
 const map = L.map('map').setView([35.68, 139.69], 11);
@@ -216,8 +216,8 @@ setupGeolocation();
 // ── UI mobile (bottom-sheet + en-tête repliable) ──────────────────────────
 initMobileUI();
 
-// ── Widget météo (en-tête desktop) ────────────────────────────────────────
-initWeather();
+// ── Context Cards (en-tête desktop) ───────────────────────────────────────
+initTokyoLive();
 
 // ── Portée de la liste : zone visible vs tous les événements filtrés ───────
 const scopeToggle = document.getElementById('scope-toggle');

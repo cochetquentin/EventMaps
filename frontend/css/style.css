@@ -173,19 +173,65 @@ body {
 /* Espace flexible au centre de l'en-tête : pousse météo + boutons à droite */
 .header-fill { flex: 1 1 auto; min-width: 0; }
 
-/* Widget météo Tokyo (desktop) — un peu d'info sympa dans l'en-tête */
-.weather {
-  display: flex; align-items: center; gap: 8px;
+/* Context Cards Tokyo (desktop) — infos contextuelles rotatives, très discrètes.
+   Largeur bornée + hauteur figée : le changement de carte ne décale jamais le layout. */
+.tlive {
+  display: flex; align-items: center; gap: 9px;
   flex-shrink: 1; min-width: 0;
-  padding: 0 6px;
-  font-size: 12.5px; color: var(--ink-2);
+  width: 288px; max-width: 288px; height: 38px;
+  padding: 0 4px;
+  cursor: pointer; user-select: none;
 }
-.weather[hidden] { display: none; }
-.weather-icon { font-size: 17px; line-height: 1; }
-.weather-temp { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
-.weather-msg {
+.tlive[hidden] { display: none; }
+
+/* Point « live » : pulsation douce, or festif (jamais le rouge d'action) */
+.tlive-dot {
+  flex-shrink: 0;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 0 rgba(201, 150, 47, 0.5);
+  animation: tlive-pulse 3.2s ease-in-out infinite;
+}
+@keyframes tlive-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201, 150, 47, 0.45); opacity: 0.9; }
+  50%      { box-shadow: 0 0 0 4px rgba(201, 150, 47, 0); opacity: 0.5; }
+}
+
+.tlive-title {
+  flex-shrink: 0;
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--ink-3);
+}
+
+/* Scène : fenêtre à hauteur fixe qui masque le glissement des cartes */
+.tlive-stage { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+
+.tlive-card {
+  display: flex; align-items: center; gap: 8px;
+  min-width: 0;
+  transition: opacity 130ms cubic-bezier(0.4, 0, 0.2, 1),
+              transform 130ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* Sortie (glisse vers le haut) puis entrée (depuis le bas) — 4–8px, à peine perceptible */
+.tlive-card.is-leaving  { opacity: 0; transform: translateY(-6px); }
+.tlive-card.is-entering { opacity: 0; transform: translateY(6px); transition: none; }
+
+.tlive-ico { font-size: 17px; line-height: 1; flex-shrink: 0; }
+.tlive-lines { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.tlive-l1 {
+  font-size: 12.5px; font-weight: 600; color: var(--ink);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tlive-l2 {
+  font-size: 11px; color: var(--ink-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tlive-dot { animation: none; }
+  .tlive-card { transition: opacity 130ms linear; }
 }
 
 /* Boutons icônes — poussés à droite (indispensable sur mobile, où les presets
@@ -750,8 +796,8 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
   .header-main { gap: 8px; }
   .header-actions { gap: 6px; }
 
-  /* Widget météo réservé au desktop (en-tête mobile déjà compact) */
-  .weather { display: none; }
+  /* Context Cards réservées au desktop (en-tête mobile déjà compact) */
+  .tlive { display: none; }
 
   .search-wrap input { font-size: 16px; }  /* évite le zoom iOS */
 
