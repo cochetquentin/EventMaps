@@ -51,6 +51,17 @@
       <input type="text" id="search-input" placeholder="Un événement, un lieu, une station…" />
     </div>
 
+    <!-- Périodes rapides inline (desktop) — les mêmes presets restent dans le panneau Filtres sur mobile -->
+    <div class="header-presets">
+      <div class="segmented" role="group" aria-label="Périodes">
+        <button class="preset-btn" data-preset="today">Aujourd'hui</button>
+        <button class="preset-btn" data-preset="weekend">Ce W-E</button>
+        <button class="preset-btn" data-preset="next-weekend">W-E suivant</button>
+        <button class="preset-btn" data-preset="week">Cette semaine</button>
+        <button class="preset-btn" data-preset="next-week">Sem. suivante</button>
+      </div>
+    </div>
+
     <div class="header-actions">
       <button id="search-toggle" class="icon-btn" title="Rechercher" aria-label="Ouvrir la recherche" aria-expanded="false">
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.65" y2="16.65"/></svg>
