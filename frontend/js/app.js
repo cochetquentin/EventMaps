@@ -15,7 +15,6 @@ import {
 import { setupGeolocation, cancelGeolocation } from './geolocation.js';
 import { initDrawer, openDrawer } from './drawer.js';
 import { updateURL, restoreFromURL } from './share.js';
-import { downloadICS } from './ics-export.js';
 import { initMobileUI } from './mobile-ui.js';
 
 // ── Map init ──────────────────────────────────────────────────────────────
@@ -250,30 +249,6 @@ scopeToggle.addEventListener('click', () => {
   setFetchDebounceTimer(setTimeout(fetchEventsByBbox, 50));
 });
 updateScopeToggle();
-
-// ── Copy-link button ──────────────────────────────────────────────────────
-document.getElementById('copy-link-btn').addEventListener('click', () => {
-  updateURL();
-  const btn = document.getElementById('copy-link-btn');
-  const onSuccess = () => {
-    btn.classList.add('copied');
-    setTimeout(() => btn.classList.remove('copied'), 1500);
-  };
-  const onFailure = () => {
-    btn.classList.add('failed');
-    setTimeout(() => btn.classList.remove('failed'), 1500);
-  };
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(location.href).then(onSuccess).catch(onFailure);
-  } else {
-    onFailure();
-  }
-});
-
-// ── Export ICS button ─────────────────────────────────────────────────────
-document.getElementById('export-ics-btn').addEventListener('click', () => {
-  downloadICS();
-});
 
 // ── Toggle catégories (Aucune / Toutes) ───────────────────────────────────
 document.getElementById('toggle-cats').addEventListener('click', toggleAllCategoryPills);

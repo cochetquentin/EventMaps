@@ -98,6 +98,7 @@ body {
 .header-main {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   min-width: 0;
 }
@@ -136,8 +137,14 @@ body {
   color: var(--gold);
 }
 
-/* Recherche */
-.search-wrap { position: relative; flex: 1; min-width: 0; }
+/* Recherche — repliée derrière la loupe (desktop comme mobile), déployée en
+   pleine largeur sous la barre principale au clic. Économise l'espace de l'en-tête. */
+.search-wrap { position: relative; min-width: 0; display: none; }
+#app-header.search-open .search-wrap {
+  display: block;
+  order: 10; flex-basis: 100%;
+  margin-top: 8px;
+}
 .search-wrap input {
   width: 100%; height: 40px;
   padding: 0 14px 0 40px;
@@ -163,8 +170,8 @@ body {
   pointer-events: none;
 }
 
-/* Boutons icônes */
-.header-actions { display: flex; gap: 7px; flex-shrink: 0; }
+/* Boutons icônes — poussés à droite (la recherche repliée ne fait plus de spacer) */
+.header-actions { display: flex; gap: 7px; flex-shrink: 0; margin-left: auto; }
 
 .icon-btn {
   position: relative;
@@ -721,20 +728,9 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
   /* Sous-titre « Tokyo » masqué : on centre le nom avec le sceau et les boutons
      (baseline le faisait remonter trop haut dans la barre). */
   .brand { align-items: center; }
-  .mobile-only { display: inline-flex; }
-  .header-main { flex-wrap: wrap; gap: 8px; }
-  .header-actions { margin-left: auto; gap: 6px; }
+  .header-main { gap: 8px; }
+  .header-actions { gap: 6px; }
 
-  /* Boutons secondaires retirés sur mobile (place gagnée) */
-  #copy-link-btn, #export-ics-btn { display: none; }
-
-  /* Recherche repliée par défaut, déployée en 2ᵉ ligne via la loupe */
-  .search-wrap { display: none; }
-  #app-header.search-open .search-wrap {
-    display: block;
-    order: 10; flex-basis: 100%;
-    margin-top: 8px;
-  }
   .search-wrap input { font-size: 16px; }  /* évite le zoom iOS */
 
   /* Sur mobile, le panneau de filtres s'affiche en colonne : une entrée par ligne,
