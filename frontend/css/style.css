@@ -170,68 +170,62 @@ body {
   pointer-events: none;
 }
 
-/* Espace flexible au centre de l'en-tête : pousse météo + boutons à droite */
-.header-fill { flex: 1 1 auto; min-width: 0; }
-
-/* Context Cards Tokyo (desktop) — infos contextuelles rotatives, très discrètes.
-   Largeur bornée + hauteur figée : le changement de carte ne décale jamais le layout. */
+/* ══ Context Bar (desktop) ══════════════════════════════════════════════════
+   Occupe l'espace libre du header entre le logo et les boutons.
+   Blocs de contexte permanents (météo · heure · quartier) + un bloc éditorial
+   rotatif qui récupère l'espace restant. Largeur adaptative, hauteur figée :
+   le header reste équilibré et ne décale jamais. */
 .tlive {
-  display: flex; align-items: center; gap: 9px;
-  flex-shrink: 1; min-width: 0;
-  width: 288px; max-width: 288px; height: 38px;
-  padding: 0 4px;
-  cursor: pointer; user-select: none;
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center;
+  height: 38px;
+  color: var(--ink-2);
+  overflow: hidden;
 }
 .tlive[hidden] { display: none; }
 
-/* Point « live » : pulsation douce, or festif (jamais le rouge d'action) */
-.tlive-dot {
-  flex-shrink: 0;
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--gold);
-  box-shadow: 0 0 0 0 rgba(201, 150, 47, 0.5);
-  animation: tlive-pulse 3.2s ease-in-out infinite;
+/* Contexte permanent — occupe juste la place nécessaire, ne rétrécit pas */
+.tlive-context { display: flex; align-items: center; flex: 0 0 auto; min-width: 0; }
+.tlive-block {
+  display: flex; align-items: center; gap: 7px;
+  padding: 0 16px; white-space: nowrap;
 }
-@keyframes tlive-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(201, 150, 47, 0.45); opacity: 0.9; }
-  50%      { box-shadow: 0 0 0 4px rgba(201, 150, 47, 0); opacity: 0.5; }
+.tlive-block:first-child { padding-left: 6px; }
+.tlive-block + .tlive-block { border-left: 1px solid var(--line); }
+.tlive-b-ico  { font-size: 16px; line-height: 1; }
+.tlive-b-main {
+  font-size: 13px; font-weight: 600; color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
+.tlive-b-sub  { font-size: 12px; color: var(--ink-3); }
 
-.tlive-title {
-  flex-shrink: 0;
-  font-size: 10.5px; font-weight: 600;
-  letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--ink-3);
+/* Bloc éditorial — récupère tout l'espace restant, le plus discret visuellement,
+   tronqué proprement si nécessaire. Seul élément animé de la barre. */
+.tlive-editorial {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center;
+  padding-left: 16px;
+  border-left: 1px solid var(--line);
+  overflow: hidden;
+  cursor: pointer;
 }
-
-/* Scène : fenêtre à hauteur fixe qui masque le glissement des cartes */
-.tlive-stage { flex: 1 1 auto; min-width: 0; overflow: hidden; }
-
 .tlive-card {
-  display: flex; align-items: center; gap: 8px;
-  min-width: 0;
-  transition: opacity 130ms cubic-bezier(0.4, 0, 0.2, 1),
-              transform 130ms cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  transition: opacity 150ms cubic-bezier(0.4, 0, 0.2, 1),
+              transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
 }
-/* Sortie (glisse vers le haut) puis entrée (depuis le bas) — 4–8px, à peine perceptible */
+/* Sortie (glisse vers le haut) puis entrée (depuis le bas) — 6px, à peine perceptible */
 .tlive-card.is-leaving  { opacity: 0; transform: translateY(-6px); }
 .tlive-card.is-entering { opacity: 0; transform: translateY(6px); transition: none; }
-
-.tlive-ico { font-size: 17px; line-height: 1; flex-shrink: 0; }
-.tlive-lines { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
-.tlive-l1 {
-  font-size: 12.5px; font-weight: 600; color: var(--ink);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.tlive-l2 {
-  font-size: 11px; color: var(--ink-3);
+.tlive-ed-ico  { font-size: 15px; line-height: 1; flex-shrink: 0; opacity: 0.9; }
+.tlive-ed-text {
+  font-size: 12.5px; color: var(--ink-3);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tlive-dot { animation: none; }
-  .tlive-card { transition: opacity 130ms linear; }
+  .tlive-card { transition: opacity 150ms linear; }
+  .tlive-card.is-leaving, .tlive-card.is-entering { transform: none; }
 }
 
 /* Boutons icônes — poussés à droite (indispensable sur mobile, où les presets

@@ -147,13 +147,10 @@ describe('describeDistrict', () => {
 
 function fakeEl() {
   return {
-    innerHTML: '', hidden: true, offsetWidth: 0, _card: null,
+    innerHTML: '', hidden: true, offsetWidth: 0, _q: {},
     classList: { add() {}, remove() {}, contains: () => false },
     addEventListener() {},
-    querySelector(sel) {
-      if (sel === '.tlive-card') { this._card = this._card || fakeEl(); return this._card; }
-      return null;
-    },
+    querySelector(sel) { this._q[sel] = this._q[sel] || fakeEl(); return this._q[sel]; },
   };
 }
 
@@ -168,12 +165,13 @@ describe('initTokyoLive (montage)', () => {
   });
   afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
-  test('affiche une carte immédiatement (fallback) sans lever d\'erreur', () => {
+  test('monte la barre (contexte + éditorial) sans lever d\'erreur', () => {
     expect(() => initTokyoLive()).not.toThrow();
     expect(host.hidden).toBe(false);
-    // Le premier advance() rend une carte : le conteneur interne n'est plus vide.
-    expect(host._card.innerHTML).toContain('tlive-l1');
-    expect(host._card.innerHTML).toContain('Tokyo'); // fallback garanti hors réseau
+    // Contexte permanent : l'heure est toujours présente (même hors réseau).
+    expect(host.querySelector('.tlive-context').innerHTML).toContain('tlive-block');
+    // Bloc éditorial : le fallback garantit un contenu même sans météo/événements.
+    expect(host.querySelector('.tlive-card').innerHTML).toContain('tlive-ed-text');
   });
 });
 
