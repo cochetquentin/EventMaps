@@ -170,9 +170,8 @@ body {
   pointer-events: none;
 }
 
-/* Périodes rapides inline (desktop) : occupent et centrent l'espace libre au
-   milieu de l'en-tête. Masquées sur mobile (elles restent dans le panneau Filtres). */
-.header-presets { flex: 1; display: flex; justify-content: center; min-width: 0; }
+/* Espace flexible au centre de l'en-tête : pousse météo + boutons à droite */
+.header-fill { flex: 1 1 auto; min-width: 0; }
 
 /* Widget météo Tokyo (desktop) — un peu d'info sympa dans l'en-tête */
 .weather {
@@ -258,10 +257,6 @@ body {
   z-index: 600;
   max-height: 60vh; overflow-y: auto;   /* défilement si vraiment beaucoup de filtres */
 }
-/* Sur desktop, les périodes sont inline dans l'en-tête : on ne les duplique pas
-   dans le panneau (elles réapparaissent dans le panneau sur mobile, cf. media query). */
-.header-filters .segmented { display: none; }
-
 /* Groupes internes en pleine largeur : sans flex-basis:100% + min-width:0, un flex
    imbriqué garde la largeur de son contenu (min-width auto) et déborde au lieu de
    wrapper. Là, périodes et catégories passent proprement à la ligne.
@@ -755,9 +750,6 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
   .header-main { gap: 8px; }
   .header-actions { gap: 6px; }
 
-  /* Presets inline masqués sur mobile ; ils réapparaissent dans le panneau Filtres */
-  .header-presets { display: none; }
-  .header-filters .segmented { display: inline-flex; }
   /* Widget météo réservé au desktop (en-tête mobile déjà compact) */
   .weather { display: none; }
 

@@ -51,16 +51,8 @@
       <input type="text" id="search-input" placeholder="Un événement, un lieu, une station…" />
     </div>
 
-    <!-- Périodes rapides inline (desktop) — les mêmes presets restent dans le panneau Filtres sur mobile -->
-    <div class="header-presets">
-      <div class="segmented" role="group" aria-label="Périodes">
-        <button class="preset-btn" data-preset="today">Aujourd'hui</button>
-        <button class="preset-btn" data-preset="weekend">Ce W-E</button>
-        <button class="preset-btn" data-preset="next-weekend">W-E suivant</button>
-        <button class="preset-btn" data-preset="week">Cette semaine</button>
-        <button class="preset-btn" data-preset="next-week">Sem. suivante</button>
-      </div>
-    </div>
+    <!-- Espace flexible : pousse météo + boutons à droite, laisse le centre libre -->
+    <div class="header-fill" aria-hidden="true"></div>
 
     <!-- Widget météo Tokyo (desktop) — masqué tant que les données ne sont pas chargées -->
     <div id="weather" class="weather" hidden></div>
