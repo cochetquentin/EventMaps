@@ -216,15 +216,32 @@ body {
 #copy-link-btn.copied .ico-check { display: block; }
 #copy-link-btn.failed { color: var(--tot); border-color: rgba(194, 58, 87, 0.4); }
 
-/* ── Rangée filtres ──────────────────────────────────────────────────────── */
-.header-filters {
-  display: flex; align-items: center; gap: 8px;
-  margin-top: 11px; padding-top: 11px;
-  border-top: 1px solid var(--line-2);
-  overflow-x: auto;
-  scrollbar-width: none;
+/* ── Rangée filtres : panneau déroulant ouvert via le bouton « Filtres » ──── */
+/* Repliée par défaut (desktop comme mobile) : évite qu'une longue liste de
+   catégories déborde du cadre sans moyen de défiler. */
+.header-filters { display: none; }
+#app-header.filters-open .header-filters {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  position: absolute; top: 100%; left: 0; right: 0;
+  margin-top: 8px; padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  z-index: 600;
+  max-height: 60vh; overflow-y: auto;   /* défilement si vraiment beaucoup de filtres */
 }
-.header-filters::-webkit-scrollbar { display: none; }
+/* Groupes internes : passent à la ligne au lieu de déborder du panneau */
+#app-header.filters-open .segmented { flex-wrap: wrap; border-radius: var(--r-md); }
+#app-header.filters-open .pills-row { flex-wrap: wrap; }
+/* Spacer/divider n'ont plus de sens dans un panneau qui wrap */
+.filters-spacer, .filters-divider { display: none; }
+
+/* Bouton Filtres actif quand le panneau est ouvert */
+#filters-toggle[aria-expanded="true"],
+#search-toggle[aria-expanded="true"] {
+  color: var(--shu); border-color: var(--shu); background: var(--shu-wash);
+}
 
 /* Segmented control — périodes */
 .segmented {
@@ -720,18 +737,12 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
   }
   .search-wrap input { font-size: 16px; }  /* évite le zoom iOS */
 
-  /* Filtres repliés par défaut, déployés en liste déroulante verticale via le bouton filtres.
-     Chaque groupe occupe la largeur et passe à la ligne au lieu de déborder du cadre. */
-  .header-filters { display: none; }
+  /* Sur mobile, le panneau de filtres s'affiche en colonne : une entrée par ligne,
+     défilement vertical (positionnement/fond hérités de la règle de base). */
   #app-header.filters-open .header-filters {
-    display: flex; flex-direction: column; align-items: stretch;
+    flex-direction: column; flex-wrap: nowrap; align-items: stretch;
     gap: 12px;
-    max-height: 62vh; overflow-y: auto;   /* scroll vertical si beaucoup de filtres */
   }
-  #app-header.filters-open .segmented { flex-wrap: wrap; border-radius: var(--r-md); }
-  #app-header.filters-open .pills-row { flex-wrap: wrap; }
-  /* Spacer/divider n'ont plus de sens en colonne */
-  .filters-spacer, .filters-divider { display: none; }
 
   /* ── Bottom-sheet glissable pour la liste ── */
   #list-panel {
