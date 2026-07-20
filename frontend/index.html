@@ -87,35 +87,25 @@
       <button class="preset-btn" data-preset="next-week">Sem. suivante</button>
     </div>
 
-    <button id="date-custom-btn" class="chip chip-date" aria-label="Choisir des dates">
-      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/></svg>
-      <span>Dates</span>
-      <svg class="ico ico-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-    </button>
-
-    <span class="filters-divider" aria-hidden="true"></span>
+    <div class="filter-dates">
+      <div class="dd-row">
+        <span>Du</span>
+        <input type="date" id="filter-date-from" />
+      </div>
+      <div class="dd-row">
+        <span>Au</span>
+        <input type="date" id="filter-date-to" />
+      </div>
+    </div>
 
     <button id="toggle-cats" class="chip-ghost" title="Tout sélectionner / désélectionner">Aucune</button>
 
     <div id="pills" class="pills-row"></div>
 
-    <span class="filters-spacer"></span>
-
     <button id="reset-filters" class="chip-ghost" aria-label="Réinitialiser les filtres">
       <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
       <span>Réinit.</span>
     </button>
-  </div>
-
-  <div id="date-dropdown" class="hidden">
-    <div class="dd-row">
-      <span>Du</span>
-      <input type="date" id="filter-date-from" />
-    </div>
-    <div class="dd-row">
-      <span>Au</span>
-      <input type="date" id="filter-date-to" />
-    </div>
   </div>
 </header>
 

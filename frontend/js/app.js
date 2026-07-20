@@ -135,26 +135,6 @@ document.getElementById('filter-date-to').addEventListener('change', () => {
   setFetchDebounceTimer(setTimeout(fetchEventsByBbox, 300));
 });
 
-function positionDateDropdown() {
-  const dd = document.getElementById('date-dropdown');
-  const btn = document.getElementById('date-custom-btn');
-  const header = document.getElementById('app-header');
-  // Aligner le popover sous le bouton « Dates » (et non au bord gauche du header).
-  // getBoundingClientRect tient compte du scroll horizontal de la barre de filtres.
-  const btnRect = btn.getBoundingClientRect();
-  const headerRect = header.getBoundingClientRect();
-  const maxLeft = headerRect.width - dd.offsetWidth - 12;
-  const left = Math.max(12, Math.min(btnRect.left - headerRect.left, maxLeft));
-  dd.style.left = `${left}px`;
-}
-
-document.getElementById('date-custom-btn').addEventListener('click', () => {
-  const dd = document.getElementById('date-dropdown');
-  const willOpen = dd.classList.contains('hidden');
-  dd.classList.toggle('hidden');
-  if (willOpen) positionDateDropdown();  // offsetWidth requiert que le popover soit visible
-});
-
 // ── Reset ─────────────────────────────────────────────────────────────────
 document.getElementById('reset-filters').addEventListener('click', () => {
   document.getElementById('filter-date-from').value = isoDate(todayJST());
@@ -173,7 +153,6 @@ document.getElementById('reset-filters').addEventListener('click', () => {
     else p.classList.add('active');
   });
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('date-dropdown').classList.add('hidden');
   updateURL();
   clearTimeout(fetchDebounceTimer);
   setFetchDebounceTimer(setTimeout(fetchEventsByBbox, 300));
