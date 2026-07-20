@@ -7,6 +7,9 @@ export const markerMap = new Map();
 export const deactivatedPills = new Set();
 export let userPosition = null;   // { lat, lng } | null
 export let proximityMode = false;
+// Portée de la liste : false = événements de la zone visible (bbox), true = tous les
+// événements correspondant aux filtres (date/recherche/catégorie), sans limite de vue.
+export let showAllEvents = false;
 
 export function setAllEvents(v) { allEvents = v; }
 export function setShowOnlyFavorites(v) { showOnlyFavorites = v; }
@@ -14,6 +17,7 @@ export function setMap(v) { map = v; }
 export function setClusterGroup(v) { clusterGroup = v; }
 export function setUserPosition(v) { userPosition = v; }
 export function setProximityMode(v) { proximityMode = v; }
+export function setShowAllEvents(v) { showAllEvents = v; }
 
 export let selectedEventId = null;
 export function setSelectedEventId(v) { selectedEventId = v; }

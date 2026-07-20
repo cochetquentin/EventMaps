@@ -1,5 +1,5 @@
 /* global L */
-import { setMap, setClusterGroup, deactivatedPills, setShowOnlyFavorites, showOnlyFavorites, markerMap, allEvents, setUserPosition, setProximityMode } from './state.js';
+import { setMap, setClusterGroup, deactivatedPills, setShowOnlyFavorites, showOnlyFavorites, markerMap, allEvents, setUserPosition, setProximityMode, showAllEvents, setShowAllEvents } from './state.js';
 import { isoDate, todayJST, computePresets } from './utils.js';
 import { toggleFavorite, isFavorite, getIcon, updateFavPill } from './favorites.js';
 import { buildPopup } from './popups.js';
@@ -15,7 +15,8 @@ import {
 import { setupGeolocation, cancelGeolocation } from './geolocation.js';
 import { initDrawer, openDrawer } from './drawer.js';
 import { updateURL, restoreFromURL } from './share.js';
-import { downloadICS } from './ics-export.js';
+import { initMobileUI } from './mobile-ui.js';
+import { initWeather } from './weather.js';
 
 // ── Map init ──────────────────────────────────────────────────────────────
 const map = L.map('map').setView([35.68, 139.69], 11);
@@ -50,6 +51,8 @@ let skipFetchOnce = false;
 map.on('autopanstart', () => { skipFetchOnce = true; });
 map.on('moveend', () => {
   if (!bboxFetchEnabled) return;
+  // En mode « Tous », la liste ne dépend pas de la zone visible : inutile de recharger.
+  if (showAllEvents) return;
   if (skipFetchOnce) { skipFetchOnce = false; return; }
   clearTimeout(fetchDebounceTimer);
   setFetchDebounceTimer(setTimeout(fetchEventsByBbox, 300));
@@ -133,26 +136,6 @@ document.getElementById('filter-date-to').addEventListener('change', () => {
   setFetchDebounceTimer(setTimeout(fetchEventsByBbox, 300));
 });
 
-function positionDateDropdown() {
-  const dd = document.getElementById('date-dropdown');
-  const btn = document.getElementById('date-custom-btn');
-  const header = document.getElementById('app-header');
-  // Aligner le popover sous le bouton « Dates » (et non au bord gauche du header).
-  // getBoundingClientRect tient compte du scroll horizontal de la barre de filtres.
-  const btnRect = btn.getBoundingClientRect();
-  const headerRect = header.getBoundingClientRect();
-  const maxLeft = headerRect.width - dd.offsetWidth - 12;
-  const left = Math.max(12, Math.min(btnRect.left - headerRect.left, maxLeft));
-  dd.style.left = `${left}px`;
-}
-
-document.getElementById('date-custom-btn').addEventListener('click', () => {
-  const dd = document.getElementById('date-dropdown');
-  const willOpen = dd.classList.contains('hidden');
-  dd.classList.toggle('hidden');
-  if (willOpen) positionDateDropdown();  // offsetWidth requiert que le popover soit visible
-});
-
 // ── Reset ─────────────────────────────────────────────────────────────────
 document.getElementById('reset-filters').addEventListener('click', () => {
   document.getElementById('filter-date-from').value = isoDate(todayJST());
@@ -171,7 +154,6 @@ document.getElementById('reset-filters').addEventListener('click', () => {
     else p.classList.add('active');
   });
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('date-dropdown').classList.add('hidden');
   updateURL();
   clearTimeout(fetchDebounceTimer);
   setFetchDebounceTimer(setTimeout(fetchEventsByBbox, 300));
@@ -231,29 +213,25 @@ initScrapeButton();
 // ── Geolocation ───────────────────────────────────────────────────────────
 setupGeolocation();
 
-// ── Copy-link button ──────────────────────────────────────────────────────
-document.getElementById('copy-link-btn').addEventListener('click', () => {
-  updateURL();
-  const btn = document.getElementById('copy-link-btn');
-  const onSuccess = () => {
-    btn.classList.add('copied');
-    setTimeout(() => btn.classList.remove('copied'), 1500);
-  };
-  const onFailure = () => {
-    btn.classList.add('failed');
-    setTimeout(() => btn.classList.remove('failed'), 1500);
-  };
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(location.href).then(onSuccess).catch(onFailure);
-  } else {
-    onFailure();
-  }
-});
+// ── UI mobile (bottom-sheet + en-tête repliable) ──────────────────────────
+initMobileUI();
 
-// ── Export ICS button ─────────────────────────────────────────────────────
-document.getElementById('export-ics-btn').addEventListener('click', () => {
-  downloadICS();
+// ── Widget météo (en-tête desktop) ────────────────────────────────────────
+initWeather();
+
+// ── Portée de la liste : zone visible vs tous les événements filtrés ───────
+const scopeToggle = document.getElementById('scope-toggle');
+function updateScopeToggle() {
+  scopeToggle.setAttribute('aria-pressed', String(showAllEvents));
+  scopeToggle.querySelector('.scope-label').textContent = showAllEvents ? '🌐 Tous' : '📍 Zone visible';
+}
+scopeToggle.addEventListener('click', () => {
+  setShowAllEvents(!showAllEvents);
+  updateScopeToggle();
+  clearTimeout(fetchDebounceTimer);
+  setFetchDebounceTimer(setTimeout(fetchEventsByBbox, 50));
 });
+updateScopeToggle();
 
 // ── Toggle catégories (Aucune / Toutes) ───────────────────────────────────
 document.getElementById('toggle-cats').addEventListener('click', toggleAllCategoryPills);

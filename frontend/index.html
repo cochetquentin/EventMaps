@@ -51,20 +51,24 @@
       <input type="text" id="search-input" placeholder="Un événement, un lieu, une station…" />
     </div>
 
+    <!-- Espace flexible : pousse météo + boutons à droite, laisse le centre libre -->
+    <div class="header-fill" aria-hidden="true"></div>
+
+    <!-- Widget météo Tokyo (desktop) — masqué tant que les données ne sont pas chargées -->
+    <div id="weather" class="weather" hidden></div>
+
     <div class="header-actions">
+      <button id="search-toggle" class="icon-btn" title="Rechercher" aria-label="Ouvrir la recherche" aria-expanded="false">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.65" y2="16.65"/></svg>
+      </button>
+      <button id="filters-toggle" class="icon-btn" title="Filtres" aria-label="Afficher les filtres" aria-expanded="false">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><polygon points="21 4 3 4 10 12.5 10 19 14 21 14 12.5 21 4"/></svg>
+      </button>
       <button id="locate-btn" class="icon-btn" title="Me localiser" aria-label="Me localiser">
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><circle class="ico-fill" cx="12" cy="12" r="2.4"/></svg>
       </button>
       <button id="scrape-btn" class="icon-btn" title="Relancer le scraping" aria-label="Rafraîchir les données">
         <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.7 9.7 0 0 1 6.7 2.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.7 9.7 0 0 1-6.7-2.7L3 16"/><path d="M8 16H3v5"/></svg>
-      </button>
-      <button id="copy-link-btn" class="icon-btn" title="Copier le lien" aria-label="Copier le lien">
-        <svg class="ico ico-link" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
-        <svg class="ico ico-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-      </button>
-      <button id="export-ics-btn" class="icon-btn has-label" title="Exporter la liste filtrée au format ICS" aria-label="Exporter au format ICS">
-        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/></svg>
-        <span>ICS</span>
       </button>
     </div>
   </div>
@@ -78,41 +82,38 @@
       <button class="preset-btn" data-preset="next-week">Sem. suivante</button>
     </div>
 
-    <button id="date-custom-btn" class="chip chip-date" aria-label="Choisir des dates">
-      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/></svg>
-      <span>Dates</span>
-      <svg class="ico ico-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-    </button>
-
-    <span class="filters-divider" aria-hidden="true"></span>
+    <div class="filter-dates">
+      <div class="dd-row">
+        <span>Du</span>
+        <input type="date" id="filter-date-from" />
+      </div>
+      <div class="dd-row">
+        <span>Au</span>
+        <input type="date" id="filter-date-to" />
+      </div>
+    </div>
 
     <button id="toggle-cats" class="chip-ghost" title="Tout sélectionner / désélectionner">Aucune</button>
 
     <div id="pills" class="pills-row"></div>
-
-    <span class="filters-spacer"></span>
 
     <button id="reset-filters" class="chip-ghost" aria-label="Réinitialiser les filtres">
       <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
       <span>Réinit.</span>
     </button>
   </div>
-
-  <div id="date-dropdown" class="hidden">
-    <div class="dd-row">
-      <span>Du</span>
-      <input type="date" id="filter-date-from" />
-    </div>
-    <div class="dd-row">
-      <span>Au</span>
-      <input type="date" id="filter-date-to" />
-    </div>
-  </div>
 </header>
 
 <!-- ── Panneau liste ── -->
 <aside id="list-panel">
-  <div id="stats">Chargement…</div>
+  <div class="sheet-handle" aria-hidden="true"><span class="sheet-grip"></span></div>
+  <div class="list-head">
+    <div id="stats">Chargement…</div>
+    <button id="scope-toggle" class="scope-toggle" type="button" aria-pressed="false"
+            title="Basculer entre les événements de la zone visible et tous les événements filtrés">
+      <span class="scope-label">📍 Zone visible</span>
+    </button>
+  </div>
   <div id="event-list"></div>
 </aside>
 

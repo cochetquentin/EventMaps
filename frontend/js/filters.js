@@ -33,9 +33,32 @@ export function toggleAllCategoryPills() {
   updateURL();
 }
 
+// Catégories connues : on part de la liste curée (CAT_EMOJI) et on l'enrichit au fil
+// des données chargées, SANS jamais retirer. Ainsi toutes les catégories sont
+// affichées d'emblée et les pastilles restent stables quand on zoome/déplace la carte
+// (avant, elles apparaissaient/disparaissaient selon les événements de la bbox, ce qui
+// empêchait de désélectionner une catégorie absente de la vue courante).
+const knownCategories = new Set(
+  Object.keys(CAT_EMOJI).filter(c => c !== 'hanabi' && !TC_EXCLUDED_CATS.includes(c)),
+);
+
 export function buildPills() {
   const container = document.getElementById('pills');
   container.innerHTML = '';
+
+  // Comptes sur les événements actuellement chargés (bbox visible)
+  const catCounts = {};
+  let hanabiN = 0;
+  let totN = 0;
+  allEvents.forEach(ev => {
+    if (ev.source === 'hanabi') { hanabiN++; return; }
+    if (ev.source === 'tot') { totN++; return; }
+    ((ev.attributes || {}).categories || []).forEach(c => {
+      if (TC_EXCLUDED_CATS.includes(c)) return;
+      catCounts[c] = (catCounts[c] || 0) + 1;
+      knownCategories.add(c);   // enrichit la liste (grow-only)
+    });
+  });
 
   // Favorites pill — toggles showOnlyFavorites, not in deactivatedPills
   const favCount = getFavorites().size;
@@ -50,19 +73,26 @@ export function buildPills() {
   });
   container.appendChild(favPill);
 
-  addPill(container, 'hanabi', '🎆 Hanabi', true);
-  addPill(container, 'tot', '🗼 Time Out', true);
+  addPill(container, 'hanabi', `🎆 Hanabi (${hanabiN})`, true);
+  addPill(container, 'tot', `🗼 Time Out (${totN})`, true);
 
-  const catCounts = {};
-  allEvents.forEach(ev => {
-    if (ev.source !== 'tc') return;
-    ((ev.attributes || {}).categories || []).forEach(c => { catCounts[c] = (catCounts[c] || 0) + 1; });
-  });
-
-  Object.entries(catCounts)
-    .filter(([c]) => !TC_EXCLUDED_CATS.includes(c))
-    .sort((a, b) => b[1] - a[1])
-    .forEach(([cat]) => addPill(container, cat, `${CAT_EMOJI[cat] || ''} ${cat}`));
+  // Toutes les catégories connues, ordre stable : les curées d'abord (ordre de
+  // CAT_EMOJI), puis les éventuelles autres par ordre alphabétique. Le compteur
+  // entre parenthèses = nombre d'événements de cette catégorie actuellement à l'écran.
+  const order = Object.keys(CAT_EMOJI);
+  [...knownCategories]
+    .sort((a, b) => {
+      const ia = order.indexOf(a);
+      const ib = order.indexOf(b);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return a.localeCompare(b);
+    })
+    .forEach(cat => {
+      const n = catCounts[cat] || 0;
+      addPill(container, cat, `${CAT_EMOJI[cat] || ''} ${cat} (${n})`);
+    });
 
   // Restore deactivated state after rebuild
   container.querySelectorAll('.pill').forEach(p => {

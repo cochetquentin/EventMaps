@@ -31,6 +31,17 @@ export function setupGeolocation() {
       alert("La géolocalisation n'est pas supportée par ce navigateur.");
       return;
     }
+    // Contexte non sécurisé (page servie en HTTP hors localhost) : les navigateurs,
+    // en particulier sur mobile, bloquent getCurrentPosition avant même de demander
+    // la permission. On l'explique clairement plutôt que d'afficher le message natif.
+    if (!window.isSecureContext) {
+      alert(
+        "La géolocalisation nécessite une connexion sécurisée (HTTPS). "
+        + "L'application est ouverte en HTTP, ce que les navigateurs mobiles bloquent. "
+        + "Ouvre-la via une URL https:// pour te localiser.",
+      );
+      return;
+    }
     activeRequestId++;
     const myRequestId = activeRequestId;
     btn.classList.add('loading');
@@ -56,7 +67,13 @@ export function setupGeolocation() {
         if (myRequestId !== activeRequestId) return;
         btn.classList.remove('loading');
         btn.disabled = false;
-        alert("Impossible d'obtenir votre position : " + err.message);
+        const messages = {
+          1: "Localisation refusée. Autorise l'accès à ta position dans les réglages du navigateur.",
+          2: 'Position indisponible pour le moment. Réessaie dans un instant.',
+          3: 'La localisation a pris trop de temps. Réessaie.',
+        };
+        alert("Impossible d'obtenir votre position : "
+          + (messages[err.code] || err.message));
       },
       { timeout: 10000, maximumAge: 60000 },
     );
