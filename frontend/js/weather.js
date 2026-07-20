@@ -11,8 +11,9 @@ const URL =
   `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}`
   + '&current=temperature_2m,weather_code'
   + '&hourly=precipitation_probability'
-  + '&daily=sunrise,sunset'
-  + '&timezone=Asia%2FTokyo&forecast_days=1';
+  + '&daily=sunrise,sunset,uv_index_max'
+  // forecast_days=2 : on récupère aussi le lever du soleil de demain (carte « Sunrise tomorrow »)
+  + '&timezone=Asia%2FTokyo&forecast_days=2';
 
 const CACHE_KEY = 'eventmaps-weather';
 const CACHE_TTL = 30 * 60 * 1000; // 30 min : Open-Meteo est généreux mais inutile de spammer
@@ -93,10 +94,11 @@ export async function fetchWeather() {
       emoji,
       label,
       hourly: data.hourly,
-      // Open-Meteo daily renvoie des tableaux (forecast_days=1) → on prend le jour courant
+      // Open-Meteo daily renvoie des tableaux [aujourd'hui, demain] (forecast_days=2).
       daily: {
-        sunrise: data.daily?.sunrise?.[0] ?? null,
-        sunset: data.daily?.sunset?.[0] ?? null,
+        sunrise: data.daily?.sunrise ?? [], // [today, tomorrow]
+        sunset: data.daily?.sunset ?? [],   // [today, tomorrow]
+        uvMax: data.daily?.uv_index_max?.[0] ?? null, // UV max du jour
       },
       message: buildMessage(temp, code, data.hourly),
     };

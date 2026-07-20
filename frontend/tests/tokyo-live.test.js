@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { pickNext, createScheduler, initTokyoLive } from '../js/tokyo-live.js';
-import { seasonFor, describeDistrict, nearestDistrict } from '../js/tokyo-live-data.js';
+import { seasonFor, describeDistrict, nearestDistrict, SEASONAL_CARDS, inSeasonWindow } from '../js/tokyo-live-data.js';
 import { fetchWeather } from '../js/weather.js';
 
 // ── Ordonnanceur ────────────────────────────────────────────────────────────
@@ -123,23 +123,46 @@ describe('describeDistrict', () => {
     expect(describeDistrict(34.6937, 135.5023, 14)).toBeNull(); // Osaka
   });
 
-  test('centré sur un quartier → formulation "Exploring"', () => {
+  test('centré sur un quartier → "Exploration de …"', () => {
     const r = describeDistrict(35.6595, 139.7005, 14); // Shibuya
     expect(r.name).toBe('Shibuya');
-    expect(r.natural.text).toBe('Exploring Shibuya');
+    expect(r.natural.text).toBe('Exploration de Shibuya');
   });
 
-  test('un peu décentré → "Around"', () => {
+  test('un peu décentré → "Autour de …"', () => {
     // ~1.4 km au sud d'Odaiba (quartier isolé → pas d'ambiguïté de voisinage)
     const r = describeDistrict(35.6170, 139.7752, 14);
     expect(r.name).toBe('Odaiba');
-    expect(r.natural.text.startsWith('Around')).toBe(true);
+    expect(r.natural.text.startsWith('Autour de')).toBe(true);
   });
 
   test('quartier tagué → carte éditoriale disponible', () => {
     const r = describeDistrict(35.7141, 139.7774, 14); // Ueno
     expect(r.tag).not.toBeNull();
-    expect(r.tag.text).toBe('Ueno is entering peak bloom.');
+    expect(r.tag.text).toContain('Ueno');
+  });
+});
+
+// ── Temps forts saisonniers (gated par période) ──────────────────────────────
+
+describe('inSeasonWindow', () => {
+  const on = (m, d) => new Date(Date.UTC(2026, m - 1, d));
+
+  test('carte active dans sa fenêtre', () => {
+    const sakura = SEASONAL_CARDS.find((c) => c.id === 'sakura-start');
+    expect(inSeasonWindow(sakura, on(3, 25))).toBe(true);
+  });
+
+  test('carte inactive hors fenêtre', () => {
+    const sakura = SEASONAL_CARDS.find((c) => c.id === 'sakura-start');
+    expect(inSeasonWindow(sakura, on(6, 1))).toBe(false);
+  });
+
+  test('bornes incluses', () => {
+    const hanabi = SEASONAL_CARDS.find((c) => c.id === 'hanabi');
+    expect(inSeasonWindow(hanabi, on(7, 21))).toBe(true);
+    expect(inSeasonWindow(hanabi, on(8, 20))).toBe(true);
+    expect(inSeasonWindow(hanabi, on(8, 21))).toBe(false);
   });
 });
 
@@ -180,20 +203,26 @@ describe('initTokyoLive (montage)', () => {
 describe('fetchWeather', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  test('normalise le payload Open-Meteo (dont daily sunrise/sunset)', async () => {
+  test('normalise le payload Open-Meteo (daily en tableaux + uvMax)', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,
       json: async () => ({
         current: { temperature_2m: 22.6, weather_code: 0 },
         hourly: { time: [], precipitation_probability: [] },
-        daily: { sunrise: ['2026-07-20T04:39'], sunset: ['2026-07-20T18:56'] },
+        daily: {
+          sunrise: ['2026-07-20T04:39', '2026-07-21T04:40'],
+          sunset: ['2026-07-20T18:56', '2026-07-21T18:55'],
+          uv_index_max: [9.2, 8.1],
+        },
       }),
     })));
     const w = await fetchWeather();
     expect(w.temp).toBe(23);
     expect(w.emoji).toBe('☀️');
-    expect(w.daily.sunrise).toBe('2026-07-20T04:39');
-    expect(w.daily.sunset).toBe('2026-07-20T18:56');
+    expect(w.daily.sunrise[0]).toBe('2026-07-20T04:39');
+    expect(w.daily.sunrise[1]).toBe('2026-07-21T04:40'); // demain
+    expect(w.daily.sunset[0]).toBe('2026-07-20T18:56');
+    expect(w.daily.uvMax).toBe(9.2);
     expect(typeof w.message).toBe('string');
   });
 

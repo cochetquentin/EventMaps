@@ -23,7 +23,7 @@
 import { map, allEvents } from './state.js';
 import { escapeHtml, todayJST } from './utils.js';
 import { fetchWeather } from './weather.js';
-import { seasonFor, describeDistrict } from './tokyo-live-data.js';
+import { seasonFor, describeDistrict, SEASONAL_CARDS, inSeasonWindow } from './tokyo-live-data.js';
 
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
@@ -105,6 +105,61 @@ function district(ctx) {
   return describeDistrict(ctx.center.lat, ctx.center.lon, ctx.zoom);
 }
 
+// Minutes écoulées depuis minuit, en heure de Tokyo.
+function minutesJST(date) {
+  const [h, m] = formatJST(date).split(':').map(Number);
+  return h * 60 + m;
+}
+const jstHour = (date) => Math.floor(minutesJST(date) / 60);
+// "2026-07-20T18:56" → minutes depuis minuit (589) ; null si absent
+const isoToMin = (iso) => (iso ? Number(iso.slice(11, 13)) * 60 + Number(iso.slice(14, 16)) : null);
+
+// Durée courte lisible : 42 → "42 min", 80 → "1 h 20"
+function fmtDuration(min) {
+  if (min < 60) return `${min} min`;
+  return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}`;
+}
+
+// Première heure À VENIR aujourd'hui avec forte probabilité de pluie → "18:00" (factuel).
+function upcomingRainHour(hourly, nowHour) {
+  if (!hourly?.time) return null;
+  const today = hourly.time[0]?.slice(0, 10);
+  for (let i = 0; i < hourly.time.length; i++) {
+    const iso = hourly.time[i];
+    if (iso.slice(0, 10) !== today) break;                 // on se limite à aujourd'hui
+    if (Number(iso.slice(11, 13)) <= nowHour) continue;    // uniquement à venir
+    if ((hourly.precipitation_probability?.[i] ?? 0) >= 60) return iso.slice(11, 16);
+  }
+  return null;
+}
+
+const isRainingNow = (c) => (c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95;
+
+// Coucher du soleil : uniquement dans les 3 h qui précèdent → "Coucher du soleil dans 42 min"
+function buildSunsetCard(ctx) {
+  const set = ctx.weather?.daily?.sunset?.[0];
+  if (!set) return null;
+  const diff = isoToMin(set) - minutesJST(ctx.now);
+  if (diff <= 0 || diff > 180) return null;
+  return { icon: '🌇', text: `Coucher du soleil dans ${fmtDuration(diff)}` };
+}
+
+// Lever du soleil : le petit matin (avant le lever) ou le soir (après le coucher) seulement.
+function buildSunriseCard(ctx) {
+  const d = ctx.weather?.daily;
+  if (!d) return null;
+  const nowM = minutesJST(ctx.now);
+  const riseToday = d.sunrise?.[0];
+  const setToday = d.sunset?.[0];
+  if (riseToday && nowM < isoToMin(riseToday)) {
+    return { icon: '🌅', text: `Lever du soleil à ${riseToday.slice(11, 16)}` };
+  }
+  if (setToday && nowM >= isoToMin(setToday) && d.sunrise?.[1]) {
+    return { icon: '🌅', text: `Lever du soleil demain à ${d.sunrise[1].slice(11, 16)}` };
+  }
+  return null;
+}
+
 // ── Context providers (permanents) ─────────────────────────────────────────
 
 function makeContextProviders() {
@@ -130,33 +185,92 @@ function makeContextProviders() {
 }
 
 // ── Editorial providers (rotatifs — un seul bloc) ──────────────────────────
+//
+// Principe : une carte n'apparaît QUE si elle porte une info réelle et pertinente
+// (build → null sinon). La fréquence contextuelle voulue en découle mécaniquement :
+// une carte n'est éligible que dans sa fenêtre (pluie imminente, ~3 h avant le
+// coucher, période saisonnière réelle…), et sa `priority` la favorise à ce moment-là.
+// Jamais d'info inventée pour remplir : le seul « floor » est un CTA neutre.
+//
+// Ajouter une carte = pousser un provider ici (ou une ligne dans SEASONAL_CARDS).
 
 function makeEditorialProviders() {
-  return [
+  const providers = [
+    // ── Météo factuelle (dérivée des données Open-Meteo) ──
     {
-      id: 'ed-advice', category: 'advice', priority: 6, importance: 'normal',
-      build: (ctx) => (ctx.weather ? { icon: ctx.weather.emoji, text: ctx.weather.message } : null),
+      id: 'wx-rain-now', category: 'weather', priority: 9, importance: 'normal',
+      build: (ctx) => (ctx.weather && isRainingNow(ctx.weather.code)
+        ? { icon: '🌧️', text: 'Il pleut en ce moment — pensez au parapluie' } : null),
     },
     {
-      id: 'ed-discover', category: 'place', priority: 7, importance: 'normal',
+      id: 'wx-rain-soon', category: 'weather', priority: 9, importance: 'normal',
+      build: (ctx) => {
+        if (!ctx.weather) return null;
+        const h = upcomingRainHour(ctx.weather.hourly, jstHour(ctx.now));
+        return h ? { icon: '☔', text: `Pluie attendue vers ${h}` } : null;
+      },
+    },
+    {
+      id: 'wx-uv', category: 'weather', priority: 7, importance: 'normal',
+      build: (ctx) => (ctx.weather?.daily?.uvMax >= 8
+        ? { icon: '💧', text: 'Indice UV élevé aujourd’hui — hydratez-vous' } : null),
+    },
+    {
+      id: 'wx-hot', category: 'weather', priority: 6, importance: 'normal',
+      build: (ctx) => (ctx.weather && ctx.weather.temp >= 33
+        ? { icon: '🥵', text: `${ctx.weather.temp}° — forte chaleur, hydratez-vous` } : null),
+    },
+    {
+      id: 'wx-cold', category: 'weather', priority: 6, importance: 'normal',
+      build: (ctx) => (ctx.weather && ctx.weather.temp <= 2
+        ? { icon: '🧣', text: `${ctx.weather.temp}° — couvrez-vous bien` } : null),
+    },
+
+    // ── Soleil (uniquement quand c'est pertinent) ──
+    { id: 'sun-set', category: 'sun', priority: 8, importance: 'normal', build: buildSunsetCard },
+    { id: 'sun-rise', category: 'sun', priority: 6, importance: 'low', build: buildSunriseCard },
+
+    // ── Lieu éditorial (tag du quartier exploré) ──
+    {
+      id: 'place-discover', category: 'place', priority: 6, importance: 'normal',
       build: (ctx) => { const r = district(ctx); return r && r.tag ? { icon: r.tag.emoji, text: r.tag.text } : null; },
     },
+
+    // ── Événements réels chargés sur la carte ──
     {
-      id: 'ed-season', category: 'season', priority: 5, importance: 'low',
-      build: () => { const s = seasonFor(todayJST()); return { icon: s.emoji, text: s.note }; },
-    },
-    {
-      id: 'ed-events', category: 'events', priority: 4, importance: 'normal',
+      id: 'events-nearby', category: 'events', priority: 5, importance: 'normal',
       build: (ctx) => {
         const n = ctx.events?.length || 0;
         return n > 0 ? { icon: '🎭', text: `${n} événement${n > 1 ? 's' : ''} à explorer sur la carte` } : null;
       },
     },
+
+    // ── Saison générique (floor factuel, toujours vrai) ──
     {
-      id: 'ed-fallback', category: 'fallback', priority: 0, importance: 'low',
-      build: () => ({ icon: '✨', text: "Découvrez ce qui se passe à Tokyo aujourd'hui." }),
+      id: 'season-now', category: 'season', priority: 3, importance: 'low',
+      build: () => { const s = seasonFor(todayJST()); return { icon: s.emoji, text: s.note }; },
+    },
+
+    // ── CTA neutre (dernier recours : jamais une fausse info) ──
+    {
+      id: 'cta', category: 'fallback', priority: 0, importance: 'low',
+      build: () => ({ icon: '✨', text: 'Explorez les événements de Tokyo' }),
     },
   ];
+
+  // ── Temps forts saisonniers : un provider gated par période et par lieu ──
+  for (const c of SEASONAL_CARDS) {
+    providers.push({
+      id: `season-${c.id}`, category: 'season', priority: c.near ? 9 : 8, importance: 'low',
+      build: (ctx) => {
+        if (!inSeasonWindow(c, todayJST())) return null;
+        if (c.near) { const r = district(ctx); if (!r || r.name !== c.near) return null; }
+        return { icon: c.emoji, text: c.text };
+      },
+    });
+  }
+
+  return providers;
 }
 
 // ── Moteur (effets de bord : DOM, carte, timers) ───────────────────────────

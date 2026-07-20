@@ -19,9 +19,9 @@ export const TOKYO_DISTRICTS = [
   { name: 'Ikebukuro',  kanji: '池袋',   lat: 35.7295, lon: 139.7109 },
   { name: 'Nakameguro', kanji: '中目黒', lat: 35.6440, lon: 139.6990 },
   { name: 'Odaiba',     kanji: 'お台場', lat: 35.6297, lon: 139.7752 },
-  { name: 'Ueno',    kanji: '上野', lat: 35.7141, lon: 139.7774, tag: { emoji: '🌸', text: 'Ueno is entering peak bloom.' } },
-  { name: 'Asakusa', kanji: '浅草', lat: 35.7118, lon: 139.7967, tag: { emoji: '🏮', text: 'Explore historic Asakusa.' } },
-  { name: 'Sumida',  kanji: '墨田', lat: 35.7101, lon: 139.8017, tag: { emoji: '🎆', text: 'Sumida prepares for fireworks.' } },
+  { name: 'Ueno',    kanji: '上野', lat: 35.7141, lon: 139.7774, tag: { emoji: '🌸', text: 'Ueno, réputé pour ses cerisiers' } },
+  { name: 'Asakusa', kanji: '浅草', lat: 35.7118, lon: 139.7967, tag: { emoji: '🏮', text: "Asakusa, le Tokyo historique" } },
+  { name: 'Sumida',  kanji: '墨田', lat: 35.7101, lon: 139.8017, tag: { emoji: '🎆', text: "Sumida, terre des feux d'artifice" } },
 ];
 
 // Renvoie le quartier le plus proche d'un point + sa distance en km.
@@ -43,11 +43,11 @@ export function describeDistrict(lat, lon, zoom) {
   if (zoom == null || zoom < 12) return null;      // dézoomé : vue trop large
   const { district, km } = nearestDistrict(lat, lon);
   if (!district || km > 4) return null;            // rien de pertinent tout près
-  const verb = km <= 1 ? 'Exploring' : km <= 2.2 ? 'Around' : 'Near';
+  const prefix = km <= 1 ? 'Exploration de' : km <= 2.2 ? 'Autour de' : 'Près de';
   return {
     name: district.name,
     kanji: district.kanji,
-    natural: { emoji: '📍', text: `${verb} ${district.name}` },
+    natural: { emoji: '📍', text: `${prefix} ${district.name}` },
     // Carte éditoriale seulement si on est bien sur la zone taguée
     tag: district.tag && km <= 1.5 ? district.tag : null,
   };
@@ -77,4 +77,25 @@ export function seasonFor(date) {
     if (key >= lo && key <= hi) return s;
   }
   return SEASONS[0]; // couverture complète : fallback théorique
+}
+
+// ── Temps forts saisonniers (factuels, affichés UNIQUEMENT pendant leur fenêtre) ──
+// Chaque entrée devient un provider éditorial gated par date. `near` (optionnel) limite
+// l'affichage au voisinage d'un quartier précis. Ajouter un temps fort = ajouter une ligne.
+export const SEASONAL_CARDS = [
+  { id: 'new-year',     emoji: '🎍', text: 'Hatsumōde — visites de sanctuaires du Nouvel An', from: [1, 1],   to: [1, 7] },
+  { id: 'sakura-start', emoji: '🌸', text: 'La saison des sakura a commencé',                  from: [3, 20],  to: [4, 10] },
+  { id: 'ueno-bloom',   emoji: '🌸', text: 'Ueno approche de la pleine floraison',              from: [3, 22],  to: [4, 5], near: 'Ueno' },
+  { id: 'tsuyu',        emoji: '☔', text: 'Saison des pluies — gardez un parapluie',          from: [6, 1],   to: [7, 20] },
+  { id: 'tanabata',     emoji: '🎋', text: 'La saison de Tanabata a commencé',                 from: [7, 1],   to: [7, 7] },
+  { id: 'hanabi',       emoji: '🎆', text: "La saison des feux d'artifice a commencé",         from: [7, 21],  to: [8, 20] },
+  { id: 'momiji-soon',  emoji: '🍁', text: 'La saison des momiji débute le mois prochain',     from: [10, 1],  to: [10, 31] },
+  { id: 'momiji',       emoji: '🍁', text: 'La saison des momiji a commencé',                  from: [11, 1],  to: [11, 30] },
+  { id: 'illumination', emoji: '🎄', text: "Les illuminations d'hiver sont ouvertes",          from: [11, 15], to: [12, 31] },
+];
+
+// Une carte saisonnière est-elle dans sa fenêtre à cette date ? (mois/jour UTC, cf. todayJST)
+export function inSeasonWindow(card, date) {
+  const key = (date.getUTCMonth() + 1) * 100 + date.getUTCDate();
+  return key >= card.from[0] * 100 + card.from[1] && key <= card.to[0] * 100 + card.to[1];
 }
