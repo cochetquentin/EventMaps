@@ -1,6 +1,9 @@
 // Widget météo Tokyo — remplit l'en-tête desktop avec la météo courante et un petit
 // mot contextuel. Source : Open-Meteo (gratuit, sans clé API, CORS ouvert).
 // Échec réseau → le widget reste masqué, aucune conséquence sur le reste de l'app.
+//
+// Les phrases affichées vivent dans ./weather-messages.js (facile à enrichir).
+import { WEATHER_MESSAGES } from './weather-messages.js';
 
 const LAT = 35.68;
 const LON = 139.69;
@@ -30,41 +33,6 @@ function weatherInfo(code) {
 
 const RAIN_CODES = (c) => (c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95;
 
-// Petite base de mots mignons selon la situation — on en pioche un au hasard
-const MESSAGES = {
-  rainSoon: (h) => [
-    `Pluie prévue vers ${h} ☔ — prévois un plan en intérieur`,
-    `Averses annoncées vers ${h} — musée ou café peut-être ?`,
-    `Ça va tomber vers ${h} 🌧️ — garde un parapluie`,
-  ],
-  rainNow: [
-    'Il pleut 🌧️ — parapluie obligatoire !',
-    'Temps à rester au chaud ☕ — expo ou izakaya ?',
-    'Pluie en cours — parfait pour un musée 🖼️',
-  ],
-  hot: [
-    'Grosse chaleur 🥵 — hydrate-toi bien !',
-    'Il fait chaud — cherche l’ombre et bois de l’eau 💧',
-    'Canicule — privilégie l’intérieur climatisé ❄️',
-  ],
-  cold: [
-    'Ça caille 🧣 — couvre-toi bien',
-    'Froid glacial — un ramen bien chaud ? 🍜',
-    'Brrr ❄️ — pense aux couches',
-  ],
-  nice: [
-    'Temps idéal pour sortir 🌸 — profites-en !',
-    'Grand beau ☀️ — direction l’extérieur !',
-    'Journée parfaite pour flâner 🚶',
-  ],
-  cloudy: [
-    'Ciel gris ☁️ — parfait pour un musée',
-    'Un peu couvert — expo ou café cosy ?',
-    'Temps doux et nuageux — balade tranquille 🚶',
-  ],
-  default: ['Belle journée à Tokyo ✨'],
-};
-
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 // Cherche la première heure à venir avec forte probabilité de pluie → "15h"
@@ -82,14 +50,14 @@ function nextRainHour(hourly) {
 }
 
 function buildMessage(temp, code, hourly) {
-  if (RAIN_CODES(code)) return pick(MESSAGES.rainNow);
+  if (RAIN_CODES(code)) return pick(WEATHER_MESSAGES.rainNow);
   const rainHour = nextRainHour(hourly);
-  if (rainHour) return pick(MESSAGES.rainSoon(rainHour));
-  if (temp >= 30) return pick(MESSAGES.hot);
-  if (temp <= 6) return pick(MESSAGES.cold);
-  if (code <= 2 && temp >= 15 && temp <= 28) return pick(MESSAGES.nice);
-  if (code === 3 || code === 45 || code === 48) return pick(MESSAGES.cloudy);
-  return pick(MESSAGES.default);
+  if (rainHour) return pick(WEATHER_MESSAGES.rainSoon).replace('{h}', rainHour);
+  if (temp >= 30) return pick(WEATHER_MESSAGES.hot);
+  if (temp <= 6) return pick(WEATHER_MESSAGES.cold);
+  if (code <= 2 && temp >= 15 && temp <= 28) return pick(WEATHER_MESSAGES.nice);
+  if (code === 3 || code === 45 || code === 48) return pick(WEATHER_MESSAGES.cloudy);
+  return pick(WEATHER_MESSAGES.default);
 }
 
 async function loadData() {
