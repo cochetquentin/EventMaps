@@ -238,9 +238,15 @@ body {
   z-index: 600;
   max-height: 60vh; overflow-y: auto;   /* défilement si vraiment beaucoup de filtres */
 }
-/* Groupes internes : passent à la ligne au lieu de déborder du panneau */
-#app-header.filters-open .segmented { flex-wrap: wrap; border-radius: var(--r-md); }
-#app-header.filters-open .pills-row { flex-wrap: wrap; }
+/* Groupes internes en pleine largeur : sans flex-basis:100% + min-width:0, un flex
+   imbriqué garde la largeur de son contenu (min-width auto) et déborde au lieu de
+   wrapper. Là, périodes et catégories passent proprement à la ligne. */
+#app-header.filters-open .segmented {
+  flex-wrap: wrap; flex-basis: 100%; min-width: 0; border-radius: var(--r-md);
+}
+#app-header.filters-open .pills-row {
+  flex-wrap: wrap; flex-basis: 100%; min-width: 0;
+}
 /* Spacer/divider n'ont plus de sens dans un panneau qui wrap */
 .filters-spacer, .filters-divider { display: none; }
 
