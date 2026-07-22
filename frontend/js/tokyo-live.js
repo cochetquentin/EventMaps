@@ -1,22 +1,22 @@
 // ══════════════════════════════════════════════════════════════════════════
 // Tokyo — « Context Bar » de l'en-tête.
 //
-// Ce n'est PAS un widget météo : c'est une barre de contexte qui occupe l'espace
-// disponible du header entre le logo et les boutons. Deux familles de providers :
+// Barre de contexte qui occupe l'espace disponible du header. Deux familles :
 //
-//   • Context providers  → toujours visibles (météo, heure JST, quartier exploré).
-//                          Rendus côte à côte, jamais animés, mis à jour en place.
-//   • Editorial providers → un seul bloc rotatif à droite (flex: 1). Change
-//                          discrètement toutes les ~12 s (léger fondu + slide).
+//   • Context providers  → blocs permanents (météo, ressenti, heure, soleil,
+//                          saison, quartier, événements). Rangés par PRIORITÉ :
+//                          plus l'écran est large, plus on en affiche ; quand la
+//                          place manque, on retire les moins prioritaires (à droite).
+//                          Chaque bloc s'anime à l'apparition et lors d'un changement
+//                          de valeur → la barre vit sans jamais s'agiter.
+//   • Editorial providers → un seul bloc rotatif à droite (flex: 1) : messages
+//                          factuels + éditoriaux, personnalisés selon le moment.
 //
-// Le contexte reste stable ; seul le message éditorial évolue → le header paraît
-// vivant sans donner l'impression que toute l'interface bouge.
-//
-// EXTENSIBLE : ajouter une info = enregistrer un provider dans makeContextProviders()
-// (bloc permanent) ou makeEditorialProviders() (rotation), sans toucher au moteur.
+// EXTENSIBLE : ajouter une info = enregistrer un provider (context ou editorial),
+// sans toucher au moteur.
 //
 // Contrat d'un provider :
-//   context  : { id, build(ctx) -> { icon, main, sub? } | null }
+//   context  : { id, rank, build(ctx) -> { icon, main, sub? } | null }   // rank = priorité
 //   editorial: { id, category, priority, importance, build(ctx) -> { icon, text } | null }
 //   ctx = { weather, now, center, zoom, events }
 // ══════════════════════════════════════════════════════════════════════════
@@ -31,9 +31,10 @@ const MINUTE = 60 * SECOND;
 const ROTATE_MS = 12 * SECOND;          // rotation du bloc éditorial (10–15 s)
 const ANIM_MS = 300;                    // transition quasi invisible (fondu + slide)
 const CONTEXT_REFRESH_MS = 15 * SECOND; // rafraîchissement du contexte (surtout l'heure)
-const MOVE_DEBOUNCE_MS = 350;           // anti-spam sur les déplacements de carte
+const MOVE_DEBOUNCE_MS = 300;           // anti-spam sur les déplacements de carte
 const WEATHER_REFRESH_MS = 30 * MINUTE;
 const RECENT_WINDOW = 2;                // cooldown par catégorie (éditorial)
+const EDITORIAL_MIN_PX = 150;           // largeur mini réservée au bloc éditorial
 
 const IMPORTANCE_RANK = { low: 0, normal: 1, high: 2, critical: 3 };
 const impRank = (x) => IMPORTANCE_RANK[x] ?? 1;
@@ -100,6 +101,10 @@ function formatJST(date) {
   }).format(date);
 }
 
+function weekdayJST(date) {
+  return new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tokyo', weekday: 'short' }).format(date);
+}
+
 function district(ctx) {
   if (!ctx.center) return null;
   return describeDistrict(ctx.center.lat, ctx.center.lon, ctx.zoom);
@@ -136,10 +141,10 @@ function upcomingRainHour(hourly, nowHour) {
 const isRainingNow = (c) => (c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95;
 
 // Bloc permanent « soleil » : affiche toujours le prochain événement solaire pertinent.
-//   • dans les 3 h avant le coucher  → compte à rebours « 🌇 dans 42 min »
-//   • petit matin (avant le lever)   → « 🌅 04:40 »
-//   • soir (après le coucher)        → lever de demain « 🌅 04:41 »
-//   • journée                        → coucher du jour « 🌇 18:56 »
+//   • dans les 3 h avant le coucher  → compte à rebours « 🌇 dans 42 min · coucher »
+//   • petit matin (avant le lever)   → « 🌅 04:40 · lever »
+//   • soir (après le coucher)        → lever de demain « 🌅 04:41 · lever demain »
+//   • journée                        → coucher du jour « 🌇 18:56 · coucher »
 // Renvoie null tant que la météo n'est pas chargée (le bloc est alors simplement masqué).
 function buildSunContext(ctx) {
   const d = ctx.weather?.daily;
@@ -159,47 +164,64 @@ function buildSunContext(ctx) {
   return null;
 }
 
-// ── Context providers (permanents) ─────────────────────────────────────────
+// Message éditorial « d'ambiance » selon l'heure de Tokyo (toujours disponible → floor).
+function timeVibe(ctx) {
+  const h = jstHour(ctx.now);
+  if (h < 5) return { icon: '🌙', text: 'Tokyo ne dort jamais' };
+  if (h < 9) return { icon: '🌅', text: 'Tokyo s’éveille doucement' };
+  if (h < 11) return { icon: '☕', text: 'Matinée tranquille à Tokyo' };
+  if (h < 14) return { icon: '🍜', text: 'C’est l’heure du déjeuner à Tokyo' };
+  if (h < 17) return { icon: '🚶', text: 'Bel après-midi pour explorer' };
+  if (h < 19) return { icon: '🌇', text: 'Tokyo se pare de lumières' };
+  if (h < 22) return { icon: '🏮', text: 'Tokyo s’illumine' };
+  return { icon: '🌃', text: 'Douceur nocturne à Tokyo' };
+}
+
+// ── Context providers (permanents, rangés par priorité) ────────────────────
+// rank croissant = priorité décroissante ; on retire les plus grands rank d'abord.
 
 function makeContextProviders() {
   return [
     {
-      id: 'weather',
+      id: 'weather', rank: 1,
       build: (ctx) => (ctx.weather
         ? { icon: ctx.weather.emoji, main: `${ctx.weather.temp}°`, sub: ctx.weather.label }
         : null),
     },
     {
-      id: 'feels',
-      build: (ctx) => (ctx.weather && ctx.weather.feels != null
-        ? { icon: '🌡️', main: `${ctx.weather.feels}°`, sub: 'ressenti' }
-        : null),
-    },
-    {
-      id: 'time',
+      id: 'time', rank: 2,
       build: (ctx) => ({ icon: '🕒', main: formatJST(ctx.now), sub: 'JST' }),
     },
     {
-      id: 'sun',
-      build: buildSunContext, // prochain événement solaire (compte à rebours si proche)
-    },
-    {
-      id: 'season',
-      build: () => { const s = seasonFor(todayJST()); return { icon: s.emoji, main: s.label, sub: s.note }; },
-    },
-    {
-      id: 'district',
+      id: 'district', rank: 3,
+      // Toujours présent : dézoomé / hors zone → vue d'ensemble « Tokyo ».
       build: (ctx) => {
         const r = district(ctx);
-        return r ? { icon: r.natural.emoji, main: r.natural.text, sub: null } : null;
+        if (r) return { icon: r.natural.emoji, main: r.natural.text, sub: null };
+        return { icon: '📍', main: 'Tokyo', sub: null };
       },
     },
     {
-      id: 'events',
+      id: 'season', rank: 4,
+      // Libellé français clair, sans terme japonais dans le bloc permanent.
+      build: () => { const s = seasonFor(todayJST()); return { icon: s.emoji, main: s.label, sub: 'saison' }; },
+    },
+    {
+      id: 'sun', rank: 5,
+      build: buildSunContext,
+    },
+    {
+      id: 'events', rank: 6,
       build: (ctx) => {
         const n = ctx.events?.length || 0;
         return n > 0 ? { icon: '🎭', main: `${n} événement${n > 1 ? 's' : ''}`, sub: null } : null;
       },
+    },
+    {
+      id: 'feels', rank: 7,
+      build: (ctx) => (ctx.weather && ctx.weather.feels != null
+        ? { icon: '🌡️', main: `${ctx.weather.feels}°`, sub: 'ressenti' }
+        : null),
     },
   ];
 }
@@ -207,12 +229,10 @@ function makeContextProviders() {
 // ── Editorial providers (rotatifs — un seul bloc) ──────────────────────────
 //
 // Principe : une carte n'apparaît QUE si elle porte une info réelle et pertinente
-// (build → null sinon). La fréquence contextuelle voulue en découle mécaniquement :
-// une carte n'est éligible que dans sa fenêtre (pluie imminente, ~3 h avant le
-// coucher, période saisonnière réelle…), et sa `priority` la favorise à ce moment-là.
-// Jamais d'info inventée pour remplir : le seul « floor » est un CTA neutre.
-//
-// Ajouter une carte = pousser un provider ici (ou une ligne dans SEASONAL_CARDS).
+// (build → null sinon). La fréquence contextuelle en découle mécaniquement : une carte
+// n'est éligible que dans sa fenêtre (pluie imminente, période saisonnière réelle…),
+// et sa `priority` la favorise à ce moment-là. Le floor est un message d'ambiance
+// (vrai selon l'heure), jamais une fausse info.
 
 function makeEditorialProviders() {
   const providers = [
@@ -252,14 +272,20 @@ function makeEditorialProviders() {
       build: (ctx) => { const r = district(ctx); return r && r.tag ? { icon: r.tag.emoji, text: r.tag.text } : null; },
     },
 
-    // ── CTA neutre (dernier recours : jamais une fausse info) ──
+    // ── Week-end (personnalisé selon le jour) ──
     {
-      id: 'cta', category: 'fallback', priority: 0, importance: 'low',
-      build: () => ({ icon: '✨', text: 'Explorez les événements de Tokyo' }),
+      id: 'weekend', category: 'vibe', priority: 3, importance: 'low',
+      build: (ctx) => {
+        const wd = weekdayJST(ctx.now);
+        return (wd === 'Sat' || wd === 'Sun') ? { icon: '🎉', text: 'C’est le week-end à Tokyo' } : null;
+      },
     },
+
+    // ── Ambiance selon l'heure (floor : toujours disponible) ──
+    { id: 'vibe', category: 'vibe', priority: 2, importance: 'low', build: timeVibe },
   ];
 
-  // ── Temps forts saisonniers : un provider gated par période et par lieu ──
+  // ── Temps forts saisonniers : un provider gated par période (et parfois par lieu) ──
   for (const c of SEASONAL_CARDS) {
     providers.push({
       id: `season-${c.id}`, category: 'season', priority: c.near ? 9 : 8, importance: 'low',
@@ -282,12 +308,14 @@ export function initTokyoLive() {
 
   const reduceMotion = typeof matchMedia === 'function'
     && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (fn) => fn();
 
   const contextProviders = makeContextProviders();
   const editorialProviders = makeEditorialProviders();
   const scheduler = createScheduler(editorialProviders);
   let weather = null;
   let editorialCards = {};
+  const blockEls = {}; // id -> { el, sig }
 
   el.innerHTML =
     '<div class="tlive-context"></div>'
@@ -310,21 +338,68 @@ export function initTokyoLive() {
     return { weather, now, center, zoom, events: allEvents };
   }
 
-  // ── Contexte permanent (jamais animé, mis à jour en place) ──
-  function renderContext() {
-    const ctx = buildCtx();
-    contextEl.innerHTML = contextProviders.map((p) => {
-      let b = null;
-      try { b = p.build(ctx); } catch { b = null; }
-      if (!b) return '';
-      const sub = b.sub ? `<span class="tlive-b-sub">${escapeHtml(b.sub)}</span>` : '';
-      return '<div class="tlive-block">'
-        + `<span class="tlive-b-ico" aria-hidden="true">${b.icon}</span>`
-        + `<span class="tlive-b-main">${escapeHtml(b.main)}</span>${sub}</div>`;
-    }).join('');
+  // ── Contexte permanent : rendu par nœuds (diff par widget → animations) ──
+  function blockInner(b) {
+    const sub = b.sub ? `<span class="tlive-b-sub">${escapeHtml(b.sub)}</span>` : '';
+    return `<span class="tlive-b-ico" aria-hidden="true">${b.icon}</span>`
+      + `<span class="tlive-b-main">${escapeHtml(b.main)}</span>${sub}`;
   }
 
-  // ── Bloc éditorial (seul élément animé) ──
+  function flashUpdate(blockEl) {
+    const mainEl = blockEl.querySelector('.tlive-b-main');
+    if (!mainEl || !mainEl.classList) return;
+    mainEl.classList.remove('is-updated');
+    void blockEl.offsetWidth;              // reflow → l'animation peut rejouer
+    mainEl.classList.add('is-updated');
+  }
+
+  function renderContext() {
+    const ctx = buildCtx();
+    contextProviders.forEach((p, i) => {
+      let b = null;
+      try { b = p.build(ctx); } catch { b = null; }
+      const cur = blockEls[p.id];
+      if (!b) {
+        if (cur) { cur.el.remove(); delete blockEls[p.id]; }
+        return;
+      }
+      const sig = `${b.icon}|${b.main}|${b.sub || ''}`;
+      if (!cur) {
+        const bl = document.createElement('div');
+        bl.className = 'tlive-block';
+        bl.innerHTML = blockInner(b);
+        if (!reduceMotion) {
+          bl.classList.add('is-enter');
+          bl.style.transitionDelay = `${Math.min(i, 6) * 45}ms`;   // apparition en cascade
+          raf(() => raf(() => { bl.classList.remove('is-enter'); bl.style.transitionDelay = ''; }));
+        }
+        contextEl.appendChild(bl);
+        blockEls[p.id] = { el: bl, sig };
+      } else {
+        contextEl.appendChild(cur.el);      // ré-ordonne selon la priorité (rank)
+        if (cur.sig !== sig) {
+          cur.el.innerHTML = blockInner(b);
+          cur.sig = sig;
+          if (!reduceMotion) flashUpdate(cur.el);
+        }
+      }
+    });
+    fitContext();
+  }
+
+  // ── Responsive : montre tout, puis retire les blocs de plus faible priorité ──
+  function fitContext() {
+    const blocks = [...contextEl.children];
+    blocks.forEach((bl) => { bl.style.display = ''; });
+    for (let i = blocks.length - 1; i >= 1; i--) {          // garde toujours le 1er (météo)
+      const overflow = el.scrollWidth > el.clientWidth + 1;
+      const tight = (el.clientWidth - contextEl.offsetWidth) < EDITORIAL_MIN_PX;
+      if (!overflow && !tight) break;
+      blocks[i].style.display = 'none';
+    }
+  }
+
+  // ── Bloc éditorial (rotatif, animé) ──
   function editorialHTML(card) {
     return `<span class="tlive-ed-ico" aria-hidden="true">${card.icon}</span>`
       + `<span class="tlive-ed-text">${escapeHtml(card.text)}</span>`;
@@ -341,7 +416,7 @@ export function initTokyoLive() {
       cardEl.innerHTML = html;
       cardEl.classList.remove('is-leaving');
       cardEl.classList.add('is-entering');
-      void cardEl.offsetWidth; // reflow → transition douce vers l'état normal
+      void cardEl.offsetWidth;
       cardEl.classList.remove('is-entering');
     }, ANIM_MS / 2);
   }
@@ -374,6 +449,11 @@ export function initTokyoLive() {
 
   setInterval(() => { if (!paused) renderContext(); }, CONTEXT_REFRESH_MS);
 
+  // ── Responsive : recalcule le nombre de blocs quand la largeur change ──
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(() => fitContext()).observe(el);
+  }
+
   // ── Interactions (seul le bloc éditorial réagit au clic/hover) ──
   editorialEl.addEventListener('mouseenter', () => { paused = true; clearTimeout(rotTimer); });
   editorialEl.addEventListener('mouseleave', () => { paused = false; scheduleRot(); });
@@ -385,7 +465,7 @@ export function initTokyoLive() {
     });
   }
 
-  // Déplacement de carte → le quartier permanent se met à jour (sans animation).
+  // Déplacement de carte → le quartier se met à jour (avec un flash discret).
   if (map && typeof map.on === 'function') {
     let moveTimer = null;
     map.on('moveend', () => {
@@ -398,8 +478,8 @@ export function initTokyoLive() {
   fetchWeather().then((w) => {
     if (!w) return;
     weather = w;
-    renderContext();      // la météo apparaît dans le contexte permanent
-    kickEditorial();      // le conseil météo devient disponible en rotation
+    renderContext();      // météo + ressenti + soleil apparaissent (en cascade)
+    kickEditorial();      // les cartes météo deviennent disponibles en rotation
   });
   setInterval(() => {
     fetchWeather().then((w) => { if (w) { weather = w; renderContext(); } });

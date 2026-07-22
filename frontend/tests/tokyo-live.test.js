@@ -168,13 +168,27 @@ describe('inSeasonWindow', () => {
 
 // ── Montage (smoke test du moteur avec un DOM minimal) ───────────────────────
 
+// Faux nœud DOM : suffisant pour exercer le rendu par nœuds + le responsive.
 function fakeEl() {
-  return {
-    innerHTML: '', hidden: true, offsetWidth: 0, _q: {},
-    classList: { add() {}, remove() {}, contains: () => false },
+  const self = {
+    innerHTML: '', hidden: true, className: '', dataset: {}, style: {},
+    children: [], parentNode: null,
+    offsetWidth: 0, scrollWidth: 0, clientWidth: 1000, _q: {},
+    classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, contains(c) { return this._s.has(c); } },
     addEventListener() {},
-    querySelector(sel) { this._q[sel] = this._q[sel] || fakeEl(); return this._q[sel]; },
+    appendChild(child) {
+      const i = self.children.indexOf(child);
+      if (i >= 0) self.children.splice(i, 1);
+      self.children.push(child); child.parentNode = self; return child;
+    },
+    remove() {
+      const p = self.parentNode;
+      if (p) { const i = p.children.indexOf(self); if (i >= 0) p.children.splice(i, 1); }
+      self.parentNode = null;
+    },
+    querySelector(sel) { self._q[sel] = self._q[sel] || fakeEl(); return self._q[sel]; },
   };
+  return self;
 }
 
 describe('initTokyoLive (montage)', () => {
@@ -182,7 +196,12 @@ describe('initTokyoLive (montage)', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     host = fakeEl();
-    vi.stubGlobal('document', { getElementById: (id) => (id === 'tokyo-live' ? host : null), addEventListener() {}, hidden: false });
+    vi.stubGlobal('document', {
+      getElementById: (id) => (id === 'tokyo-live' ? host : null),
+      createElement: () => fakeEl(),
+      addEventListener() {},
+      hidden: false,
+    });
     vi.stubGlobal('matchMedia', () => ({ matches: true })); // reduce-motion → rendu synchrone
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
   });
@@ -191,9 +210,11 @@ describe('initTokyoLive (montage)', () => {
   test('monte la barre (contexte + éditorial) sans lever d\'erreur', () => {
     expect(() => initTokyoLive()).not.toThrow();
     expect(host.hidden).toBe(false);
-    // Contexte permanent : l'heure est toujours présente (même hors réseau).
-    expect(host.querySelector('.tlive-context').innerHTML).toContain('tlive-block');
-    // Bloc éditorial : le fallback garantit un contenu même sans météo/événements.
+    // Contexte permanent : heure + saison + quartier « Tokyo » présents même hors réseau.
+    const blocks = host.querySelector('.tlive-context').children;
+    expect(blocks.length).toBeGreaterThan(0);
+    expect(blocks.some((b) => b.innerHTML.includes('tlive-b-main'))).toBe(true);
+    // Bloc éditorial : le vibe horaire garantit un contenu même sans météo/événements.
     expect(host.querySelector('.tlive-card').innerHTML).toContain('tlive-ed-text');
   });
 });
