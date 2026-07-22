@@ -9,7 +9,7 @@ const LAT = 35.68;
 const LON = 139.69;
 const URL =
   `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}`
-  + '&current=temperature_2m,apparent_temperature,weather_code'
+  + '&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code'
   + '&hourly=precipitation_probability'
   + '&daily=sunrise,sunset,uv_index_max'
   // forecast_days=2 : on récupère aussi le lever du soleil de demain (carte « Sunrise tomorrow »)
@@ -89,9 +89,13 @@ export async function fetchWeather() {
     const code = data.current?.weather_code ?? 0;
     const { emoji, label } = weatherInfo(code);
     const feels = data.current?.apparent_temperature;
+    const humidity = data.current?.relative_humidity_2m;
+    const wind = data.current?.wind_speed_10m;
     return {
       temp: Math.round(temp),
-      feels: feels == null ? null : Math.round(feels), // température ressentie
+      feels: feels == null ? null : Math.round(feels),       // température ressentie
+      humidity: humidity == null ? null : Math.round(humidity),
+      wind: wind == null ? null : Math.round(wind),          // km/h
       code,
       emoji,
       label,

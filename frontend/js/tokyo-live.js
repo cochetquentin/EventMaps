@@ -223,6 +223,18 @@ function makeContextProviders() {
         ? { icon: '🌡️', main: `${ctx.weather.feels}°`, sub: 'ressenti' }
         : null),
     },
+    {
+      id: 'humidity', rank: 8,
+      build: (ctx) => (ctx.weather && ctx.weather.humidity != null
+        ? { icon: '💧', main: `${ctx.weather.humidity}%`, sub: 'humidité' }
+        : null),
+    },
+    {
+      id: 'wind', rank: 9,
+      build: (ctx) => (ctx.weather && ctx.weather.wind != null
+        ? { icon: '💨', main: `${ctx.weather.wind} km/h`, sub: 'vent' }
+        : null),
+    },
   ];
 }
 
@@ -370,7 +382,7 @@ export function initTokyoLive() {
         bl.innerHTML = blockInner(b);
         if (!reduceMotion) {
           bl.classList.add('is-enter');
-          bl.style.transitionDelay = `${Math.min(i, 6) * 45}ms`;   // apparition en cascade
+          bl.style.transitionDelay = `${Math.min(i, 8) * 40}ms`;   // apparition en cascade
           raf(() => raf(() => { bl.classList.remove('is-enter'); bl.style.transitionDelay = ''; }));
         }
         contextEl.appendChild(bl);

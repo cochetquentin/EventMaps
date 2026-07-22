@@ -228,7 +228,7 @@ describe('fetchWeather', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,
       json: async () => ({
-        current: { temperature_2m: 22.6, apparent_temperature: 25.4, weather_code: 0 },
+        current: { temperature_2m: 22.6, apparent_temperature: 25.4, relative_humidity_2m: 61, wind_speed_10m: 14.3, weather_code: 0 },
         hourly: { time: [], precipitation_probability: [] },
         daily: {
           sunrise: ['2026-07-20T04:39', '2026-07-21T04:40'],
@@ -240,6 +240,8 @@ describe('fetchWeather', () => {
     const w = await fetchWeather();
     expect(w.temp).toBe(23);
     expect(w.feels).toBe(25);
+    expect(w.humidity).toBe(61);
+    expect(w.wind).toBe(14);
     expect(w.emoji).toBe('☀️');
     expect(w.daily.sunrise[0]).toBe('2026-07-20T04:39');
     expect(w.daily.sunrise[1]).toBe('2026-07-21T04:40'); // demain
