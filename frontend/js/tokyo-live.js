@@ -135,28 +135,27 @@ function upcomingRainHour(hourly, nowHour) {
 
 const isRainingNow = (c) => (c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95;
 
-// Coucher du soleil : uniquement dans les 3 h qui précèdent → "Coucher du soleil dans 42 min"
-function buildSunsetCard(ctx) {
-  const set = ctx.weather?.daily?.sunset?.[0];
-  if (!set) return null;
-  const diff = isoToMin(set) - minutesJST(ctx.now);
-  if (diff <= 0 || diff > 180) return null;
-  return { icon: '🌇', text: `Coucher du soleil dans ${fmtDuration(diff)}` };
-}
-
-// Lever du soleil : le petit matin (avant le lever) ou le soir (après le coucher) seulement.
-function buildSunriseCard(ctx) {
+// Bloc permanent « soleil » : affiche toujours le prochain événement solaire pertinent.
+//   • dans les 3 h avant le coucher  → compte à rebours « 🌇 dans 42 min »
+//   • petit matin (avant le lever)   → « 🌅 04:40 »
+//   • soir (après le coucher)        → lever de demain « 🌅 04:41 »
+//   • journée                        → coucher du jour « 🌇 18:56 »
+// Renvoie null tant que la météo n'est pas chargée (le bloc est alors simplement masqué).
+function buildSunContext(ctx) {
   const d = ctx.weather?.daily;
   if (!d) return null;
   const nowM = minutesJST(ctx.now);
-  const riseToday = d.sunrise?.[0];
-  const setToday = d.sunset?.[0];
-  if (riseToday && nowM < isoToMin(riseToday)) {
-    return { icon: '🌅', text: `Lever du soleil à ${riseToday.slice(11, 16)}` };
+  const set0 = d.sunset?.[0];
+  const rise0 = d.sunrise?.[0];
+  if (set0) {
+    const diff = isoToMin(set0) - nowM;
+    if (diff > 0 && diff <= 180) return { icon: '🌇', main: `dans ${fmtDuration(diff)}`, sub: null };
   }
-  if (setToday && nowM >= isoToMin(setToday) && d.sunrise?.[1]) {
-    return { icon: '🌅', text: `Lever du soleil demain à ${d.sunrise[1].slice(11, 16)}` };
+  if (rise0 && nowM < isoToMin(rise0)) return { icon: '🌅', main: rise0.slice(11, 16), sub: null };
+  if (set0 && nowM >= isoToMin(set0) && d.sunrise?.[1]) {
+    return { icon: '🌅', main: d.sunrise[1].slice(11, 16), sub: null };
   }
+  if (set0) return { icon: '🌇', main: set0.slice(11, 16), sub: null };
   return null;
 }
 
@@ -180,6 +179,14 @@ function makeContextProviders() {
         const r = district(ctx);
         return r ? { icon: r.natural.emoji, main: r.natural.text, sub: null } : null;
       },
+    },
+    {
+      id: 'sun',
+      build: buildSunContext, // prochain événement solaire (compte à rebours si proche)
+    },
+    {
+      id: 'season',
+      build: () => { const s = seasonFor(todayJST()); return { icon: s.emoji, main: s.label, sub: null }; },
     },
   ];
 }
@@ -226,10 +233,6 @@ function makeEditorialProviders() {
         ? { icon: '🧣', text: `${ctx.weather.temp}° — couvrez-vous bien` } : null),
     },
 
-    // ── Soleil (uniquement quand c'est pertinent) ──
-    { id: 'sun-set', category: 'sun', priority: 8, importance: 'normal', build: buildSunsetCard },
-    { id: 'sun-rise', category: 'sun', priority: 6, importance: 'low', build: buildSunriseCard },
-
     // ── Lieu éditorial (tag du quartier exploré) ──
     {
       id: 'place-discover', category: 'place', priority: 6, importance: 'normal',
@@ -243,12 +246,6 @@ function makeEditorialProviders() {
         const n = ctx.events?.length || 0;
         return n > 0 ? { icon: '🎭', text: `${n} événement${n > 1 ? 's' : ''} à explorer sur la carte` } : null;
       },
-    },
-
-    // ── Saison générique (floor factuel, toujours vrai) ──
-    {
-      id: 'season-now', category: 'season', priority: 3, importance: 'low',
-      build: () => { const s = seasonFor(todayJST()); return { icon: s.emoji, text: s.note }; },
     },
 
     // ── CTA neutre (dernier recours : jamais une fausse info) ──
