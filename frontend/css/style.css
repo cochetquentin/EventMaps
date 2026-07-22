@@ -184,32 +184,45 @@ body {
 }
 .tlive[hidden] { display: none; }
 
-/* Contexte permanent — occupe juste la place nécessaire, ne rétrécit pas.
-   Les blocs de plus faible priorité sont masqués en JS (display:none) quand la
-   largeur manque → nombre de widgets adaptatif à la taille de l'écran. */
+/* Contexte permanent — groupes (météo, heure, quartier…) séparés par un filet.
+   Les cellules de plus faible priorité sont masquées en JS quand la largeur manque
+   → nombre de widgets adaptatif ; les infos proches restent regroupées. */
 .tlive-context { display: flex; align-items: center; flex: 0 0 auto; min-width: 0; }
-.tlive-block {
-  display: flex; align-items: center; gap: 7px;
-  padding: 0 16px; white-space: nowrap;
+.tlive-group {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 14px; white-space: nowrap;
+}
+.tlive-group:first-child { padding-left: 6px; }
+.tlive-group + .tlive-group { border-left: 1px solid var(--line); }
+
+.tlive-cell {
+  display: flex; align-items: center; gap: 6px; white-space: nowrap;
   transition: opacity 320ms cubic-bezier(0.4, 0, 0.2, 1),
               transform 320ms cubic-bezier(0.4, 0, 0.2, 1);
 }
-.tlive-block:first-child { padding-left: 6px; }
-.tlive-block + .tlive-block { border-left: 1px solid var(--line); }
 /* Apparition en cascade (délai posé en JS) */
-.tlive-block.is-enter { opacity: 0; transform: translateY(5px); }
-.tlive-b-ico  { font-size: 16px; line-height: 1; }
-.tlive-b-main {
+.tlive-cell.is-enter { opacity: 0; transform: translateY(5px); }
+.tlive-c-ico  { font-size: 16px; line-height: 1; }
+.tlive-c-main {
   font-size: 13px; font-weight: 600; color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
+.tlive-c-sub  { font-size: 12px; color: var(--ink-3); }
+
+/* Cellules « détail » (ressenti, humidité, vent) : secondaires, préfixées d'un « · ».
+   Comme elles se masquent des dernières vers les premières, le « · » reste toujours
+   correctement placé après la valeur principale. */
+.tlive-cell--detail::before { content: '·'; color: var(--ink-3); margin-right: 2px; }
+.tlive-cell--detail .tlive-c-main {
+  font-weight: 500; font-size: 12.5px; color: var(--ink-2);
+}
+
 /* Flash discret quand la valeur change (heure, compte à rebours, quartier…) */
-.tlive-b-main.is-updated { animation: tlive-flash 420ms cubic-bezier(0.4, 0, 0.2, 1); }
+.tlive-c-main.is-updated { animation: tlive-flash 420ms cubic-bezier(0.4, 0, 0.2, 1); }
 @keyframes tlive-flash {
   0%   { opacity: 0.25; transform: translateY(-3px); }
   100% { opacity: 1;    transform: translateY(0); }
 }
-.tlive-b-sub  { font-size: 12px; color: var(--ink-3); }
 
 /* Bloc éditorial — récupère tout l'espace restant, le plus discret visuellement,
    tronqué proprement si nécessaire. Seul élément animé de la barre. */
@@ -238,9 +251,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .tlive-card { transition: opacity 150ms linear; }
   .tlive-card.is-leaving, .tlive-card.is-entering { transform: none; }
-  .tlive-block { transition: none; }
-  .tlive-block.is-enter { opacity: 1; transform: none; }
-  .tlive-b-main.is-updated { animation: none; }
+  .tlive-cell { transition: none; }
+  .tlive-cell.is-enter { opacity: 1; transform: none; }
+  .tlive-c-main.is-updated { animation: none; }
 }
 
 /* Boutons icônes — poussés à droite (indispensable sur mobile, où les presets

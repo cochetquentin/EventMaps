@@ -207,13 +207,14 @@ describe('initTokyoLive (montage)', () => {
   });
   afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
-  test('monte la barre (contexte + éditorial) sans lever d\'erreur', () => {
+  test('monte la barre (groupes de contexte + éditorial) sans lever d\'erreur', () => {
     expect(() => initTokyoLive()).not.toThrow();
     expect(host.hidden).toBe(false);
-    // Contexte permanent : heure + saison + quartier « Tokyo » présents même hors réseau.
-    const blocks = host.querySelector('.tlive-context').children;
-    expect(blocks.length).toBeGreaterThan(0);
-    expect(blocks.some((b) => b.innerHTML.includes('tlive-b-main'))).toBe(true);
+    // Contexte : des groupes non vides (heure, saison, quartier « Tokyo ») même hors réseau.
+    const groups = host.querySelector('.tlive-context').children;
+    expect(groups.length).toBeGreaterThan(0);
+    const hasCell = groups.some((g) => g.children.some((c) => c.innerHTML.includes('tlive-c-main')));
+    expect(hasCell).toBe(true);
     // Bloc éditorial : le vibe horaire garantit un contenu même sans météo/événements.
     expect(host.querySelector('.tlive-card').innerHTML).toContain('tlive-ed-text');
   });

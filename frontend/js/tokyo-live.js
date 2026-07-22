@@ -34,7 +34,6 @@ const CONTEXT_REFRESH_MS = 15 * SECOND; // rafraîchissement du contexte (surtou
 const MOVE_DEBOUNCE_MS = 300;           // anti-spam sur les déplacements de carte
 const WEATHER_REFRESH_MS = 30 * MINUTE;
 const RECENT_WINDOW = 2;                // cooldown par catégorie (éditorial)
-const EDITORIAL_MIN_PX = 150;           // largeur mini réservée au bloc éditorial
 
 const IMPORTANCE_RANK = { low: 0, normal: 1, high: 2, critical: 3 };
 const impRank = (x) => IMPORTANCE_RANK[x] ?? 1;
@@ -177,64 +176,56 @@ function timeVibe(ctx) {
   return { icon: '🌃', text: 'Douceur nocturne à Tokyo' };
 }
 
-// ── Context providers (permanents, rangés par priorité) ────────────────────
-// rank croissant = priorité décroissante ; on retire les plus grands rank d'abord.
+// ── Cellules de contexte (permanentes) ─────────────────────────────────────
+// Chaque cellule appartient à un `group` (regroupement visuel : les cellules d'un
+// même groupe sont collées, un séparateur ne s'affiche qu'ENTRE groupes) et porte un
+// `rank` = priorité (indépendante de la position). Quand la place manque, on masque
+// les rangs les plus élevés d'abord — donc les détails météo (ressenti, humidité,
+// vent) disparaissent avant l'heure, même s'ils sont affichés à gauche avec la météo.
+//   detail:true → cellule secondaire (grisée, préfixée d'un « · »), sans icône.
 
-function makeContextProviders() {
+const GROUP_ORDER = ['weather', 'time', 'place', 'events', 'sun', 'season'];
+
+function makeContextCells() {
   return [
+    // ── Groupe météo (tout ce qui touche au temps, regroupé) ──
     {
-      id: 'weather', rank: 1,
-      build: (ctx) => (ctx.weather
-        ? { icon: ctx.weather.emoji, main: `${ctx.weather.temp}°`, sub: ctx.weather.label }
-        : null),
+      id: 'temp', group: 'weather', rank: 1,
+      build: (ctx) => (ctx.weather ? { icon: ctx.weather.emoji, main: `${ctx.weather.temp}°`, sub: ctx.weather.label } : null),
     },
     {
-      id: 'time', rank: 2,
-      build: (ctx) => ({ icon: '🕒', main: formatJST(ctx.now), sub: 'JST' }),
+      id: 'feels', group: 'weather', rank: 4, detail: true,
+      build: (ctx) => (ctx.weather && ctx.weather.feels != null ? { main: `ressenti ${ctx.weather.feels}°` } : null),
     },
     {
-      id: 'district', rank: 3,
-      // Toujours présent : dézoomé / hors zone → vue d'ensemble « Tokyo ».
-      build: (ctx) => {
-        const r = district(ctx);
-        if (r) return { icon: r.natural.emoji, main: r.natural.text, sub: null };
-        return { icon: '📍', main: 'Tokyo', sub: null };
-      },
+      id: 'humidity', group: 'weather', rank: 8, detail: true,
+      build: (ctx) => (ctx.weather && ctx.weather.humidity != null ? { main: `${ctx.weather.humidity}%` } : null),
     },
     {
-      id: 'season', rank: 4,
-      // Libellé français clair, sans terme japonais dans le bloc permanent.
-      build: () => { const s = seasonFor(todayJST()); return { icon: s.emoji, main: s.label, sub: 'saison' }; },
+      id: 'wind', group: 'weather', rank: 9, detail: true,
+      build: (ctx) => (ctx.weather && ctx.weather.wind != null ? { main: `${ctx.weather.wind} km/h` } : null),
     },
+
+    // ── Heure ──
+    { id: 'time', group: 'time', rank: 2, build: (ctx) => ({ icon: '🕒', main: formatJST(ctx.now), sub: 'JST' }) },
+
+    // ── Quartier (toujours présent : dézoomé / hors zone → « Tokyo ») ──
     {
-      id: 'sun', rank: 5,
-      build: buildSunContext,
+      id: 'district', group: 'place', rank: 3,
+      build: (ctx) => { const r = district(ctx); return r ? { icon: r.natural.emoji, main: r.natural.text } : { icon: '📍', main: 'Tokyo' }; },
     },
+
+    // ── Événements chargés sur la carte ──
     {
-      id: 'events', rank: 6,
-      build: (ctx) => {
-        const n = ctx.events?.length || 0;
-        return n > 0 ? { icon: '🎭', main: `${n} événement${n > 1 ? 's' : ''}`, sub: null } : null;
-      },
+      id: 'events', group: 'events', rank: 5,
+      build: (ctx) => { const n = ctx.events?.length || 0; return n > 0 ? { icon: '🎭', main: `${n} événement${n > 1 ? 's' : ''}` } : null; },
     },
-    {
-      id: 'feels', rank: 7,
-      build: (ctx) => (ctx.weather && ctx.weather.feels != null
-        ? { icon: '🌡️', main: `${ctx.weather.feels}°`, sub: 'ressenti' }
-        : null),
-    },
-    {
-      id: 'humidity', rank: 8,
-      build: (ctx) => (ctx.weather && ctx.weather.humidity != null
-        ? { icon: '💧', main: `${ctx.weather.humidity}%`, sub: 'humidité' }
-        : null),
-    },
-    {
-      id: 'wind', rank: 9,
-      build: (ctx) => (ctx.weather && ctx.weather.wind != null
-        ? { icon: '💨', main: `${ctx.weather.wind} km/h`, sub: 'vent' }
-        : null),
-    },
+
+    // ── Soleil (prochain événement solaire) ──
+    { id: 'sun', group: 'sun', rank: 6, build: buildSunContext },
+
+    // ── Saison (libellé français clair) ──
+    { id: 'season', group: 'season', rank: 7, build: () => { const s = seasonFor(todayJST()); return { icon: s.emoji, main: s.label }; } },
   ];
 }
 
@@ -322,12 +313,13 @@ export function initTokyoLive() {
     && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (fn) => fn();
 
-  const contextProviders = makeContextProviders();
+  const contextCells = makeContextCells();
   const editorialProviders = makeEditorialProviders();
   const scheduler = createScheduler(editorialProviders);
   let weather = null;
   let editorialCards = {};
-  const blockEls = {}; // id -> { el, sig }
+  const cellState = {};  // id -> { el, sig }
+  const groupState = {}; // group -> element
 
   el.innerHTML =
     '<div class="tlive-context"></div>'
@@ -350,64 +342,90 @@ export function initTokyoLive() {
     return { weather, now, center, zoom, events: allEvents };
   }
 
-  // ── Contexte permanent : rendu par nœuds (diff par widget → animations) ──
-  function blockInner(b) {
-    const sub = b.sub ? `<span class="tlive-b-sub">${escapeHtml(b.sub)}</span>` : '';
-    return `<span class="tlive-b-ico" aria-hidden="true">${b.icon}</span>`
-      + `<span class="tlive-b-main">${escapeHtml(b.main)}</span>${sub}`;
+  // ── Contexte permanent : groupes + cellules (diff par cellule → animations) ──
+  function cellInner(b) {
+    const ico = b.icon ? `<span class="tlive-c-ico" aria-hidden="true">${b.icon}</span>` : '';
+    const sub = b.sub ? `<span class="tlive-c-sub">${escapeHtml(b.sub)}</span>` : '';
+    return `${ico}<span class="tlive-c-main">${escapeHtml(b.main)}</span>${sub}`;
   }
 
-  function flashUpdate(blockEl) {
-    const mainEl = blockEl.querySelector('.tlive-b-main');
+  function flashUpdate(cellEl) {
+    const mainEl = cellEl.querySelector('.tlive-c-main');
     if (!mainEl || !mainEl.classList) return;
     mainEl.classList.remove('is-updated');
-    void blockEl.offsetWidth;              // reflow → l'animation peut rejouer
+    void cellEl.offsetWidth;              // reflow → l'animation peut rejouer
     mainEl.classList.add('is-updated');
+  }
+
+  function ensureGroup(name) {
+    if (!groupState[name]) {
+      const g = document.createElement('div');
+      g.className = 'tlive-group';
+      groupState[name] = g;
+    }
+    return groupState[name];
   }
 
   function renderContext() {
     const ctx = buildCtx();
-    contextProviders.forEach((p, i) => {
+    contextCells.forEach((def, i) => {
       let b = null;
-      try { b = p.build(ctx); } catch { b = null; }
-      const cur = blockEls[p.id];
-      if (!b) {
-        if (cur) { cur.el.remove(); delete blockEls[p.id]; }
+      try { b = def.build(ctx); } catch { b = null; }
+      const cur = cellState[def.id];
+      if (!b || b.main == null) {
+        if (cur) { cur.el.remove(); delete cellState[def.id]; }
         return;
       }
-      const sig = `${b.icon}|${b.main}|${b.sub || ''}`;
+      const sig = `${b.icon || ''}|${b.main}|${b.sub || ''}`;
+      const group = ensureGroup(def.group);
       if (!cur) {
-        const bl = document.createElement('div');
-        bl.className = 'tlive-block';
-        bl.innerHTML = blockInner(b);
+        const cell = document.createElement('div');
+        cell.className = 'tlive-cell' + (def.detail ? ' tlive-cell--detail' : '');
+        cell.dataset.rank = String(def.rank);
+        cell.innerHTML = cellInner(b);
         if (!reduceMotion) {
-          bl.classList.add('is-enter');
-          bl.style.transitionDelay = `${Math.min(i, 8) * 40}ms`;   // apparition en cascade
-          raf(() => raf(() => { bl.classList.remove('is-enter'); bl.style.transitionDelay = ''; }));
+          cell.classList.add('is-enter');
+          cell.style.transitionDelay = `${Math.min(i, 8) * 40}ms`;   // apparition en cascade
+          raf(() => raf(() => { cell.classList.remove('is-enter'); cell.style.transitionDelay = ''; }));
         }
-        contextEl.appendChild(bl);
-        blockEls[p.id] = { el: bl, sig };
+        group.appendChild(cell);
+        cellState[def.id] = { el: cell, sig };
       } else {
-        contextEl.appendChild(cur.el);      // ré-ordonne selon la priorité (rank)
+        group.appendChild(cur.el);          // ré-ordonne la cellule dans son groupe
         if (cur.sig !== sig) {
-          cur.el.innerHTML = blockInner(b);
+          cur.el.innerHTML = cellInner(b);
           cur.sig = sig;
           if (!reduceMotion) flashUpdate(cur.el);
         }
       }
     });
+    // (ré)insère les groupes non vides dans l'ordre défini
+    for (const name of GROUP_ORDER) {
+      const g = groupState[name];
+      if (g && g.children.length) contextEl.appendChild(g);
+    }
     fitContext();
   }
 
-  // ── Responsive : montre tout, puis retire les blocs de plus faible priorité ──
+  // ── Responsive : masque les cellules par priorité (rang) jusqu'à ce que ça tienne.
+  // Le rang est indépendant de la position → les détails météo (rangs élevés) partent
+  // avant l'heure/le quartier, tout en restant visuellement collés à la météo. ──
   function fitContext() {
-    const blocks = [...contextEl.children];
-    blocks.forEach((bl) => { bl.style.display = ''; });
-    for (let i = blocks.length - 1; i >= 1; i--) {          // garde toujours le 1er (météo)
-      const overflow = el.scrollWidth > el.clientWidth + 1;
-      const tight = (el.clientWidth - contextEl.offsetWidth) < EDITORIAL_MIN_PX;
-      if (!overflow && !tight) break;
-      blocks[i].style.display = 'none';
+    const cells = Object.values(cellState);
+    cells.forEach((c) => { c.el.style.display = ''; });
+    Object.values(groupState).forEach((g) => { g.style.display = ''; });
+    // rang décroissant : on cache le moins prioritaire d'abord
+    const ordered = cells.slice().sort((a, b) => Number(b.el.dataset.rank) - Number(a.el.dataset.rank));
+    for (const c of ordered) {
+      if (el.scrollWidth <= el.clientWidth + 1) break;
+      if (Number(c.el.dataset.rank) <= 1) continue;          // ne jamais masquer la météo
+      c.el.style.display = 'none';
+    }
+    // masque les groupes dont toutes les cellules sont cachées (évite un séparateur orphelin)
+    for (const g of Object.values(groupState)) {
+      const kids = [...g.children];
+      const anyVisible = kids.some((k) => k.style.display !== 'none');
+      g.style.display = kids.length && anyVisible ? '' : 'none';
     }
   }
 
