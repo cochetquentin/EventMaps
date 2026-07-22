@@ -149,13 +149,13 @@ function buildSunContext(ctx) {
   const rise0 = d.sunrise?.[0];
   if (set0) {
     const diff = isoToMin(set0) - nowM;
-    if (diff > 0 && diff <= 180) return { icon: '🌇', main: `dans ${fmtDuration(diff)}`, sub: null };
+    if (diff > 0 && diff <= 180) return { icon: '🌇', main: `dans ${fmtDuration(diff)}`, sub: 'coucher' };
   }
-  if (rise0 && nowM < isoToMin(rise0)) return { icon: '🌅', main: rise0.slice(11, 16), sub: null };
+  if (rise0 && nowM < isoToMin(rise0)) return { icon: '🌅', main: rise0.slice(11, 16), sub: 'lever' };
   if (set0 && nowM >= isoToMin(set0) && d.sunrise?.[1]) {
-    return { icon: '🌅', main: d.sunrise[1].slice(11, 16), sub: null };
+    return { icon: '🌅', main: d.sunrise[1].slice(11, 16), sub: 'lever demain' };
   }
-  if (set0) return { icon: '🌇', main: set0.slice(11, 16), sub: null };
+  if (set0) return { icon: '🌇', main: set0.slice(11, 16), sub: 'coucher' };
   return null;
 }
 
@@ -170,8 +170,22 @@ function makeContextProviders() {
         : null),
     },
     {
+      id: 'feels',
+      build: (ctx) => (ctx.weather && ctx.weather.feels != null
+        ? { icon: '🌡️', main: `${ctx.weather.feels}°`, sub: 'ressenti' }
+        : null),
+    },
+    {
       id: 'time',
       build: (ctx) => ({ icon: '🕒', main: formatJST(ctx.now), sub: 'JST' }),
+    },
+    {
+      id: 'sun',
+      build: buildSunContext, // prochain événement solaire (compte à rebours si proche)
+    },
+    {
+      id: 'season',
+      build: () => { const s = seasonFor(todayJST()); return { icon: s.emoji, main: s.label, sub: s.note }; },
     },
     {
       id: 'district',
@@ -181,12 +195,11 @@ function makeContextProviders() {
       },
     },
     {
-      id: 'sun',
-      build: buildSunContext, // prochain événement solaire (compte à rebours si proche)
-    },
-    {
-      id: 'season',
-      build: () => { const s = seasonFor(todayJST()); return { icon: s.emoji, main: s.label, sub: null }; },
+      id: 'events',
+      build: (ctx) => {
+        const n = ctx.events?.length || 0;
+        return n > 0 ? { icon: '🎭', main: `${n} événement${n > 1 ? 's' : ''}`, sub: null } : null;
+      },
     },
   ];
 }
@@ -237,15 +250,6 @@ function makeEditorialProviders() {
     {
       id: 'place-discover', category: 'place', priority: 6, importance: 'normal',
       build: (ctx) => { const r = district(ctx); return r && r.tag ? { icon: r.tag.emoji, text: r.tag.text } : null; },
-    },
-
-    // ── Événements réels chargés sur la carte ──
-    {
-      id: 'events-nearby', category: 'events', priority: 5, importance: 'normal',
-      build: (ctx) => {
-        const n = ctx.events?.length || 0;
-        return n > 0 ? { icon: '🎭', text: `${n} événement${n > 1 ? 's' : ''} à explorer sur la carte` } : null;
-      },
     },
 
     // ── CTA neutre (dernier recours : jamais une fausse info) ──

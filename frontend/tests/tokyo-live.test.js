@@ -90,15 +90,15 @@ describe('seasonFor', () => {
   const on = (m, d) => seasonFor(new Date(Date.UTC(2026, m - 1, d)));
 
   test.each([
-    [1, 15, 'Winter'],
-    [3, 19, 'Winter'],
-    [3, 20, 'Sakura'],
-    [4, 10, 'Sakura'],
-    [4, 11, 'Fresh green'],
-    [6, 15, 'Tsuyu'],
-    [8, 1, 'Hanabi'],
-    [10, 1, 'Autumn'],
-    [11, 15, 'Momiji'],
+    [1, 15, 'Hiver'],
+    [3, 19, 'Hiver'],
+    [3, 20, 'Cerisiers en fleurs'],
+    [4, 10, 'Cerisiers en fleurs'],
+    [4, 11, 'Nouvelle verdure'],
+    [6, 15, 'Saison des pluies'],
+    [8, 1, "Feux d'artifice"],
+    [10, 1, 'Automne'],
+    [11, 15, "Érables d'automne"],
     [12, 25, 'Illuminations'],
   ])('%i/%i → %s', (m, d, label) => {
     expect(on(m, d).label).toBe(label);
@@ -207,7 +207,7 @@ describe('fetchWeather', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,
       json: async () => ({
-        current: { temperature_2m: 22.6, weather_code: 0 },
+        current: { temperature_2m: 22.6, apparent_temperature: 25.4, weather_code: 0 },
         hourly: { time: [], precipitation_probability: [] },
         daily: {
           sunrise: ['2026-07-20T04:39', '2026-07-21T04:40'],
@@ -218,6 +218,7 @@ describe('fetchWeather', () => {
     })));
     const w = await fetchWeather();
     expect(w.temp).toBe(23);
+    expect(w.feels).toBe(25);
     expect(w.emoji).toBe('☀️');
     expect(w.daily.sunrise[0]).toBe('2026-07-20T04:39');
     expect(w.daily.sunrise[1]).toBe('2026-07-21T04:40'); // demain

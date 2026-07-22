@@ -56,15 +56,16 @@ export function describeDistrict(lat, lon, zoom) {
 // ── Saisons de Tokyo ───────────────────────────────────────────────────────
 // Plages [mois, jour] → [mois, jour] (bornes incluses), couverture complète de l'année,
 // sans chevauchement d'année (Illuminations séparé de Winter au 1er janvier).
+// label : formulation courte et explicite en français (affichée) ; note : détail court.
 export const SEASONS = [
-  { emoji: '❄️', label: 'Winter',        note: 'Crisp winter days',  from: [1, 1],   to: [3, 19] },
-  { emoji: '🌸', label: 'Sakura',        note: 'Peak bloom season',  from: [3, 20],  to: [4, 10] },
-  { emoji: '🍃', label: 'Fresh green',   note: 'Shinryoku season',   from: [4, 11],  to: [5, 31] },
-  { emoji: '☔', label: 'Tsuyu',         note: 'Rainy season',       from: [6, 1],   to: [7, 20] },
-  { emoji: '🎆', label: 'Hanabi',        note: 'Fireworks season',   from: [7, 21],  to: [8, 31] },
-  { emoji: '🍂', label: 'Autumn',        note: 'Autumn breeze',      from: [9, 1],   to: [10, 31] },
-  { emoji: '🍁', label: 'Momiji',        note: 'Autumn leaves',      from: [11, 1],  to: [11, 30] },
-  { emoji: '✨', label: 'Illuminations', note: 'Winter lights',      from: [12, 1],  to: [12, 31] },
+  { emoji: '❄️', label: 'Hiver',              note: 'Journées fraîches', from: [1, 1],   to: [3, 19] },
+  { emoji: '🌸', label: 'Cerisiers en fleurs', note: 'Saison des sakura', from: [3, 20],  to: [4, 10] },
+  { emoji: '🍃', label: 'Nouvelle verdure',    note: 'Shinryoku',         from: [4, 11],  to: [5, 31] },
+  { emoji: '☔', label: 'Saison des pluies',   note: 'Tsuyu',             from: [6, 1],   to: [7, 20] },
+  { emoji: '🎆', label: "Feux d'artifice",     note: 'Saison des hanabi', from: [7, 21],  to: [8, 31] },
+  { emoji: '🍂', label: 'Automne',             note: 'Douceur d’automne', from: [9, 1],   to: [10, 31] },
+  { emoji: '🍁', label: "Érables d'automne",   note: 'Saison des momiji', from: [11, 1],  to: [11, 30] },
+  { emoji: '✨', label: 'Illuminations',       note: "Lumières d'hiver",  from: [12, 1],  to: [12, 31] },
 ];
 
 // Saison correspondant à une date. Lit le mois/jour en UTC pour coller à la convention
