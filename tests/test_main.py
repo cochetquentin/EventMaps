@@ -9,6 +9,7 @@ from db.store import EventStore
 from main import _write_events_csv, cmd_all, cmd_hanabi, cmd_tc
 from scrapers.base import ScrapeReport
 from scrapers.hanabi_walker import HanabiWalker
+from scrapers.ichiban_japan import IchibanJapan
 from scrapers.timeout_tokyo import TimeoutTokyo
 from scrapers.tokyo_cheapo import TokyoCheapo
 from tests.test_store import make_hanabi, make_tc
@@ -16,6 +17,7 @@ from tests.test_store import make_hanabi, make_tc
 _TC_REPORT = ScrapeReport(source="tc", links_seen=1, events_ok=1)
 _HW_REPORT = ScrapeReport(source="hanabi", links_seen=1, events_ok=1)
 _TOT_REPORT = ScrapeReport(source="tot", links_seen=0, events_ok=0)
+_IJ_REPORT = ScrapeReport(source="ij", links_seen=0, events_ok=0)
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -116,6 +118,7 @@ def test_cmd_all_db(tmp_path):
         patch.object(TokyoCheapo, "scrape", return_value=([tc_event], _TC_REPORT)),
         patch.object(HanabiWalker, "scrape", return_value=([hw_event], _HW_REPORT)),
         patch.object(TimeoutTokyo, "scrape", return_value=([], _TOT_REPORT)),
+        patch.object(IchibanJapan, "scrape", return_value=([], _IJ_REPORT)),
     ):
         cmd_all(_db_args(tmp_path, source="all"))
 
@@ -135,6 +138,7 @@ def test_cmd_all_csv(tmp_path, monkeypatch, capsys):
         patch.object(TokyoCheapo, "scrape", return_value=([tc_event], _TC_REPORT)),
         patch.object(HanabiWalker, "scrape", return_value=([hw_event], _HW_REPORT)),
         patch.object(TimeoutTokyo, "scrape", return_value=([], _TOT_REPORT)),
+        patch.object(IchibanJapan, "scrape", return_value=([], _IJ_REPORT)),
     ):
         cmd_all(_csv_args(tmp_path, source="all"))
 
@@ -152,6 +156,7 @@ def test_cmd_all_region_forwarded(tmp_path):
         patch.object(HanabiWalker, "__init__", return_value=None) as mock_init,
         patch.object(HanabiWalker, "scrape", return_value=([hw_event], _HW_REPORT)),
         patch.object(TimeoutTokyo, "scrape", return_value=([], _TOT_REPORT)),
+        patch.object(IchibanJapan, "scrape", return_value=([], _IJ_REPORT)),
     ):
         cmd_all(_db_args(tmp_path, source="all", region="ar9999"))
 

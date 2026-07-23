@@ -5,12 +5,17 @@ from typing import Literal
 
 from pydantic import BaseModel, model_validator
 
-from models.attributes import HanabiWalkerAttributes, TimeoutTokyoAttributes, TokyoCheapoAttributes
+from models.attributes import (
+    HanabiWalkerAttributes,
+    IchibanJapanAttributes,
+    TimeoutTokyoAttributes,
+    TokyoCheapoAttributes,
+)
 
 
 class Event(BaseModel):
     id: str
-    source: Literal["tc", "hanabi", "tot"]
+    source: Literal["tc", "hanabi", "tot", "ij"]
     title: str
     url: str
     start_date: date | None = None
@@ -20,7 +25,12 @@ class Event(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     price: str | None = None
-    attributes: TokyoCheapoAttributes | HanabiWalkerAttributes | TimeoutTokyoAttributes
+    attributes: (
+        TokyoCheapoAttributes
+        | HanabiWalkerAttributes
+        | TimeoutTokyoAttributes
+        | IchibanJapanAttributes
+    )
     created_at: datetime
     # ID du représentant du cluster de doublons (None = non encore dédupliqué,
     # traité comme canonique). Voir le package dedup/ et db/events.py.
@@ -40,4 +50,6 @@ class Event(BaseModel):
                 data["attributes"] = HanabiWalkerAttributes.model_validate(attrs)
             elif source == "tot":
                 data["attributes"] = TimeoutTokyoAttributes.model_validate(attrs)
+            elif source == "ij":
+                data["attributes"] = IchibanJapanAttributes.model_validate(attrs)
         return data

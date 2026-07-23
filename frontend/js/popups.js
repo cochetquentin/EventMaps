@@ -72,6 +72,34 @@ export function buildPopup(ev) {
         ${directions}
         <a href="/events/${ev.id}.ics" style="font-size:11px;text-align:center;color:var(--muted);text-decoration:underline;">📅 Ajouter au calendrier</a>
       </div></div></div>`;
+  } else if (ev.source === 'ij') {
+    const date  = ev.end_date && ev.end_date !== ev.start_date
+      ? `📅 ${fmtDate(ev.start_date)} → ${fmtDate(ev.end_date)}`
+      : `📅 ${fmtDate(ev.start_date)}`;
+    const place = [ev.venue, attrs.neighbourhood].filter(Boolean).map(escapeHtml).join(' · ');
+    const loc   = place ? `📍 ${place}` : '';
+    const meta  = [date, loc].filter(Boolean).join('<br>');
+    const dist  = distBadge(ev);
+    const badge = dist ? `<div class="pop-badges">${dist}</div>` : '';
+    const directions = ev.latitude && ev.longitude
+      ? `<div style="display:flex;gap:6px;">
+          <a class="pop-btn secondary" href="https://www.google.com/maps/dir/?api=1&destination=${ev.latitude},${ev.longitude}" target="_blank">🗺 Google</a>
+          <a class="pop-btn secondary" href="https://maps.apple.com/?daddr=${ev.latitude},${ev.longitude}" target="_blank"> Apple</a>
+        </div>`
+      : '';
+    return `<div class="pop"><div class="pop-bar ij"></div><div class="pop-body">
+      <div class="pop-source ij">🏮 Ichiban Japan</div>
+      <div class="pop-title">${escapeHtml(ev.title)}</div>
+      <div class="pop-meta">${meta}</div>${badge}
+      <div class="pop-actions" style="flex-direction:column;gap:6px;">
+        <div style="display:flex;gap:6px;">
+          <a class="pop-btn primary" href="${escapeHtml(safeUrl(ev.url))}" target="_blank" style="flex:1">Voir l'événement →</a>
+          <button class="fav-btn pop-fav-btn ${isFavorite(ev.id) ? 'active' : ''}" data-fav-id="${ev.id}" title="Favoris">${isFavorite(ev.id) ? '★' : '☆'}</button>
+        </div>
+        <button class="pop-btn secondary pop-info-btn" data-info-id="${ev.id}">ℹ️ Plus d'infos</button>
+        ${directions}
+        <a href="/events/${ev.id}.ics" style="font-size:11px;text-align:center;color:var(--muted);text-decoration:underline;">📅 Ajouter au calendrier</a>
+      </div></div></div>`;
   } else {
     const [st, et] = parseTimes(ev);
     const date   = `📅 ${fmtDate(ev.start_date)}`;

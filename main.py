@@ -6,6 +6,7 @@ import sys
 from db.store import EventStore
 from models.event import Event
 from scrapers.hanabi_walker import HanabiWalker
+from scrapers.ichiban_japan import IchibanJapan
 from scrapers.timeout_tokyo import TimeoutTokyo
 from scrapers.tokyo_cheapo import TokyoCheapo
 
@@ -103,10 +104,28 @@ def cmd_tot(args):
         _write_events_csv(events)
 
 
+def cmd_ij(args):
+    events, report = IchibanJapan().scrape()
+    logger.info(
+        "Ichiban Japan: %d ok, %d skipped, %d errors (of %d links)",
+        report.events_ok,
+        report.events_skipped,
+        len(report.errors),
+        report.links_seen,
+    )
+    if args.output == "db":
+        with EventStore(args.db) as store:
+            store.upsert_with_dedup(events)
+        logger.info("Ichiban Japan: %d rows → %s", len(events), args.db)
+    else:
+        _write_events_csv(events)
+
+
 def cmd_all(args):
     tc_events, tc_report = TokyoCheapo().scrape()
     hanabi_events, hanabi_report = HanabiWalker(region=args.region).scrape()
     tot_events, tot_report = TimeoutTokyo().scrape()
+    ij_events, ij_report = IchibanJapan().scrape()
     logger.info(
         "Tokyo Cheapo: %d ok, %d skipped, %d errors (of %d links)",
         tc_report.events_ok,
@@ -128,19 +147,27 @@ def cmd_all(args):
         len(tot_report.errors),
         tot_report.links_seen,
     )
+    logger.info(
+        "Ichiban Japan: %d ok, %d skipped, %d errors (of %d links)",
+        ij_report.events_ok,
+        ij_report.events_skipped,
+        len(ij_report.errors),
+        ij_report.links_seen,
+    )
     if args.output == "db":
         with EventStore(args.db) as store:
-            # Un seul passage de dédup sur l'ensemble agrégé des 3 sources.
-            store.upsert_with_dedup(tc_events + hanabi_events + tot_events)
+            # Un seul passage de dédup sur l'ensemble agrégé des 4 sources.
+            store.upsert_with_dedup(tc_events + hanabi_events + tot_events + ij_events)
         logger.info(
-            "Stored %d + %d + %d rows in %s",
+            "Stored %d + %d + %d + %d rows in %s",
             len(tc_events),
             len(hanabi_events),
             len(tot_events),
+            len(ij_events),
             args.db,
         )
     else:
-        _write_events_csv(tc_events + hanabi_events + tot_events)
+        _write_events_csv(tc_events + hanabi_events + tot_events + ij_events)
 
 
 def main():
@@ -157,6 +184,8 @@ def main():
 
     sub.add_parser("tot", help="Scrape Time Out Tokyo")
 
+    sub.add_parser("ij", help="Scrape Ichiban Japan")
+
     p_all = sub.add_parser("all", help="Scrape all sources")
     p_all.add_argument("--region", default="ar0300", metavar="CODE")
 
@@ -171,6 +200,8 @@ def main():
         cmd_hanabi(args)
     elif args.source == "tot":
         cmd_tot(args)
+    elif args.source == "ij":
+        cmd_ij(args)
     elif args.source == "all":
         cmd_all(args)
 

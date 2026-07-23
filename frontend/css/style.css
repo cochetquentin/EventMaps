@@ -25,6 +25,7 @@
   --tc:       #2F5D8A;   /* 藍 indigo — Tokyo Cheapo */
   --hanabi:   #E0912A;   /* or chaud — Hanabi */
   --tot:      #C23A57;   /* 紅 beni — Time Out */
+  --ij:       #6B4E9E;   /* 紫 murasaki — Ichiban Japan */
   --gold:     #C9962F;   /* or festif — favoris & accents */
 
   /* Élévation */
@@ -533,6 +534,7 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
 .event-card.src-tc::before     { background: var(--tc); }
 .event-card.src-hanabi::before { background: var(--hanabi); }
 .event-card.src-tot::before    { background: var(--tot); }
+.event-card.src-ij::before     { background: var(--ij); }
 .event-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); border-color: var(--line); }
 .event-card:hover::before { width: 5px; }
 .event-card.highlighted { border-color: var(--shu); box-shadow: 0 0 0 3px var(--shu-wash); }
@@ -569,6 +571,11 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
   width: 14px; height: 14px; border-radius: 50%;
   background: var(--tot); border: 2.5px solid var(--surface);
   box-shadow: 0 2px 7px -1px rgba(194, 58, 87, 0.55), 0 0 0 1px var(--line);
+}
+.m-ij {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--ij); border: 2.5px solid var(--surface);
+  box-shadow: 0 2px 7px -1px rgba(107, 78, 158, 0.55), 0 0 0 1px var(--line);
 }
 .m-hanabi {
   width: 18px; height: 18px; border-radius: 50%;
@@ -631,6 +638,7 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
 .pop-bar { height: 5px; }
 .pop-bar.tc     { background: var(--tc); }
 .pop-bar.tot    { background: var(--tot); }
+.pop-bar.ij     { background: var(--ij); }
 .pop-bar.hanabi { background: linear-gradient(90deg, var(--hanabi), #F2B84B); }
 .pop-body { padding: 15px 17px 16px; }
 .pop-source {
@@ -640,6 +648,7 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
 .pop-source.tc     { color: var(--tc); }
 .pop-source.hanabi { color: var(--hanabi); }
 .pop-source.tot    { color: var(--tot); }
+.pop-source.ij     { color: var(--ij); }
 .pop-title {
   font-family: var(--font-display);
   font-size: 18px; font-weight: 600; letter-spacing: -0.015em;
@@ -717,6 +726,7 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
 .drawer-source-bar { height: 5px; flex-shrink: 0; }
 .drawer-source-bar.tc     { background: var(--tc); }
 .drawer-source-bar.tot    { background: var(--tot); }
+.drawer-source-bar.ij     { background: var(--ij); }
 .drawer-source-bar.hanabi { background: linear-gradient(90deg, var(--hanabi), #F2B84B); }
 .drawer-header {
   padding: 20px 20px 16px;

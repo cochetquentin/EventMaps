@@ -40,3 +40,18 @@ class TimeoutTokyoAttributes(BaseModel):
     venue_address: str | None = None
     image_url: str | None = None
     description: str | None = None
+
+
+class IchibanJapanAttributes(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    description: str | None = None
+    official_link: str | None = None
+    neighbourhood: str | None = None  # quartier, ex. "Monzen-Nakacho"
+    venue_name: str | None = None
+    zone: str | None = None  # ex. "Tokyo", "Tohoku"
+    image_url: str | None = None
+    image_caption: str | None = None
+    dates_text: str | None = None  # texte de date brut, ex. "Du 3 au 5 mai 2026"
+    article_url: str | None = None
+    article_title: str | None = None

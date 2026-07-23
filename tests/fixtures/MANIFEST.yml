@@ -527,3 +527,33 @@ fixtures:
     anonymized: true  # Google Maps key remplacée par AIzaSyREDACTED
     tests_consuming:
       - test_hanabi_walker.py::test_real_event_parses_essential_fields[ar0518e00070]
+
+  # ── Ichiban Japan ────────────────────────────────────────────────────────────
+
+  - file: ij/synthetic/listing.html
+    category: synthetic
+    source: ij
+    captured_at: null
+    url: null
+    purpose: >
+      Page catégorie Ichiban minimale : 3 li.post-card (dont un href relatif) plus
+      des liens de menu/footer à exclure. Couvre get_article_links (sélection des
+      cartes uniquement, jointure BASE_URL des href relatifs, déduplication).
+    tests_consuming:
+      - test_ichiban_japan.py::test_get_article_links_from_fixture
+
+  - file: ij/synthetic/article_full.html
+    category: synthetic
+    source: ij
+    captured_at: null
+    url: null
+    purpose: >
+      Article Ichiban avec 3 événements couvrant les variations du guide : <br> après
+      vs dans le <strong>, URL Maps complète avec coords vs lien court maps.app.goo.gl
+      vs URL sans coords, quartier présent/absent, "Lieux :" pluriel, dates simple /
+      "Du … au …" / "jusqu'au …", figure avec légende + crédit, embed Instagram à
+      ignorer, et un <h2> sans "Lieu :" (intro/conclusion) qui ne doit pas devenir un
+      événement. Cas nominal du parseur d'article.
+    tests_consuming:
+      - test_ichiban_japan.py::test_scrape_article_full_fixture
+      - test_ichiban_japan.py::test_scrape_builds_canonical_events

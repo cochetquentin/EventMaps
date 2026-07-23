@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from scrapers.base import ScrapeReport
 from scrapers.hanabi_walker import HanabiWalker
+from scrapers.ichiban_japan import IchibanJapan
 from scrapers.timeout_tokyo import TimeoutTokyo
 from scrapers.tokyo_cheapo import TokyoCheapo
 
@@ -77,12 +78,14 @@ def test_job_id_consistent_across_log_lines(tmp_path, monkeypatch, caplog):
     tc_report = _make_report("tc")
     hw_report = _make_report("hanabi")
     tot_report = _make_report("tot")
+    ij_report = _make_report("ij")
 
     job_id = _start_job(db_path, "all")
     with (
         patch.object(TokyoCheapo, "scrape", return_value=([], tc_report)),
         patch.object(HanabiWalker, "scrape", return_value=([], hw_report)),
         patch.object(TimeoutTokyo, "scrape", return_value=([], tot_report)),
+        patch.object(IchibanJapan, "scrape", return_value=([], ij_report)),
     ):
         with caplog.at_level("INFO", logger="api.routes.scrape"):
             m._do_scrape(job_id, "all", "ar0300")

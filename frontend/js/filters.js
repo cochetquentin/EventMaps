@@ -50,9 +50,11 @@ export function buildPills() {
   const catCounts = {};
   let hanabiN = 0;
   let totN = 0;
+  let ijN = 0;
   allEvents.forEach(ev => {
     if (ev.source === 'hanabi') { hanabiN++; return; }
     if (ev.source === 'tot') { totN++; return; }
+    if (ev.source === 'ij') { ijN++; return; }
     ((ev.attributes || {}).categories || []).forEach(c => {
       if (TC_EXCLUDED_CATS.includes(c)) return;
       catCounts[c] = (catCounts[c] || 0) + 1;
@@ -75,6 +77,7 @@ export function buildPills() {
 
   addPill(container, 'hanabi', `🎆 Hanabi (${hanabiN})`, true);
   addPill(container, 'tot', `🗼 Time Out (${totN})`, true);
+  addPill(container, 'ij', `🏮 Ichiban (${ijN})`, true);
 
   // Toutes les catégories connues, ordre stable : les curées d'abord (ordre de
   // CAT_EMOJI), puis les éventuelles autres par ordre alphabétique. Le compteur

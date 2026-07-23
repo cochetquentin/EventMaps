@@ -9,6 +9,7 @@ from api.limiter import limiter
 from config import settings
 from db.store import EventStore
 from scrapers.hanabi_walker import HanabiWalker
+from scrapers.ichiban_japan import IchibanJapan
 from scrapers.timeout_tokyo import TimeoutTokyo
 from scrapers.tokyo_cheapo import TokyoCheapo
 
@@ -97,6 +98,21 @@ def _do_scrape(job_id: int, source: str, region: str) -> None:
                     len(tot_report.errors),
                     tot_report.duration_s,
                 )
+            if source in ("ij", "all"):
+                t0 = time.monotonic()
+                ij_events, ij_report = IchibanJapan().scrape()
+                ij_report.duration_s = time.monotonic() - t0
+                events.extend(ij_events)
+                reports.append(ij_report)
+                logger.info(
+                    "scraper source=ij job_id=%d events=%d links=%d skipped=%d errors=%d duration=%.2fs",
+                    job_id,
+                    ij_report.events_ok,
+                    ij_report.links_seen,
+                    ij_report.events_skipped,
+                    len(ij_report.errors),
+                    ij_report.duration_s,
+                )
 
             job_duration = time.monotonic() - job_start
             links_seen = sum(r.links_seen for r in reports)
@@ -178,7 +194,7 @@ def _do_scrape(job_id: int, source: str, region: str) -> None:
 def _conflicting_sources(source: str) -> list[str]:
     """Return all source names that would overlap with the requested source."""
     if source == "all":
-        return ["tc", "hanabi", "tot", "all"]
+        return ["tc", "hanabi", "tot", "ij", "all"]
     return [source, "all"]
 
 
@@ -193,7 +209,7 @@ def scrape_config():
 async def trigger_scrape(
     request: Request,
     background_tasks: BackgroundTasks,
-    source: Literal["tc", "hanabi", "tot", "all"] = Query("all"),
+    source: Literal["tc", "hanabi", "tot", "ij", "all"] = Query("all"),
     region: str = Query("ar0300"),
     _auth: None = Depends(verify_scrape_token),
 ):

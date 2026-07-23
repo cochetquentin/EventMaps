@@ -13,7 +13,7 @@ cp .env.example .env   # configurer les variables si besoin
 
 ```
 EventMaps/
-├── scrapers/          # Scrapers Tokyo Cheapo, Hanabi Walker et TimeoutTokyo
+├── scrapers/          # Scrapers Tokyo Cheapo, Hanabi Walker, TimeoutTokyo et Ichiban Japan
 ├── models/            # Modèles Pydantic (Event, attributes, identity)
 ├── db/                # Persistance SQLite (EventStore, migrations)
 ├── api/               # API FastAPI (routes events, scrape, health)
@@ -36,7 +36,10 @@ uv run python main.py hanabi --region ar0300
 # Scraper TimeoutTokyo → SQLite
 uv run python main.py tot
 
-# Scraper les trois sources
+# Scraper Ichiban Japan → SQLite
+uv run python main.py ij
+
+# Scraper toutes les sources
 uv run python main.py all
 
 # Exporter en CSV au lieu de SQLite (--output est un flag global, avant le sous-commande)
@@ -64,7 +67,7 @@ uv run uvicorn api.app:app --reload
 ```
 
 Affiche tous les événements géolocalisés sur une carte OpenStreetMap :
-- **Bleu** → Tokyo Cheapo · **Orange** → Hanabi · **Rouge** → TimeoutTokyo
+- **Bleu** → Tokyo Cheapo · **Orange** → Hanabi · **Rouge** → TimeoutTokyo · **Violet** → Ichiban Japan
 - Clustering automatique des marqueurs proches
 - Popup au clic : titre, date, lieu, prix / feux d'artifice, lien
 - Filtres par source et par date (sidebar gauche)
@@ -94,7 +97,7 @@ GET  /docs                          → Swagger UI
 
 | Paramètre | Type | Description |
 |---|---|---|
-| `source` | `tc` \| `hanabi` \| `tot` | Filtre par source |
+| `source` | `tc` \| `hanabi` \| `tot` \| `ij` | Filtre par source |
 | `date` | `YYYY-MM-DD` | Filtre par chevauchement de date |
 | `bbox` | `min_lon,min_lat,max_lon,max_lat` | Filtre géographique |
 | `start_from` | `YYYY-MM-DD` | Borne inférieure de chevauchement : inclut les événements dont `COALESCE(end_date, start_date) >= start_from` |
@@ -113,7 +116,7 @@ POST /scrape?source=all&region=ar0300
 Authorization: Bearer <EVENTMAPS_SCRAPE_TOKEN>
 ```
 
-Paramètres : `source` (`tc` | `hanabi` | `tot` | `all`), `region` (code Hanabi Walker). Rate limité à 2 req/h.
+Paramètres : `source` (`tc` | `hanabi` | `tot` | `ij` | `all`), `region` (code Hanabi Walker). Rate limité à 2 req/h.
 
 Réponses possibles :
 - `{"status": "started", "job_id": 42}` — job lancé ; utiliser `GET /scrape/status?job_id=42` pour suivre.
@@ -212,6 +215,7 @@ Variables d'environnement préfixées `EVENTMAPS_` (fichier `.env` ou variables 
 | `EVENTMAPS_SCRAPE_MAX_PAGES_TC` | `10` | Pages max scraper Tokyo Cheapo |
 | `EVENTMAPS_SCRAPE_MAX_PAGES_HANABI` | `20` | Pages max scraper Hanabi Walker |
 | `EVENTMAPS_SCRAPE_MAX_LISTING_PAGES_TOT` | `4` | Pages max scraper TimeoutTokyo |
+| `EVENTMAPS_SCRAPE_MAX_PAGES_IJ` | `5` | Pages catégorie max scraper Ichiban Japan |
 | `EVENTMAPS_SCRAPE_RETRY_ATTEMPTS` | `3` | Nombre de tentatives tenacity |
 | `EVENTMAPS_SCRAPE_RETRY_WAIT_MIN` | `2` | Backoff min entre tentatives (secondes) |
 | `EVENTMAPS_SCRAPE_RETRY_WAIT_MAX` | `10` | Backoff max entre tentatives (secondes) |
