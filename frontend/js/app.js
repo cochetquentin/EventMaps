@@ -16,13 +16,16 @@ import { setupGeolocation, cancelGeolocation } from './geolocation.js';
 import { initDrawer, openDrawer } from './drawer.js';
 import { updateURL, restoreFromURL } from './share.js';
 import { initMobileUI } from './mobile-ui.js';
-import { initWeather } from './weather.js';
+import { initTokyoLive } from './tokyo-live.js';
 
 // ── Map init ──────────────────────────────────────────────────────────────
 const map = L.map('map').setView([35.68, 139.69], 11);
-L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png', {
+// Fond de carte CARTO Positron : clair, minimal, sans clé API (Stadia plafonnait à
+// vide → erreurs 429 en zoomant). Sous-domaines a–d pour répartir les requêtes.
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
   maxZoom: 20,
-  attribution: '© <a href="https://stadiamaps.com/">Stadia Maps</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  subdomains: 'abcd',
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
 }).addTo(map);
 setMap(map);
 
@@ -216,8 +219,8 @@ setupGeolocation();
 // ── UI mobile (bottom-sheet + en-tête repliable) ──────────────────────────
 initMobileUI();
 
-// ── Widget météo (en-tête desktop) ────────────────────────────────────────
-initWeather();
+// ── Context Cards (en-tête desktop) ───────────────────────────────────────
+initTokyoLive();
 
 // ── Portée de la liste : zone visible vs tous les événements filtrés ───────
 const scopeToggle = document.getElementById('scope-toggle');

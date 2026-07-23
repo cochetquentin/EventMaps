@@ -1,6 +1,6 @@
-// Widget météo Tokyo — remplit l'en-tête desktop avec la météo courante et un petit
-// mot contextuel. Source : Open-Meteo (gratuit, sans clé API, CORS ouvert).
-// Échec réseau → le widget reste masqué, aucune conséquence sur le reste de l'app.
+// Météo Tokyo — source de données pour le widget « Context Cards » de l'en-tête.
+// Source : Open-Meteo (gratuit, sans clé API, CORS ouvert).
+// Échec réseau → fetchWeather() renvoie null ; le widget bascule sur son fallback.
 //
 // Les phrases affichées vivent dans ./weather-messages.js (facile à enrichir).
 import { WEATHER_MESSAGES } from './weather-messages.js';
@@ -9,15 +9,17 @@ const LAT = 35.68;
 const LON = 139.69;
 const URL =
   `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}`
-  + '&current=temperature_2m,weather_code'
+  + '&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code'
   + '&hourly=precipitation_probability'
-  + '&timezone=Asia%2FTokyo&forecast_days=1';
+  + '&daily=sunrise,sunset,uv_index_max'
+  // forecast_days=2 : on récupère aussi le lever du soleil de demain (carte « Sunrise tomorrow »)
+  + '&timezone=Asia%2FTokyo&forecast_days=2';
 
 const CACHE_KEY = 'eventmaps-weather';
 const CACHE_TTL = 30 * 60 * 1000; // 30 min : Open-Meteo est généreux mais inutile de spammer
 
 // Code météo WMO → emoji + libellé court
-function weatherInfo(code) {
+export function weatherInfo(code) {
   if (code === 0) return { emoji: '☀️', label: 'ensoleillé' };
   if (code <= 2) return { emoji: '🌤️', label: 'peu nuageux' };
   if (code === 3) return { emoji: '☁️', label: 'couvert' };
@@ -49,7 +51,7 @@ function nextRainHour(hourly) {
   return null;
 }
 
-function buildMessage(temp, code, hourly) {
+export function buildMessage(temp, code, hourly) {
   if (RAIN_CODES(code)) return pick(WEATHER_MESSAGES.rainNow);
   const rainHour = nextRainHour(hourly);
   if (rainHour) return pick(WEATHER_MESSAGES.rainSoon).replace('{h}', rainHour);
@@ -76,24 +78,39 @@ async function loadData() {
   return data;
 }
 
-export async function initWeather() {
-  const el = document.getElementById('weather');
-  if (!el) return;
+// Récupère et normalise la météo Tokyo pour le moteur de Context Cards.
+// Renvoie null en cas d'échec réseau / données incomplètes (le widget prend alors
+// son fallback), sans lever d'erreur ni faire de bruit.
+export async function fetchWeather() {
   try {
     const data = await loadData();
     const temp = data.current?.temperature_2m;
+    if (temp == null) return null; // données incomplètes
     const code = data.current?.weather_code ?? 0;
-    if (temp == null) return; // données incomplètes : on laisse masqué
     const { emoji, label } = weatherInfo(code);
-    const msg = buildMessage(temp, code, data.hourly);
-    el.innerHTML =
-      `<span class="weather-icon" aria-hidden="true">${emoji}</span>`
-      + `<span class="weather-temp">${Math.round(temp)}°</span>`
-      + `<span class="weather-msg">${msg}</span>`;
-    el.title = `Tokyo — ${label} ${Math.round(temp)}°C`;
-    el.hidden = false;
+    const feels = data.current?.apparent_temperature;
+    const humidity = data.current?.relative_humidity_2m;
+    const wind = data.current?.wind_speed_10m;
+    return {
+      temp: Math.round(temp),
+      feels: feels == null ? null : Math.round(feels),       // température ressentie
+      humidity: humidity == null ? null : Math.round(humidity),
+      wind: wind == null ? null : Math.round(wind),          // km/h
+      code,
+      emoji,
+      label,
+      hourly: data.hourly,
+      // Open-Meteo daily renvoie des tableaux [aujourd'hui, demain] (forecast_days=2).
+      daily: {
+        sunrise: data.daily?.sunrise ?? [], // [today, tomorrow]
+        sunset: data.daily?.sunset ?? [],   // [today, tomorrow]
+        uvMax: data.daily?.uv_index_max?.[0] ?? null, // UV max du jour
+      },
+      message: buildMessage(temp, code, data.hourly),
+    };
   } catch (e) {
-    // Réseau indisponible / API en erreur : on garde le widget masqué, sans bruit
+    // Réseau indisponible / API en erreur : pas de météo, sans bruit
     console.debug('Météo indisponible :', e);
+    return null;
   }
 }

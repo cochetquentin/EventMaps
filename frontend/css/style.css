@@ -170,22 +170,90 @@ body {
   pointer-events: none;
 }
 
-/* Espace flexible au centre de l'en-tête : pousse météo + boutons à droite */
-.header-fill { flex: 1 1 auto; min-width: 0; }
-
-/* Widget météo Tokyo (desktop) — un peu d'info sympa dans l'en-tête */
-.weather {
-  display: flex; align-items: center; gap: 8px;
-  flex-shrink: 1; min-width: 0;
-  padding: 0 6px;
-  font-size: 12.5px; color: var(--ink-2);
+/* ══ Context Bar (desktop) ══════════════════════════════════════════════════
+   Occupe l'espace libre du header entre le logo et les boutons.
+   Blocs de contexte permanents (météo · heure · quartier) + un bloc éditorial
+   rotatif qui récupère l'espace restant. Largeur adaptative, hauteur figée :
+   le header reste équilibré et ne décale jamais. */
+.tlive {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center;
+  height: 38px;
+  color: var(--ink-2);
+  overflow: hidden;
 }
-.weather[hidden] { display: none; }
-.weather-icon { font-size: 17px; line-height: 1; }
-.weather-temp { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
-.weather-msg {
-  color: var(--ink-3);
+.tlive[hidden] { display: none; }
+
+/* Contexte permanent — groupes (météo, heure, quartier…) séparés par un filet.
+   Les cellules de plus faible priorité sont masquées en JS quand la largeur manque
+   → nombre de widgets adaptatif ; les infos proches restent regroupées. */
+.tlive-context { display: flex; align-items: center; flex: 0 0 auto; min-width: 0; }
+.tlive-group {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 14px; white-space: nowrap;
+}
+.tlive-group:first-child { padding-left: 6px; }
+.tlive-group + .tlive-group { border-left: 1px solid var(--line); }
+
+.tlive-cell {
+  display: flex; align-items: center; gap: 6px; white-space: nowrap;
+  transition: opacity 320ms cubic-bezier(0.4, 0, 0.2, 1),
+              transform 320ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* Apparition en cascade (délai posé en JS) */
+.tlive-cell.is-enter { opacity: 0; transform: translateY(5px); }
+.tlive-c-ico  { font-size: 16px; line-height: 1; }
+.tlive-c-main {
+  font-size: 13px; font-weight: 600; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.tlive-c-sub  { font-size: 12px; color: var(--ink-3); }
+
+/* Cellules « détail » (ressenti, humidité, vent) : secondaires, préfixées d'un « · ».
+   Comme elles se masquent des dernières vers les premières, le « · » reste toujours
+   correctement placé après la valeur principale. */
+.tlive-cell--detail::before { content: '·'; color: var(--ink-3); margin-right: 2px; }
+.tlive-cell--detail .tlive-c-main {
+  font-weight: 500; font-size: 12.5px; color: var(--ink-2);
+}
+
+/* Flash discret quand la valeur change (heure, compte à rebours, quartier…) */
+.tlive-c-main.is-updated { animation: tlive-flash 420ms cubic-bezier(0.4, 0, 0.2, 1); }
+@keyframes tlive-flash {
+  0%   { opacity: 0.25; transform: translateY(-3px); }
+  100% { opacity: 1;    transform: translateY(0); }
+}
+
+/* Bloc éditorial — récupère tout l'espace restant, le plus discret visuellement,
+   tronqué proprement si nécessaire. Seul élément animé de la barre. */
+.tlive-editorial {
+  flex: 1 1 auto; min-width: 9rem;   /* réserve une largeur lisible → force le trim du contexte */
+  display: flex; align-items: center;
+  padding-left: 16px;
+  border-left: 1px solid var(--line);
+  overflow: hidden;
+  cursor: pointer;
+}
+.tlive-card {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  transition: opacity 150ms cubic-bezier(0.4, 0, 0.2, 1),
+              transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* Sortie (glisse vers le haut) puis entrée (depuis le bas) — 6px, à peine perceptible */
+.tlive-card.is-leaving  { opacity: 0; transform: translateY(-6px); }
+.tlive-card.is-entering { opacity: 0; transform: translateY(6px); transition: none; }
+.tlive-ed-ico  { font-size: 15px; line-height: 1; flex-shrink: 0; opacity: 0.9; }
+.tlive-ed-text {
+  font-size: 12.5px; color: var(--ink-3);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tlive-card { transition: opacity 150ms linear; }
+  .tlive-card.is-leaving, .tlive-card.is-entering { transform: none; }
+  .tlive-cell { transition: none; }
+  .tlive-cell.is-enter { opacity: 1; transform: none; }
+  .tlive-c-main.is-updated { animation: none; }
 }
 
 /* Boutons icônes — poussés à droite (indispensable sur mobile, où les presets
@@ -750,8 +818,8 @@ input[type="date"]:focus { border-color: var(--shu); box-shadow: 0 0 0 3px var(-
   .header-main { gap: 8px; }
   .header-actions { gap: 6px; }
 
-  /* Widget météo réservé au desktop (en-tête mobile déjà compact) */
-  .weather { display: none; }
+  /* Context Cards réservées au desktop (en-tête mobile déjà compact) */
+  .tlive { display: none; }
 
   .search-wrap input { font-size: 16px; }  /* évite le zoom iOS */
 

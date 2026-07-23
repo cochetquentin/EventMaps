@@ -1,0 +1,102 @@
+// Données statiques du système de Context Cards de l'en-tête (quartiers + saisons).
+// Tout est extensible ici sans toucher au moteur (tokyo-live.js) :
+//   - ajoute un quartier dans TOKYO_DISTRICTS (avec un `tag` optionnel pour une carte
+//     éditoriale de zone) ;
+//   - ajoute/ajuste une saison dans SEASONS.
+import { haversineKm } from './utils.js';
+
+// ── Quartiers de Tokyo ─────────────────────────────────────────────────────
+// name/kanji : affichage. lat/lon : centroïde, pour trouver le plus proche du centre
+// de la carte. tag (optionnel) : phrase éditoriale qui « raconte » la zone.
+export const TOKYO_DISTRICTS = [
+  { name: 'Shibuya',    kanji: '渋谷',   lat: 35.6595, lon: 139.7005 },
+  { name: 'Shinjuku',   kanji: '新宿',   lat: 35.6896, lon: 139.7006 },
+  { name: 'Harajuku',   kanji: '原宿',   lat: 35.6702, lon: 139.7027 },
+  { name: 'Ginza',      kanji: '銀座',   lat: 35.6717, lon: 139.7650 },
+  { name: 'Marunouchi', kanji: '丸の内', lat: 35.6812, lon: 139.7671 },
+  { name: 'Akihabara',  kanji: '秋葉原', lat: 35.6987, lon: 139.7730 },
+  { name: 'Roppongi',   kanji: '六本木', lat: 35.6628, lon: 139.7315 },
+  { name: 'Ikebukuro',  kanji: '池袋',   lat: 35.7295, lon: 139.7109 },
+  { name: 'Nakameguro', kanji: '中目黒', lat: 35.6440, lon: 139.6990 },
+  { name: 'Odaiba',     kanji: 'お台場', lat: 35.6297, lon: 139.7752 },
+  { name: 'Ueno',    kanji: '上野', lat: 35.7141, lon: 139.7774, tag: { emoji: '🌸', text: 'Ueno, réputé pour ses cerisiers' } },
+  { name: 'Asakusa', kanji: '浅草', lat: 35.7118, lon: 139.7967, tag: { emoji: '🏮', text: "Asakusa, le Tokyo historique" } },
+  { name: 'Sumida',  kanji: '墨田', lat: 35.7101, lon: 139.8017, tag: { emoji: '🎆', text: "Sumida, terre des feux d'artifice" } },
+];
+
+// Renvoie le quartier le plus proche d'un point + sa distance en km.
+export function nearestDistrict(lat, lon) {
+  let best = null;
+  let bestKm = Infinity;
+  for (const d of TOKYO_DISTRICTS) {
+    const km = haversineKm(lat, lon, d.lat, d.lon);
+    if (km < bestKm) { bestKm = km; best = d; }
+  }
+  return { district: best, km: bestKm };
+}
+
+// Formulation naturelle du quartier exploré selon le zoom et la distance au centre.
+// Renvoie null quand rien n'est pertinent (vue « tout Tokyo » ou aucun quartier à
+// proximité) — on n'invente jamais une fausse précision.
+//   { name, kanji, natural: { emoji, text }, tag: { emoji, text } | null }
+export function describeDistrict(lat, lon, zoom) {
+  if (zoom == null || zoom < 12) return null;      // dézoomé : vue trop large
+  const { district, km } = nearestDistrict(lat, lon);
+  if (!district || km > 4) return null;            // rien de pertinent tout près
+  const prefix = km <= 1 ? 'Exploration de' : km <= 2.2 ? 'Autour de' : 'Près de';
+  return {
+    name: district.name,
+    kanji: district.kanji,
+    natural: { emoji: '📍', text: `${prefix} ${district.name}` },
+    // Carte éditoriale seulement si on est bien sur la zone taguée
+    tag: district.tag && km <= 1.5 ? district.tag : null,
+  };
+}
+
+// ── Saisons de Tokyo ───────────────────────────────────────────────────────
+// Plages [mois, jour] → [mois, jour] (bornes incluses), couverture complète de l'année,
+// sans chevauchement d'année (Illuminations séparé de Winter au 1er janvier).
+// label : formulation courte et explicite en français (affichée) ; note : détail court.
+export const SEASONS = [
+  { emoji: '❄️', label: 'Hiver',              note: 'Journées fraîches', from: [1, 1],   to: [3, 19] },
+  { emoji: '🌸', label: 'Cerisiers en fleurs', note: 'Saison des sakura', from: [3, 20],  to: [4, 10] },
+  { emoji: '🍃', label: 'Nouvelle verdure',    note: 'Shinryoku',         from: [4, 11],  to: [5, 31] },
+  { emoji: '☔', label: 'Saison des pluies',   note: 'Tsuyu',             from: [6, 1],   to: [7, 20] },
+  { emoji: '🎆', label: "Feux d'artifice",     note: 'Saison des hanabi', from: [7, 21],  to: [8, 31] },
+  { emoji: '🍂', label: 'Automne',             note: 'Douceur d’automne', from: [9, 1],   to: [10, 31] },
+  { emoji: '🍁', label: "Érables d'automne",   note: 'Saison des momiji', from: [11, 1],  to: [11, 30] },
+  { emoji: '✨', label: 'Illuminations',       note: "Lumières d'hiver",  from: [12, 1],  to: [12, 31] },
+];
+
+// Saison correspondant à une date. Lit le mois/jour en UTC pour coller à la convention
+// de todayJST() (qui encode la date JST dans les champs UTC).
+export function seasonFor(date) {
+  const key = (date.getUTCMonth() + 1) * 100 + date.getUTCDate();
+  for (const s of SEASONS) {
+    const lo = s.from[0] * 100 + s.from[1];
+    const hi = s.to[0] * 100 + s.to[1];
+    if (key >= lo && key <= hi) return s;
+  }
+  return SEASONS[0]; // couverture complète : fallback théorique
+}
+
+// ── Temps forts saisonniers (factuels, affichés UNIQUEMENT pendant leur fenêtre) ──
+// Chaque entrée devient un provider éditorial gated par date. `near` (optionnel) limite
+// l'affichage au voisinage d'un quartier précis. Ajouter un temps fort = ajouter une ligne.
+export const SEASONAL_CARDS = [
+  { id: 'new-year',     emoji: '🎍', text: 'Hatsumōde — visites de sanctuaires du Nouvel An', from: [1, 1],   to: [1, 7] },
+  { id: 'sakura-start', emoji: '🌸', text: 'La saison des sakura a commencé',                  from: [3, 20],  to: [4, 10] },
+  { id: 'ueno-bloom',   emoji: '🌸', text: 'Ueno approche de la pleine floraison',              from: [3, 22],  to: [4, 5], near: 'Ueno' },
+  { id: 'tsuyu',        emoji: '☔', text: 'Saison des pluies — gardez un parapluie',          from: [6, 1],   to: [7, 20] },
+  { id: 'tanabata',     emoji: '🎋', text: 'La saison de Tanabata a commencé',                 from: [7, 1],   to: [7, 7] },
+  { id: 'hanabi',       emoji: '🎆', text: "La saison des feux d'artifice a commencé",         from: [7, 21],  to: [8, 20] },
+  { id: 'momiji-soon',  emoji: '🍁', text: 'La saison des momiji débute le mois prochain',     from: [10, 1],  to: [10, 31] },
+  { id: 'momiji',       emoji: '🍁', text: 'La saison des momiji a commencé',                  from: [11, 1],  to: [11, 30] },
+  { id: 'illumination', emoji: '🎄', text: "Les illuminations d'hiver sont ouvertes",          from: [11, 15], to: [12, 31] },
+];
+
+// Une carte saisonnière est-elle dans sa fenêtre à cette date ? (mois/jour UTC, cf. todayJST)
+export function inSeasonWindow(card, date) {
+  const key = (date.getUTCMonth() + 1) * 100 + date.getUTCDate();
+  return key >= card.from[0] * 100 + card.from[1] && key <= card.to[0] * 100 + card.to[1];
+}
