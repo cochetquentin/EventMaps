@@ -83,6 +83,9 @@ _RANGE_RE = re.compile(
 _TWO_DAY_RE = re.compile(rf"{_DAY}\s*(?:et|au|[-–—])\s*{_DAY}\s+({_MONTHS_ALT})")
 _SINGLE_RE = re.compile(rf"{_DAY}\s+({_MONTHS_ALT})")
 
+# Slug d'un article mensuel daté, ex. "festivals-tokyo-juillet-2026".
+_MONTH_SLUG_RE = re.compile(rf"/(?:festivals|expositions)-tokyo-({_MONTHS_ALT})-(\d{{4}})/?(?:#|$)")
+
 
 # ── Pure helpers (no I/O) ─────────────────────────────────────────────────────
 
@@ -175,6 +178,27 @@ def _parse_fr_dates(text: str, fallback_year: int) -> tuple[_date | None, _date 
         return (_mk_date(int(m.group(1)), m.group(2), year), None)
 
     return (None, None)
+
+
+def _article_month(url: str) -> tuple[int, int] | None:
+    """``(year, month)`` d'un article mensuel daté, sinon None (spécial / evergreen)."""
+    m = _MONTH_SLUG_RE.search(_strip_accents(url.lower()))
+    if not m:
+        return None
+    month = _FR_MONTHS.get(m.group(1))
+    return (int(m.group(2)), month) if month else None
+
+
+def _article_is_current_or_future(url: str, today: _date) -> bool:
+    """True sauf pour un article mensuel strictement antérieur au mois de *today*.
+
+    Les articles sans mois dans le slug (marchés, festivals-ete-tohoku, yuki-matsuri…)
+    sont des pages spéciales/evergreen : toujours conservées (leurs événements sont
+    filtrés ensuite par date, pas par le slug)."""
+    ym = _article_month(url)
+    if ym is None:
+        return True
+    return ym >= (today.year, today.month)
 
 
 def _coords_from_url_string(url: str) -> tuple[float, float] | None:
@@ -508,7 +532,13 @@ class IchibanJapan(BaseScraper):
             (raw_events, counts) with counts = {"links_seen", "events_ok", "errors"};
             ``links_seen`` counts ARTICLES (each yields many events).
         """
-        urls = self.get_article_links(max_pages=max_pages)
+        discovered = self.get_article_links(max_pages=max_pages)
+        # Ne pas télécharger les articles de mois révolus (les pages spéciales, sans
+        # mois dans le slug, passent toujours ; leurs événements sont filtrés par date).
+        urls = [u for u in discovered if _article_is_current_or_future(u, self._today)]
+        skipped = len(discovered) - len(urls)
+        if skipped:
+            logger.info("Ichiban: %d articles de mois passés ignorés", skipped)
         events: list[dict] = []
         errors: list[dict] = []
         for url in urls:
@@ -526,8 +556,16 @@ class IchibanJapan(BaseScraper):
         counts = {"links_seen": len(urls), "events_ok": len(events), "errors": errors}
         return events, counts
 
-    def scrape(self, max_pages: int | None = None) -> tuple[list[Event], ScrapeReport]:
-        """Return canonical Event models with a scrape report."""
+    def scrape(
+        self, max_pages: int | None = None, upcoming_only: bool = True
+    ) -> tuple[list[Event], ScrapeReport]:
+        """Return canonical Event models with a scrape report.
+
+        With ``upcoming_only`` (default), past events are dropped: Ichiban's monthly
+        recap articles are archival, so only events whose end date (or start date, for
+        single-day events) is today or later are kept. Set ``upcoming_only=False`` to
+        return every parsed event.
+        """
         now = datetime.now(UTC)
         raw_events, counts = self.scrape_all(max_pages=max_pages)
         report = ScrapeReport(
@@ -548,6 +586,12 @@ class IchibanJapan(BaseScraper):
             # Single-day events keep end_date=None (matches the other scrapers).
             if end_date is not None and end_date == start_date:
                 end_date = None
+
+            # Drop past events: keep only those still upcoming/ongoing today.
+            if upcoming_only:
+                reference = end_date or start_date
+                if reference is not None and reference < self._today:
+                    continue
 
             events.append(
                 Event(
@@ -578,7 +622,9 @@ class IchibanJapan(BaseScraper):
                 )
             )
 
-        if not events:
+        # Base the parser-failure alarm on parsed events, not the upcoming-filtered
+        # list: an article set that is entirely in the past is not a parser failure.
+        if not raw_events:
             logger.critical(
                 "Scraper %s returned 0 events — likely a parser failure (HTML structure changed?)",
                 self.__class__.__name__,

@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from models.attributes import IchibanJapanAttributes
 from scrapers.ichiban_japan import (
     IchibanJapan,
+    _article_is_current_or_future,
     _clean,
     _coords_from_url_string,
     _dates_from_lines,
@@ -34,6 +35,9 @@ def load(name: str) -> BeautifulSoup:
 def ij():
     scraper = IchibanJapan()
     scraper._throttle_s = 0  # no politeness sleep in tests
+    # Fixed reference date before the fixtures' May 2026 events so the default
+    # upcoming-only filter keeps them all; individual tests override as needed.
+    scraper._today = date(2026, 1, 1)
     return scraper
 
 
@@ -334,3 +338,84 @@ def test_scrape_all_records_article_with_no_events_as_error(ij, monkeypatch):
     assert events == []
     assert len(report.errors) == 1
     assert report.errors[0]["reason"] == "no events parsed"
+
+
+# ── Filtres « à venir » : articles de mois passés + événements passés ──────────
+
+
+def test_article_is_current_or_future():
+    today = date(2026, 7, 1)
+    base = "https://ichiban-japan.com/"
+    # mois passés → False
+    assert _article_is_current_or_future(f"{base}festivals-tokyo-mars-2026/", today) is False
+    assert _article_is_current_or_future(f"{base}expositions-tokyo-decembre-2025/", today) is False
+    assert _article_is_current_or_future(f"{base}festivals-tokyo-juin-2026/", today) is False
+    # mois courant / futur → True
+    assert _article_is_current_or_future(f"{base}festivals-tokyo-juillet-2026/", today) is True
+    assert _article_is_current_or_future(f"{base}expositions-tokyo-aout-2026/", today) is True
+    assert _article_is_current_or_future(f"{base}festivals-tokyo-janvier-2027/", today) is True
+    # pages spéciales / evergreen (pas de mois dans le slug) → toujours True
+    assert _article_is_current_or_future(f"{base}marches-aux-puces-tokyo/", today) is True
+    assert _article_is_current_or_future(f"{base}festivals-ete-tohoku/", today) is True
+    assert _article_is_current_or_future(f"{base}yuki-matsuri/", today) is True
+
+
+def test_scrape_skips_past_month_articles(ij, monkeypatch):
+    ij._today = date(2026, 7, 1)
+    article = load("article_full.html")
+    requested: list[str] = []
+
+    def fake_get_page(url):
+        requested.append(url)
+        return article
+
+    monkeypatch.setattr(ij, "get_page", fake_get_page)
+    monkeypatch.setattr(ij, "_resolve_short", lambda href: None)
+    monkeypatch.setattr(
+        ij,
+        "get_article_links",
+        lambda max_pages=None: [
+            "https://ichiban-japan.com/festivals-tokyo-mars-2026/",  # passé → ignoré
+            "https://ichiban-japan.com/festivals-tokyo-juillet-2026/",  # courant → récupéré
+            "https://ichiban-japan.com/marches-aux-puces-tokyo/",  # spécial → récupéré
+        ],
+    )
+    events, report = ij.scrape()
+
+    assert "https://ichiban-japan.com/festivals-tokyo-mars-2026/" not in requested
+    assert "https://ichiban-japan.com/festivals-tokyo-juillet-2026/" in requested
+    assert "https://ichiban-japan.com/marches-aux-puces-tokyo/" in requested
+    assert report.links_seen == 2  # seuls les 2 articles non-passés sont comptés
+
+
+def test_scrape_filters_past_events(ij, monkeypatch):
+    ij._today = date(2026, 5, 4)  # au milieu des événements de la fixture
+    article = load("article_full.html")
+    monkeypatch.setattr(ij, "get_page", lambda u: article)
+    monkeypatch.setattr(ij, "_resolve_short", lambda href: None)
+    monkeypatch.setattr(
+        ij,
+        "get_article_links",
+        lambda max_pages=None: ["https://ichiban-japan.com/festivals-tokyo-mai-2026/"],
+    )
+
+    events, report = ij.scrape()
+    titles = {e.title for e in events}
+    # Gardés : Haru no Taisai (3-5 mai, en cours) et Craft Gyoza (jusqu'au 6 mai).
+    assert titles == {"Haru no Taisai", "Craft Gyoza Fes 2026"}
+    # Le rapport compte tous les événements parsés (santé du parseur), pas seulement les à venir.
+    assert report.events_ok == 5
+
+
+def test_scrape_upcoming_only_false_returns_all(ij, monkeypatch):
+    ij._today = date(2026, 5, 4)
+    article = load("article_full.html")
+    monkeypatch.setattr(ij, "get_page", lambda u: article)
+    monkeypatch.setattr(ij, "_resolve_short", lambda href: None)
+    monkeypatch.setattr(
+        ij,
+        "get_article_links",
+        lambda max_pages=None: ["https://ichiban-japan.com/festivals-tokyo-mai-2026/"],
+    )
+    events, _ = ij.scrape(upcoming_only=False)
+    assert len(events) == 5  # aucun filtrage par date

@@ -57,6 +57,8 @@ Chaque scraper retourne `(list[Event], ScrapeReport)`. `ScrapeReport` comptabili
 Les retries HTTP sont gérés via **tenacity** (3 tentatives, backoff 2–10 s configurable).
 
 > **Spécificité Ichiban Japan** : contrairement aux autres sources (1 URL = 1 événement), un article Ichiban agrège **plusieurs** événements. Le scraper découvre les URLs d'articles depuis les pages catégorie paginées, puis émet **un événement par bloc « Lieu : »** de l'article (les `<h2>` ne sont que des titres de section). Les coordonnées sont extraites des liens Google Maps du lieu (`!3d!4d` ou `@lat,lng`), avec résolution des liens courts `maps.app.goo.gl`.
+>
+> Les articles mensuels étant archivistiques, le scraper ne garde que les événements **à venir** (`scrape(upcoming_only=True)` par défaut) : les articles de mois révolus sont sautés d'après leur slug (`festivals-tokyo-<mois>-<année>`), les pages spéciales sans mois (marchés, Tohoku, yuki-matsuri…) sont toujours parcourues, et chaque événement passé (date de fin < aujourd'hui) est écarté.
 
 ### `models/`
 
