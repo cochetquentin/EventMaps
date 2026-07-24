@@ -12,7 +12,7 @@ flea markets). Two levels, structurally different from the other sources:
 
 GPS coordinates are parsed from the venue's Google Maps link (``!3d!4d`` or
 ``@lat,lng``); ``maps.app.goo.gl`` short links are resolved via a throttled redirect
-follow. See docs/guide-scraping-ichiban-japan.md for the full structural analysis.
+follow.
 """
 
 from __future__ import annotations

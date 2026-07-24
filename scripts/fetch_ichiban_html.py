@@ -2,7 +2,7 @@
 
 Ce n'est PAS un scraper : aucun parsing, aucune extraction. On télécharge les pages
 telles quelles pour accumuler de la matière brute et concevoir, plus tard, un scraper
-robuste de ce site (cf. docs/guide-scraping-ichiban-japan.md).
+robuste de ce site.
 
 Usage :
     uv run python scripts/fetch_ichiban_html.py
