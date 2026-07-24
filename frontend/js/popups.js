@@ -73,6 +73,9 @@ export function buildPopup(ev) {
         <a href="/events/${ev.id}.ics" style="font-size:11px;text-align:center;color:var(--muted);text-decoration:underline;">📅 Ajouter au calendrier</a>
       </div></div></div>`;
   } else if (ev.source === 'ij') {
+    // Un article Ichiban agrège N événements ; le vrai lien de l'événement est son
+    // site officiel (attrs.official_link). On retombe sur l'article seulement s'il manque.
+    const eventUrl = safeUrl(attrs.official_link || ev.url);
     const date  = ev.end_date && ev.end_date !== ev.start_date
       ? `📅 ${fmtDate(ev.start_date)} → ${fmtDate(ev.end_date)}`
       : `📅 ${fmtDate(ev.start_date)}`;
@@ -93,7 +96,7 @@ export function buildPopup(ev) {
       <div class="pop-meta">${meta}</div>${badge}
       <div class="pop-actions" style="flex-direction:column;gap:6px;">
         <div style="display:flex;gap:6px;">
-          <a class="pop-btn primary" href="${escapeHtml(safeUrl(ev.url))}" target="_blank" style="flex:1">Voir l'événement →</a>
+          <a class="pop-btn primary" href="${escapeHtml(eventUrl)}" target="_blank" style="flex:1">Voir l'événement →</a>
           <button class="fav-btn pop-fav-btn ${isFavorite(ev.id) ? 'active' : ''}" data-fav-id="${ev.id}" title="Favoris">${isFavorite(ev.id) ? '★' : '☆'}</button>
         </div>
         <button class="pop-btn secondary pop-info-btn" data-info-id="${ev.id}">ℹ️ Plus d'infos</button>

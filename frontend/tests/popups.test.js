@@ -219,6 +219,17 @@ describe('buildPopup — source ij', () => {
     expect(buildPopup(BASE_IJ)).toContain('Ichiban Japan');
   });
 
+  test('"Voir l\'événement" links to the official event page, not the Ichiban article', () => {
+    const html = buildPopup(BASE_IJ);
+    expect(html).toContain('href="https://x.example/"');           // official_link
+    expect(html).not.toContain('href="https://ichiban-japan.com'); // pas l'article agrégateur
+  });
+
+  test('falls back to the Ichiban article URL when official_link is missing', () => {
+    const html = buildPopup({ ...BASE_IJ, attributes: { neighbourhood: 'Asakusa' } });
+    expect(html).toContain(`href="${BASE_IJ.url}"`);
+  });
+
   test('venue and neighbourhood displayed', () => {
     const html = buildPopup(BASE_IJ);
     expect(html).toContain('temple Fukagawa Fudo-do');
