@@ -376,38 +376,23 @@ class IchibanJapan(BaseScraper):
             "zone": zone,
         }
 
-    def _iter_event_groups(self, content: Tag) -> list[dict]:
-        """Group direct children of .entry-content by ``h2.wp-block-heading``.
+    def _build_event(
+        self,
+        info_p: Tag,
+        h2: Tag | None,
+        desc_paragraphs: list[Tag],
+        figure: Tag | None,
+        meta: dict,
+    ) -> dict:
+        """Build one event dict from its ``Lieu :`` info paragraph.
 
-        Each h2 opens a new group; following siblings are attached until the next h2.
-        Content before the first h2 (breadcrumbs, header image, intro) is ignored.
+        The info paragraph is self-contained: ``<strong>name</strong>``, a date line,
+        the ``Lieu :`` line (venue link + quartier) and the official link. The nearest
+        preceding ``<h2>`` and the pending description/figure only serve as context /
+        fallback, because an event may share its section heading with several others
+        (themed sections such as "Les festivals pour Setsubun").
         """
-        groups: list[dict] = []
-        current: dict | None = None
-        for child in content.children:
-            if not isinstance(child, Tag):
-                continue
-            if child.name == "h2" and "wp-block-heading" in child.get("class", []):
-                current = {"h2": child, "els": []}
-                groups.append(current)
-            elif current is not None:
-                current["els"].append(child)
-        return groups
-
-    def _parse_event_group(self, group: dict, meta: dict) -> dict | None:
-        """Turn one h2-group into an event dict, or None if it is not an event
-        (no ``Lieu :`` info paragraph → intro/conclusion/sidebar heading)."""
-        h2: Tag = group["h2"]
-        els: list[Tag] = group["els"]
-
-        info_p = next(
-            (el for el in els if el.name == "p" and _has_lieu(el.get_text())),
-            None,
-        )
-        if info_p is None:
-            return None
-
-        h2_text = _clean(h2.get_text())
+        h2_text = _clean(h2.get_text()) if h2 is not None else ""
         strong = info_p.find("strong")
         strong_text = _clean(strong.get_text()) if strong else ""
         name = strong_text or _strip_parenthetical(h2_text)
@@ -432,7 +417,7 @@ class IchibanJapan(BaseScraper):
             official_link = links[-1].get("href")
 
         dates_text = _dates_from_lines(_br_lines(info_p), name)
-        if not dates_text:
+        if not dates_text and h2_text:
             hm = re.search(r"\(([^)]*)\)\s*$", h2_text)
             dates_text = hm.group(1) if hm else ""
         start_date, end_date = _parse_fr_dates(dates_text, meta.get("year") or self._today.year)
@@ -440,21 +425,11 @@ class IchibanJapan(BaseScraper):
         latitude, longitude = self._coords_from_maps_url(venue_maps_url)
 
         descriptions = [
-            txt
-            for el in els
-            if el is not info_p
-            and el.name == "p"
-            and "wp-block-paragraph" in el.get("class", [])
-            and (txt := _clean(el.get_text()))
-            and not _has_lieu(txt)
+            txt for p in desc_paragraphs if (txt := _clean(p.get_text())) and not _has_lieu(txt)
         ]
         description = "\n\n".join(descriptions) or None
 
         image_url = image_caption = None
-        figure = next(
-            (el for el in els if el.name == "figure" and "wp-block-image" in el.get("class", [])),
-            None,
-        )
         if figure is not None:
             img = figure.find("img")
             if img is not None:
@@ -486,17 +461,44 @@ class IchibanJapan(BaseScraper):
         }
 
     def scrape_article(self, url: str) -> list[dict]:
-        """Scrape all events from a single article page."""
+        """Scrape all events from a single article page.
+
+        One event = one ``p.wp-block-paragraph`` containing ``Lieu :`` (guide §4.4).
+        The ``<h2>`` headings are only section titles: a single heading may cover many
+        events (themed sections like "Les festivals pour Setsubun"), so we must NOT
+        assume one event per heading. Preceding figures and non-info paragraphs are
+        attached to the next event as its image / description; both reset at each
+        heading and after each event so nothing bleeds across sections.
+        """
         soup = self.get_page(url)
         content = soup.find("div", class_="entry-content")
         if content is None:
             raise ValueError(f"No .entry-content found at {url}")
         meta = self._article_meta(soup, url)
-        events = []
-        for group in self._iter_event_groups(content):
-            event = self._parse_event_group(group, meta)
-            if event is not None:
-                events.append(event)
+
+        events: list[dict] = []
+        last_h2: Tag | None = None
+        pending_desc: list[Tag] = []
+        pending_figure: Tag | None = None
+
+        for el in content.find_all(["h2", "figure", "p"]):
+            classes = el.get("class", [])
+            if el.name == "h2" and "wp-block-heading" in classes:
+                last_h2 = el
+                pending_desc = []
+                pending_figure = None
+            elif el.name == "figure" and "wp-block-image" in classes:
+                if pending_figure is None:
+                    pending_figure = el
+            elif el.name == "p" and "wp-block-paragraph" in classes:
+                if _has_lieu(el.get_text()):
+                    events.append(
+                        self._build_event(el, last_h2, pending_desc, pending_figure, meta)
+                    )
+                    pending_desc = []
+                    pending_figure = None
+                else:
+                    pending_desc.append(el)
         return events
 
     def scrape_all(self, max_pages: int | None = None) -> tuple[list[dict], dict]:

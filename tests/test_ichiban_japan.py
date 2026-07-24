@@ -197,13 +197,32 @@ def article_events(ij, monkeypatch):
 
 
 def test_scrape_article_full_fixture_skips_non_event_heading(article_events):
-    # 3 events; the "Nos coups de cœur" heading (no "Lieu :") is not an event.
-    assert len(article_events) == 3
+    # 5 events (3 standalone + 2 grouped under one heading); the "Nos coups de cœur"
+    # heading (no "Lieu :") is not an event.
+    assert len(article_events) == 5
     assert [e["name"] for e in article_events] == [
         "Fukagawa Ryujin Reitaisai",
         "Haru no Taisai",
         "Craft Gyoza Fes 2026",
+        "Senso-ji Setsubun-e",
+        "Zojo-ji Setsubun-e",
     ]
+
+
+def test_scrape_article_grouped_section_yields_one_event_per_lieu(article_events):
+    # Regression: a single section heading ("Les festivals pour Setsubun") covers two
+    # events — each "Lieu :" paragraph must become its own event, not be collapsed.
+    g1, g2 = article_events[3], article_events[4]
+    assert g1["name"] == "Senso-ji Setsubun-e"
+    assert g1["start_date"] == date(2026, 5, 3)
+    assert g1["venue_name"] == "temple Senso-ji"
+    assert g1["neighbourhood"] == "Asakusa"
+    assert (g1["latitude"], g1["longitude"]) == (35.7147651, 139.7966553)
+    assert g2["name"] == "Zojo-ji Setsubun-e"
+    assert g2["start_date"] == date(2026, 5, 3)
+    assert g2["venue_name"] == "temple Zojo-ji"
+    assert g2["neighbourhood"] == "Shiba"
+    assert g2["latitude"] is None and g2["longitude"] is None  # maps URL without coords
 
 
 def test_scrape_article_event_a_nominal(article_events):
@@ -266,13 +285,13 @@ def test_scrape_builds_canonical_events(ij, monkeypatch):
 
     assert report.source == "ij"
     assert report.links_seen == 1  # one article
-    assert report.events_ok == 3
-    assert len(events) == 3
+    assert report.events_ok == 5
+    assert len(events) == 5
     assert all(e.source == "ij" for e in events)
-    assert len({e.id for e in events}) == 3  # distinct ids via #anchor urls
+    assert len({e.id for e in events}) == 5  # distinct ids via #anchor urls
     assert all(isinstance(e.attributes, IchibanJapanAttributes) for e in events)
 
-    a, b, c = events
+    a, b, c = events[0], events[1], events[2]
     assert a.start_date == date(2026, 5, 1) and a.end_date is None  # single day
     assert b.start_date == date(2026, 5, 3) and b.end_date == date(2026, 5, 5)  # range
     # "jusqu'au": start anchored to end, end collapsed to None (single day)

@@ -60,6 +60,15 @@
     <p class="wp-block-paragraph">Festival dédié aux gyoza artisanaux venus de tout le Japon.</p>
     <p class="wp-block-paragraph"><strong>Craft Gyoza Fes 2026</strong><br>jusqu'au 6 mai 2026<br>Lieux : <a href="https://www.google.com/maps/place//data=!4m2!3m1!1s0x60188cb79a4c26e5" target="_blank" rel="noreferrer noopener">place A</a> et <a href="https://www.google.com/maps/place//data=!4m2!3m1!1s0x60188cb79b" target="_blank" rel="noreferrer noopener">place B</a><br><a href="https://craftgyoza.example/" target="_blank" rel="noreferrer noopener">Site de l'événement</a></p>
 
+    <!-- ── SECTION GROUPÉE : un seul <h2> de section pour PLUSIEURS événements
+         (cas "Les festivals pour Setsubun"). Régression : le scraper doit extraire
+         un événement PAR bloc "Lieu :", pas un seul par <h2>. Un paragraphe d'intro
+         partagé (sans "Lieu :") précède les deux événements. ── -->
+    <h2 class="wp-block-heading">Les festivals pour Setsubun (3 mai 2026)</h2>
+    <p class="wp-block-paragraph">Setsubun marque l'arrivée du printemps ; voici deux célébrations à ne pas manquer.</p>
+    <p class="wp-block-paragraph"><strong>Senso-ji Setsubun-e</strong><br>3 mai 2026<br>Lieu : <a href="https://www.google.com/maps/place/Senso-ji/@35.7147651,139.7966553,17z/data=!3m1!4b1!8m2!3d35.7147651!4d139.7966553" target="_blank" rel="noreferrer noopener">temple Senso-ji</a> (Asakusa)<br><a href="https://www.senso-ji.jp/" target="_blank" rel="noreferrer noopener">Site de l'événement</a></p>
+    <p class="wp-block-paragraph"><strong>Zojo-ji Setsubun-e</strong><br>3 mai 2026<br>Lieu : <a href="https://www.google.com/maps/place//data=!4m2!3m1!1s0x60188" target="_blank" rel="noreferrer noopener">temple Zojo-ji</a> (Shiba)<br><a href="https://www.zojoji.or.jp/" target="_blank" rel="noreferrer noopener">Site officiel</a></p>
+
     <!-- ── EN-TÊTE NON-ÉVÉNEMENT : pas de bloc "Lieu :" → doit être ignoré.
          Le paragraphe de conclusion qui suit lui est rattaché (donc ignoré aussi). ── -->
     <h2 class="wp-block-heading">Nos coups de cœur du mois</h2>
