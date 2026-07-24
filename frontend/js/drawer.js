@@ -27,6 +27,7 @@ export function openDrawer(ev) {
   panel.querySelector('.drawer-source-label').textContent =
     ev.source === 'tc' ? 'Tokyo Cheapo'
     : ev.source === 'tot' ? '🗼 Time Out Tokyo'
+    : ev.source === 'ij' ? '🏮 Ichiban Japan'
     : '🎆 Hanabi';
   panel.querySelector('.drawer-title').textContent = ev.title || '';
 
@@ -35,7 +36,11 @@ export function openDrawer(ev) {
   metaEl.innerHTML = '';
   _appendMetaLine(metaEl, '📅', fmtDate(ev.start_date || ev.date));
   if (ev.times) _appendMetaLine(metaEl, '🕐', ev.times);
-  const place = ev.source === 'tc' ? attrs.location_name : ev.venue;
+  const place = ev.source === 'tc'
+    ? attrs.location_name
+    : ev.source === 'ij'
+      ? [ev.venue, attrs.neighbourhood].filter(Boolean).join(' · ')
+      : ev.venue;
   if (place) _appendMetaLine(metaEl, '📍', place);
   if (attrs.access) _appendMetaLine(metaEl, '🚉', attrs.access);
 

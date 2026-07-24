@@ -16,6 +16,8 @@ function makeCard(ev, inProximity, cardsRow) {
     ? [escapeHtml(attrs.location_name), escapeHtml(ev.price)].filter(Boolean).join(' · ')
     : ev.source === 'tot'
     ? [escapeHtml(attrs.venue_name), escapeHtml(ev.price)].filter(Boolean).join(' · ')
+    : ev.source === 'ij'
+    ? [escapeHtml(ev.venue), escapeHtml(attrs.neighbourhood)].filter(Boolean).join(' · ')
     : [escapeHtml(ev.venue), escapeHtml(attrs.fireworks_count)].filter(Boolean).join(' · ');
 
   const distBadge = (inProximity && ev.latitude != null && ev.longitude != null)
@@ -104,6 +106,9 @@ export function buildEventList(events) {
     } else if (ev.source === 'tot') {
       key = 'tot';
       if (!groups.has(key)) groups.set(key, { label: '🗼 Time Out', events: [] });
+    } else if (ev.source === 'ij') {
+      key = 'ij';
+      if (!groups.has(key)) groups.set(key, { label: '🏮 Ichiban', events: [] });
     } else {
       const cats = ((ev.attributes || {}).categories || []).filter(c => !TC_EXCLUDED_CATS.includes(c));
       key = cats[0] || 'other';

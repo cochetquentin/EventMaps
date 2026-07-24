@@ -9,7 +9,7 @@ Dépendances : requests (prod), PyYAML (dev), stdlib uniquement.
 
 Usage :
     uv run python -m tools.renew_fixtures \\
-        --source {tc|hanabi|tot} \\
+        --source {tc|hanabi|tot|ij} \\
         --url <URL> \\
         --output <chemin relatif depuis tests/fixtures/> \\
         [--user-agent "EventMaps-fixture-renewer/1.0"] \\
@@ -35,7 +35,7 @@ import requests
 
 FIXTURES_DIR = Path(__file__).parent.parent / "tests" / "fixtures"
 MANIFEST_PATH = FIXTURES_DIR / "MANIFEST.yml"
-VALID_SOURCES = ("tc", "hanabi", "tot")
+VALID_SOURCES = ("tc", "hanabi", "tot", "ij")
 DEFAULT_USER_AGENT = "EventMaps-fixture-renewer/1.0"
 DEFAULT_DELAY = 2.0
 
@@ -72,7 +72,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--source",
         required=True,
         choices=VALID_SOURCES,
-        help="Source du site (tc, hanabi, tot).",
+        help="Source du site (tc, hanabi, tot, ij).",
     )
     parser.add_argument(
         "--url",

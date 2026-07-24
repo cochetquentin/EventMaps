@@ -12,13 +12,13 @@ EventMaps est un agrégateur d'événements géolocalisés composé de trois par
 
 ```
 Sources tierces
-  tokyocheapo.com    hanabi.walkerplus.com    timeout.com/tokyo
-       │                        │                     │
-       ▼                        ▼                     ▼
-  TokyoCheapo            HanabiWalker          TimeoutTokyo
-  (scrapers/)            (scrapers/)           (scrapers/)
-       │                        │                     │
-       └──────────────┬──────────────────────────────┘
+  tokyocheapo.com   hanabi.walkerplus.com   timeout.com/tokyo   ichiban-japan.com
+       │                     │                    │                    │
+       ▼                     ▼                    ▼                    ▼
+  TokyoCheapo          HanabiWalker         TimeoutTokyo         IchibanJapan
+  (scrapers/)          (scrapers/)          (scrapers/)          (scrapers/)
+       │                     │                    │                    │
+       └──────────────┬───────────────────────────────────────────────┘
                       ▼
                models/Event
                (Pydantic model)
@@ -50,17 +50,22 @@ Le scraping est déclenché manuellement (CLI `main.py`) ou via `POST /scrape` (
 | `tokyo_cheapo.py` | Scraper tokyocheapo.com → `Event` avec `TokyoCheapoAttributes` |
 | `hanabi_walker.py` | Scraper hanabi.walkerplus.com → `Event` avec `HanabiWalkerAttributes` |
 | `timeout_tokyo.py` | Scraper timeout.com/tokyo → `Event` avec `TimeoutTokyoAttributes` |
+| `ichiban_japan.py` | Scraper ichiban-japan.com → `Event` avec `IchibanJapanAttributes` |
 
 Chaque scraper retourne `(list[Event], ScrapeReport)`. `ScrapeReport` comptabilise `links_seen`, `events_ok`, `events_skipped`, `errors[]`, `duration_s`.
 
 Les retries HTTP sont gérés via **tenacity** (3 tentatives, backoff 2–10 s configurable).
+
+> **Spécificité Ichiban Japan** : contrairement aux autres sources (1 URL = 1 événement), un article Ichiban agrège **plusieurs** événements. Le scraper découvre les URLs d'articles depuis les pages catégorie paginées, puis émet **un événement par bloc « Lieu : »** de l'article (les `<h2>` ne sont que des titres de section). Les coordonnées sont extraites des liens Google Maps du lieu (`!3d!4d` ou `@lat,lng`), avec résolution des liens courts `maps.app.goo.gl`.
+>
+> Les articles mensuels étant archivistiques, le scraper ne garde que les événements **à venir** (`scrape(upcoming_only=True)` par défaut) : les articles de mois révolus sont sautés d'après leur slug (`festivals-tokyo-<mois>-<année>`), les pages spéciales sans mois (marchés, Tohoku, yuki-matsuri…) sont toujours parcourues, et chaque événement passé (date de fin < aujourd'hui) est écarté.
 
 ### `models/`
 
 | Fichier | Rôle |
 |---------|------|
 | `event.py` | Modèle canonical `Event` (Pydantic v2) |
-| `attributes.py` | `TokyoCheapoAttributes`, `HanabiWalkerAttributes`, `TimeoutTokyoAttributes` (Pydantic BaseModel) |
+| `attributes.py` | `TokyoCheapoAttributes`, `HanabiWalkerAttributes`, `TimeoutTokyoAttributes`, `IchibanJapanAttributes` (Pydantic BaseModel) |
 | `identity.py` | `make_event_id(parts)` — génère l'ID stable SHA-256 |
 
 ### `db/`
@@ -109,7 +114,7 @@ Modules ES (pas de bundler) chargés via `<script type="module">` :
 ```python
 class Event(BaseModel):
     id: str               # SHA-256 16 hex chars (stable, calculé avant insertion)
-    source: str           # "tc" | "hanabi" | "tot"
+    source: str           # "tc" | "hanabi" | "tot" | "ij"
     title: str
     url: str
     start_date: date | None
@@ -119,7 +124,7 @@ class Event(BaseModel):
     latitude: float | None
     longitude: float | None
     price: str | None
-    attributes: TokyoCheapoAttributes | HanabiWalkerAttributes | TimeoutTokyoAttributes
+    attributes: TokyoCheapoAttributes | HanabiWalkerAttributes | TimeoutTokyoAttributes | IchibanJapanAttributes
     created_at: datetime
     canonical_id: str | None  # représentant du cluster de doublons (None = canonique)
 ```
@@ -170,6 +175,23 @@ class Event(BaseModel):
 
 `extra="allow"` : idem.
 
+#### `IchibanJapanAttributes` (source `"ij"`)
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| `description` | `str \| None` | Description de l'événement |
+| `official_link` | `str \| None` | URL du site officiel (dernier lien du bloc « Lieu : ») |
+| `neighbourhood` | `str \| None` | Quartier (ex. `"Monzen-Nakacho"`) |
+| `venue_name` | `str \| None` | Nom du lieu (complète `venue`) |
+| `zone` | `str \| None` | Zone déduite du slug (`"Tokyo"`, `"Tohoku"`) |
+| `image_url` | `str \| None` | URL de l'image de l'événement |
+| `image_caption` | `str \| None` | Légende de l'image (crédit photo retiré) |
+| `dates_text` | `str \| None` | Texte de date brut (ex. `"Du 3 au 5 mai 2026"`) |
+| `article_url` | `str \| None` | URL de l'article source (sans ancre) |
+| `article_title` | `str \| None` | Titre de l'article source |
+
+`extra="allow"` : idem. `venue` (top-level) porte le nom du lieu pour la dédup et les popups.
+
 ### Schéma SQLite
 
 #### Table `events`
@@ -177,7 +199,7 @@ class Event(BaseModel):
 ```sql
 CREATE TABLE IF NOT EXISTS events (
     id          TEXT PRIMARY KEY,   -- SHA-256 16 hex
-    source      TEXT NOT NULL,      -- "tc" | "hanabi" | "tot"
+    source      TEXT NOT NULL,      -- "tc" | "hanabi" | "tot" | "ij"
     title       TEXT NOT NULL,
     url         TEXT NOT NULL,
     start_date  TEXT,               -- ISO 8601 YYYY-MM-DD
@@ -198,7 +220,7 @@ CREATE TABLE IF NOT EXISTS events (
 ```sql
 CREATE TABLE IF NOT EXISTS scrape_jobs (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
-    source         TEXT,            -- "tc" | "hanabi" | "tot" | "all"
+    source         TEXT,            -- "tc" | "hanabi" | "tot" | "ij" | "all"
     status         TEXT,            -- "running" | "done" | "failed"
     started_at     TEXT,
     finished_at    TEXT,
@@ -231,6 +253,7 @@ def make_event_id(parts: list[str]) -> str:
 - Tokyo Cheapo : `[url, location_name]`
 - Hanabi Walker : `[url, date_val]`
 - Timeout Tokyo : `[url]`
+- Ichiban Japan : `[url]` — l'URL inclut une ancre `#slug` par événement (un article agrège plusieurs événements), ce qui garantit un ID distinct par festival
 
 L'algorithme est stable et ne doit **jamais être modifié** : les IDs persistés en DB en dépendent. Combiné à l'`ON CONFLICT(id) DO UPDATE` de `upsert_events`, il rend un re-scrape de la même URL idempotent. Il ne rapproche **pas** deux sources différentes (URLs différentes → IDs différents).
 
@@ -245,7 +268,7 @@ Un pin sur la carte = **un événement à un lieu donné**. Le clustering (`dedu
 **(b) Sources différentes → similarité floue** — `classify_pair` (logique **ET** conservatrice, pensée pour zéro faux positif). Doublon **seulement si** :
 1. leurs **plages de dates se chevauchent** (un même titre à deux dates disjointes = événement récurrent, jamais fusionné) ;
 2. leurs **titres normalisés** ont un `rapidfuzz.token_set_ratio ≥ 90` (`TITLE_MIN_RATIO`) ;
-3. le **lieu est confirmé** : **si les coordonnées sont présentes des deux côtés, la distance fait autorité** (`≤ 0.75 km`, `GEO_MAX_KM`) et les noms de lieu ne sont pas consultés — deux lieux éloignés aux noms proches ne fusionnent pas. Sinon (coordonnées manquantes, cas Time Out Tokyo) on se rabat sur la similarité des noms de lieu (`≥ 88`, `VENUE_MIN_RATIO`).
+3. le **lieu est confirmé** : **si les coordonnées sont présentes des deux côtés, la distance fait autorité** (`≤ 0.75 km`, `GEO_MAX_KM`) et les noms de lieu ne sont pas consultés — deux lieux éloignés aux noms proches ne fusionnent pas. Sinon (coordonnées manquantes — cas Time Out Tokyo, ou événement Ichiban dont le lien de lieu n'a pas fourni de coordonnées) on se rabat sur la similarité des noms de lieu (`≥ 88`, `VENUE_MIN_RATIO`).
 
 Toute donnée manquante fait échouer sa porte → pas de fusion. `classify_pair` court-circuite dès que les dates ne se chevauchent pas (la partie fuzzy coûteuse n'est évaluée que sur des paires plausibles).
 
@@ -278,7 +301,7 @@ Toute donnée manquante fait échouer sa porte → pas de fusion. `classify_pair
 
 | Paramètre | Type | Description |
 |-----------|------|-------------|
-| `source` | `"tc" \| "hanabi" \| "tot"` | Filtre par source |
+| `source` | `"tc" \| "hanabi" \| "tot" \| "ij"` | Filtre par source |
 | `date` | `YYYY-MM-DD` | Filtre par chevauchement de date |
 | `bbox` | `min_lon,min_lat,max_lon,max_lat` | Filtre géographique |
 | `start_from` | `YYYY-MM-DD` | Borne basse sur `start_date` |
@@ -312,6 +335,7 @@ Toutes les variables sont préfixées `EVENTMAPS_` et lues via `pydantic-setting
 | `EVENTMAPS_SCRAPE_MAX_PAGES_TC` | `10` | Pages max Tokyo Cheapo |
 | `EVENTMAPS_SCRAPE_MAX_PAGES_HANABI` | `20` | Pages max Hanabi Walker |
 | `EVENTMAPS_SCRAPE_MAX_LISTING_PAGES_TOT` | `4` | Pages max scraper TimeoutTokyo |
+| `EVENTMAPS_SCRAPE_MAX_PAGES_IJ` | `5` | Pages catégorie max scraper Ichiban Japan |
 | `EVENTMAPS_SCRAPE_RETRY_ATTEMPTS` | `3` | Tentatives tenacity |
 | `EVENTMAPS_SCRAPE_RETRY_WAIT_MIN` | `2` | Backoff min (secondes) |
 | `EVENTMAPS_SCRAPE_RETRY_WAIT_MAX` | `10` | Backoff max (secondes) |

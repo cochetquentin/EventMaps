@@ -10,6 +10,7 @@ from models.event import Event
 from models.identity import make_event_id
 from scrapers.base import ScrapeReport
 from scrapers.hanabi_walker import HanabiWalker
+from scrapers.ichiban_japan import IchibanJapan
 from scrapers.timeout_tokyo import TimeoutTokyo
 from scrapers.tokyo_cheapo import TokyoCheapo
 
@@ -291,11 +292,13 @@ def test_do_scrape_all_fails_if_one_source_broken(tmp_path, monkeypatch):
     )
 
     tot_report = ScrapeReport(source="tot", links_seen=0, events_ok=0)
+    ij_report = ScrapeReport(source="ij", links_seen=0, events_ok=0)
     job_id = _start_job(db_path, "all")
     with (
         patch.object(TokyoCheapo, "scrape", return_value=([_make_event()], tc_report)),
         patch.object(HanabiWalker, "scrape", return_value=([], hanabi_report)),
         patch.object(TimeoutTokyo, "scrape", return_value=([], tot_report)),
+        patch.object(IchibanJapan, "scrape", return_value=([], ij_report)),
     ):
         scrape_module._do_scrape(job_id, "all", "ar0300")
 

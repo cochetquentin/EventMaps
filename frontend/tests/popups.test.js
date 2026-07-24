@@ -194,3 +194,71 @@ describe('buildPopup — source hanabi', () => {
     expect(buildPopup(BASE_HANABI)).toContain('/events/h-1.ics');
   });
 });
+
+const BASE_IJ = {
+  id: 'ij-1',
+  source: 'ij',
+  title: 'Fukagawa Ryujin Reitaisai',
+  start_date: '2026-05-01',
+  end_date: null,
+  url: 'https://ichiban-japan.com/festivals-tokyo-mai-2026/#fukagawa-ryujin-reitaisai',
+  times: null,
+  venue: 'temple Fukagawa Fudo-do',
+  attributes: { neighbourhood: 'Monzen-Nakacho', official_link: 'https://x.example/' },
+  price: null,
+  latitude: null,
+  longitude: null,
+};
+
+describe('buildPopup — source ij', () => {
+  beforeEach(() => {
+    vi.mocked(isFavorite).mockReturnValue(false);
+  });
+
+  test('contains Ichiban Japan source badge', () => {
+    expect(buildPopup(BASE_IJ)).toContain('Ichiban Japan');
+  });
+
+  test('"Voir l\'événement" links to the official event page, not the Ichiban article', () => {
+    const html = buildPopup(BASE_IJ);
+    expect(html).toContain('href="https://x.example/"');           // official_link
+    expect(html).not.toContain('href="https://ichiban-japan.com'); // pas l'article agrégateur
+  });
+
+  test('falls back to the Ichiban article URL when official_link is missing', () => {
+    const html = buildPopup({ ...BASE_IJ, attributes: { neighbourhood: 'Asakusa' } });
+    expect(html).toContain(`href="${BASE_IJ.url}"`);
+  });
+
+  test('venue and neighbourhood displayed', () => {
+    const html = buildPopup(BASE_IJ);
+    expect(html).toContain('temple Fukagawa Fudo-do');
+    expect(html).toContain('Monzen-Nakacho');
+  });
+
+  test('XSS: title with <script> is escaped', () => {
+    const html = buildPopup({ ...BASE_IJ, title: '<script>xss</script>' });
+    expect(html).toContain('&lt;script&gt;');
+    expect(html).not.toContain('<script>');
+  });
+
+  test('directions links absent when no lat/lng', () => {
+    const html = buildPopup(BASE_IJ);
+    expect(html).not.toContain('google.com/maps');
+  });
+
+  test('directions links present when lat/lng set', () => {
+    const html = buildPopup({ ...BASE_IJ, latitude: 35.672, longitude: 139.798 });
+    expect(html).toContain('google.com/maps/dir');
+    expect(html).toContain('maps.apple.com');
+  });
+
+  test('multi-day arrow present when end_date differs', () => {
+    const html = buildPopup({ ...BASE_IJ, end_date: '2026-05-05' });
+    expect(html).toContain('→');
+  });
+
+  test('ICS calendar link points to /events/ij-1.ics', () => {
+    expect(buildPopup(BASE_IJ)).toContain('/events/ij-1.ics');
+  });
+});
