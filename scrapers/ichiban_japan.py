@@ -550,8 +550,14 @@ class IchibanJapan(BaseScraper):
             else:
                 if article_events:
                     events.extend(article_events)
-                else:
+                elif _article_month(url) is not None:
+                    # A dated monthly article with zero events is a parser failure
+                    # signal (its HTML structure likely changed).
                     errors.append({"url": url, "reason": "no events parsed"})
+                else:
+                    # Non-dated pages (specials, guides) legitimately carry no
+                    # "Lieu :" events — benign, not an error.
+                    logger.debug("Ichiban: aucun événement dans %s (page non-événementielle)", url)
             self._throttle()
         counts = {"links_seen": len(urls), "events_ok": len(events), "errors": errors}
         return events, counts

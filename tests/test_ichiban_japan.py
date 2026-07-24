@@ -325,14 +325,29 @@ def test_scrape_zero_events_logs_critical(ij, monkeypatch, caplog):
     assert any("0 events" in r.message for r in caplog.records)
 
 
-def test_scrape_all_records_article_with_no_events_as_error(ij, monkeypatch):
-    empty_article = BeautifulSoup(
-        "<html><body><div class='entry-content'><p>rien d'événementiel</p></div></body></html>",
-        "html.parser",
-    )
-    url = "https://ichiban-japan.com/a-propos/"
+_EMPTY_ARTICLE_HTML = (
+    "<html><body><div class='entry-content'><p>rien d'événementiel</p></div></body></html>"
+)
+
+
+def test_scrape_all_empty_non_dated_article_is_not_an_error(ij, monkeypatch):
+    # A non-dated page (special/guide) with no "Lieu :" is benign, not an error.
+    empty = BeautifulSoup(_EMPTY_ARTICLE_HTML, "html.parser")
+    url = "https://ichiban-japan.com/triennale-setouchi-2025/"
     monkeypatch.setattr(ij, "get_article_links", lambda max_pages=None: [url])
-    monkeypatch.setattr(ij, "get_page", lambda u: empty_article)
+    monkeypatch.setattr(ij, "get_page", lambda u: empty)
+
+    events, report = ij.scrape()
+    assert events == []
+    assert report.errors == []
+
+
+def test_scrape_all_empty_dated_month_article_is_an_error(ij, monkeypatch):
+    # A dated monthly article with zero events signals a parser failure → error.
+    empty = BeautifulSoup(_EMPTY_ARTICLE_HTML, "html.parser")
+    url = "https://ichiban-japan.com/festivals-tokyo-janvier-2026/"
+    monkeypatch.setattr(ij, "get_article_links", lambda max_pages=None: [url])
+    monkeypatch.setattr(ij, "get_page", lambda u: empty)
 
     events, report = ij.scrape()
     assert events == []
